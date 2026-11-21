@@ -8,10 +8,10 @@
   <a href="/" title="Back to menu" aria-label="ICAOdle, back to menu"><svg width="190" height="48" viewBox="0 0 250 56" role="img">
     <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset=".49" stop-color="#262c38"/><stop offset=".5" stop-color="#0d1014"/><stop offset=".51" stop-color="#1a1f28"/></linearGradient></defs>
     <g font-family="monospace" font-weight="bold" font-size="34" fill="#ffb81c" text-anchor="middle">
-      <rect x="2" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="22" y="39">I</text>
-      <rect x="48" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="68" y="39">C</text>
-      <rect x="94" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="114" y="39">A</text>
-      <rect x="140" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="160" y="39">O</text>
+      <g class="tile"><rect x="2" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="22" y="39">I</text></g>
+      <g class="tile"><rect x="48" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="68" y="39">C</text></g>
+      <g class="tile"><rect x="94" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="114" y="39">A</text></g>
+      <g class="tile"><rect x="140" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="160" y="39">O</text></g>
     </g>
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
   <small id="round"></small></h2>
@@ -35,10 +35,10 @@
 <div id="game" hidden>
   <div id="board"><div id="lcol"><div id="flap"></div>
     <div id="nav"><button id="back">&#9664; Back</button><button id="next">Next &#9654;</button></div></div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
-  <div id="hint"></div>
   <form id="f"><button id="menuBack" type="button" title="Back to the main menu" aria-label="Back to the main menu"><svg viewBox="0 0 24 32" width="24" height="32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 30V17C17 11 14 9 6 9"/><path d="M11 3 4.5 9 11 15"/></svg></button><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="msg"></div>
   <div id="stats" hidden>
+    <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="statline"></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
     <div id="endbtns"><button id="review" class="ghost">Review rounds</button><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href='/'">Play another difficulty</button></div>
@@ -46,7 +46,7 @@
 </div>
 <p><button id="reset" hidden>Dev: reset all stats</button></p>
 </main>
-<footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.7" aria-label="Volume"></div><div id="timer"></div></footer>
+<footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");$reset.hidden=false;
   $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
@@ -107,6 +107,16 @@ function confetti(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 
     x.globalAlpha=Math.max(0,Math.min(1,(dur-(n-t0))/300)); // fade out over the last 0.3 s
     for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;p.f+=p.vf*dt;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.f));x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()} // the cosine flips each piece like paper tumbling
     dur-(n-t0)>0?requestAnimationFrame(f):c.remove()})(last)}
+// Title-screen intro: the logo's tiles flip like a split-flap board and land on I, C, A, O. Each tile starts a few letters before its own letter
+// (4 to 9 flips, a little random) and counts forward through the alphabet, so it looks random but always resolves; the tiles start one after another.
+(function logoFlip(){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const ABC="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  document.querySelectorAll("h2.top .tile").forEach((g,i)=>{
+    const text=g.querySelector("text"),t=ABC.indexOf(text.textContent);let k=4+Math.floor(Math.random()*6);
+    text.textContent=ABC[(t-k+26)%26];
+    setTimeout(function step(){k--;text.textContent=ABC[(t-k+26)%26];g.classList.remove("f");void g.getBoundingClientRect();g.classList.add("f");if(k>0)setTimeout(step,70+Math.random()*50)},i*170+Math.random()*80)});
+})();
 // Split-flap display: each cell steps through the ring one flap at a time until it lands on the target letter.
 const RING="-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // One flap word per round (PER of them), each starting as K---; a solved/lost round keeps its answer.
@@ -223,15 +233,23 @@ $("f").onsubmit=async e=>{e.preventDefault();
   else snd("wrong")
   busy=0;save();S.i>i0?reveal(c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
-$("review").onclick=()=>{snd("open");$("stats").hidden=true;$("board").hidden=$("nav").hidden=false;$("msg").textContent="";$("hint").textContent="";view(0)};
+$("review").onclick=()=>{snd("open");$("stats").hidden=true;$("board").hidden=$("nav").hidden=false;$("msg").textContent="";view(0)};
+// Letter grade for the results screen: points out of the maximum, as a percentage. The color slides red -> orange -> green as the score
+// approaches the A line (so an A is fully green).
+const GRADES=[[70,"A"],[55,"B"],[40,"C"],[25,"D"],[0,"F"]]; // with only 20 points to earn, 14 of them (70%) is an A
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),mix=(a,b,t)=>`rgb(${hex(a).map((v,i)=>Math.round(v+(hex(b)[i]-v)*t)).join(",")})`;
+const gradeColor=p=>{const [r,o,g]=["--bad","--orange","--ok"].map(css);return p<50?mix(r,o,p/50):mix(o,g,(p-50)/50)};
+function showGrade(points){
+  const pct=Math.round(100*points/(PER*TRIES)),letter=GRADES.find(([min])=>pct>=min)[1];
+  $("grade").style.color=gradeColor(Math.min(100,pct/.7));$("grade").setAttribute("aria-label",`Grade ${letter}, ${pct} percent`);
+  $("grade").children[0].textContent=letter;$("grade").children[1].textContent=pct+"%"}
 function end(){
   const t=S.scores.reduce((a,b)=>a+b,0);
   $("f").hidden=$("board").hidden=$("nav").hidden=true;$("stats").hidden=$("again").hidden=false;$("board").hidden=true;
   const right=S.scores.filter(v=>v>0).length;
+  showGrade(t);
   $("statline").innerHTML=`You: <b>${right}/${PER}</b> right &middot; <b>${t}/${PER*TRIES}</b> points`;
-  $("hint").textContent=`Done! ${MODE}${PRACTICE?" · "+(ST=="ALL"?"All states":ST):""} score ${t}/${PER*TRIES}`;
   $("again").textContent=PRACTICE?"Change state":"Play another difficulty";
-  $("msg").textContent=today.map((a,i)=>a[0]+":"+S.scores[i]).join("  ");
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
   fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score:t,right})}).then(r=>r.json()).then(d=>chart(d,t,right)).catch(()=>{$("msg").textContent+="  (no global stats yet)"})}
@@ -252,24 +270,26 @@ function chart(d,me,right){
 // faster and fainter, passing in front of them for depth. Two colors only (amber and grey). Runs only while the menu / custom screen is
 // showing (start() stops it).
 const sky=(()=>{
-  const BACK=3,FRONT=2,M=90; // 5 planes in all; off-screen margin (px)
+  const BACK=3,FRONT=2,MAX=20,M=90; // 5 planes to start; clicking the background adds more, up to MAX; off-screen margin (px)
   let cb,cf,xb,xf,raf,W,H,running=false,last,cols,planes=[];
   const rnd=(a,b)=>a+Math.random()*(b-a);
-  function spawn(front,anywhere){ // a straight line across, left to right or right to left
+  function spawn(front,anywhere,at){ // a straight line across, left to right or right to left; `at` = start at a clicked point
     const ltr=Math.random()<.5,h=(ltr?0:Math.PI)+rnd(-.5,.5);
-    return{front,h,rot:h-NOSE,col:Math.random()<.5?0:1,
-      x:anywhere?rnd(0,W):(ltr?-M:W+M),y:rnd(0,H),
+    return{front,user:!!at,h,rot:h-NOSE,col:Math.random()<.5?0:1,
+      x:at?at.x:anywhere?rnd(0,W):(ltr?-M:W+M),y:at?at.y:rnd(0,H),
       speed:front?rnd(55,85):rnd(22,38),s:front?rnd(46,64):rnd(18,30),a:front?.14:.2}}
   function step(dt){
-    for(let i=0;i<planes.length;i++){const p=planes[i];
+    for(let i=planes.length-1;i>=0;i--){const p=planes[i];
       p.x+=Math.cos(p.h)*p.speed*dt;p.y+=Math.sin(p.h)*p.speed*dt;
-      if(p.x<-M-10||p.x>W+M+10||p.y<-M-10||p.y>H+M+10)planes[i]=spawn(p.front,false)} // flown off the far side: a new plane enters
+      if(p.x<-M-10||p.x>W+M+10||p.y<-M-10||p.y>H+M+10)p.user?planes.splice(i,1):planes[i]=spawn(p.front,false)} // flown off the screen: a plane you launched is gone for good; the starting ones are replaced by a new plane entering
   }
   function draw(){
     for(const [cx] of [[xb],[xf]]){cx.clearRect(0,0,W,H);cx.textAlign="center";cx.textBaseline="middle"}
     for(const p of planes){const cx=p.front?xf:xb;cx.save();cx.translate(p.x,p.y);cx.rotate(p.rot);
       cx.globalAlpha=p.a;cx.fillStyle=cols[p.col];cx.font=p.s+"px "+PLANE_FONT;cx.fillText("\u2708\uFE0E",0,0);cx.restore()}
   }
+  // a click on empty menu background (not a button, link, field, footer or the logo) launches another plane, up to MAX
+  function onClick(e){if(planes.length>=MAX||e.target.closest("button,a,select,input,label,#opts,footer,h2"))return;planes.push(spawn(Math.random()<.3,false,{x:e.clientX,y:e.clientY}))}
   function tick(n){if(!running)return;const dt=Math.min(.05,(n-last)/1e3);last=n;step(dt);draw();raf=requestAnimationFrame(tick)}
   function size(){W=cb.width=cf.width=innerWidth;H=cb.height=cf.height=innerHeight}
   return{
@@ -277,12 +297,13 @@ const sky=(()=>{
       if(running||matchMedia("(prefers-reduced-motion: reduce)").matches)return; // decorative motion, so respect the preference
       running=true;
       cb=document.createElement("canvas");cb.className="fx";cf=document.createElement("canvas");cf.className="fx front";document.body.append(cb,cf);
-      xb=cb.getContext("2d");xf=cf.getContext("2d");size();addEventListener("resize",size);
+      xb=cb.getContext("2d");xf=cf.getContext("2d");size();addEventListener("resize",size);document.addEventListener("click",onClick);
       cols=[css("--accent"),css("--muted")]; // two muted colors: amber and grey
       planes=[...Array.from({length:BACK},()=>spawn(false,true)),...Array.from({length:FRONT},()=>spawn(true,true))];
       last=performance.now();raf=requestAnimationFrame(tick);
     },
-    stop(){running=false;cancelAnimationFrame(raf);removeEventListener("resize",size);cb&&cb.remove();cf&&cf.remove()},
+    count:()=>planes.length,sim(seconds,dt=.05){for(let t=0;t<seconds;t+=dt)step(dt)}, // for testing
+    stop(){running=false;cancelAnimationFrame(raf);removeEventListener("resize",size);document.removeEventListener("click",onClick);cb&&cb.remove();cf&&cf.remove()},
   };
 })();
 sky.start();

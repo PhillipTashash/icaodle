@@ -30,13 +30,24 @@ function ensure(d) {
 // dist = how many players got each total; avg / avgRight = mean points / mean rounds solved
 const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const counts = k => { const dist = {}, s = Object.values(db.scores[k] || {}); for (const t of s) dist[t] = (dist[t] || 0) + 1; return { dist, n: s.length, avg: mean(s), avgRight: mean(Object.values(db.right[k] || {})) }; };
+// Background chart: one FAA airport diagram from ./charts (see build-charts.py), picked by day, and never one of today's airports.
+function chartOfTheDay() {
+  const files = fs.existsSync("charts") ? fs.readdirSync("charts").filter(f => f.endsWith(".jpg")).sort() : [];
+  const todays = new Set(MODES.flatMap(m => (db.sets[day() + ":" + m] || []).map(a => a[0])));
+  for (let i = 0; i < files.length; i++) { const f = files[(((day() * 2654435761) >>> 0) + i) % files.length]; if (!todays.has(f.slice(0, -4))) return f; }
+  return null;
+}
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
 const STATIC = { "/": "index.html", "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
-const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg" };
-const serve = (res, f) => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] }), res.end(fs.readFileSync(f)));
+const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
+const serve = (res, f) => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream" }), res.end(fs.readFileSync(f)));
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json" }), res.end(JSON.stringify(o)));
   if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
+  if (req.method === "GET" && u.pathname === "/chart.jpg") { // today's faint background chart
+    const f = chartOfTheDay();
+    return f ? (res.setHeader("cache-control", "max-age=600"), serve(res, "charts/" + f)) : json({ error: "no charts" }, 404);
+  }
   if (req.method === "GET" && u.pathname === "/api/sounds") return json(fs.existsSync("sounds") ? fs.readdirSync("sounds").filter(f => /\.(mp3|wav|ogg)$/.test(f)) : []); // which of your sound files exist (so the page never probes for missing ones)
   if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) // sound effects you drop in ./sounds
     return fs.existsSync("." + u.pathname) ? serve(res, "." + u.pathname) : json({ error: "not found" }, 404);

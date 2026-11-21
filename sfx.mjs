@@ -4,7 +4,8 @@
 // pack's switches, relays and firm detents match that. Your own files in /sounds (correct, wrong, lost, skip, finish, flap)
 // still win over the pack when they exist; the pack's cues cover everything else and replace the old synthesized beeps.
 export const PACK = "mechanical";
-export const KEY = "icaodle:sound"; // localStorage: { enabled, volume }
+export const KEY = "icaodle:sound"; // localStorage: { enabled, volume }, saved on every change
+export const DEFAULT_VOLUME = 0.2; // first visit: 20%
 
 // What happened -> which sound. `file` = optional user-supplied /sounds/<file>.(wav|mp3|ogg); `cue` = uisfx semantic cue.
 // One sound per interaction; outcomes are played by the caller only after the state change really happened.
@@ -24,7 +25,7 @@ export const EVENTS = {
   soundOn: { cue: "toggle-on" },                  // sound switched back on (muting is silent: mute must be immediate)
 };
 
-const clamp = (v) => Math.min(1, Math.max(0, Number.isFinite(+v) ? +v : 0.7));
+const clamp = (v) => Math.min(1, Math.max(0, Number.isFinite(+v) ? +v : DEFAULT_VOLUME));
 const fileNames = [...new Set(Object.values(EVENTS).map((e) => e.file).filter(Boolean))];
 
 export function createSound({ createUISFX, storage = null, AudioContextCtor = null, fetchFile = (u) => globalThis.fetch?.(u) } = {}) {
@@ -32,7 +33,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
   try { saved = JSON.parse(storage?.getItem(KEY) || "null") || {}; } catch {}
   // the older on/off toggle stored localStorage.muted = "1"
   try { if (saved.enabled === undefined && storage?.getItem("muted") === "1") saved.enabled = false; } catch {}
-  let enabled = saved.enabled !== false, volume = clamp(saved.volume ?? 0.7);
+  let enabled = saved.enabled !== false, volume = clamp(saved.volume ?? DEFAULT_VOLUME);
   let ui = null, ctx = null;
   const files = new Map(), active = new Set(); // decoded user files; user-file sources currently sounding
   const save = () => { try { storage?.setItem(KEY, JSON.stringify({ enabled, volume })); } catch {} };

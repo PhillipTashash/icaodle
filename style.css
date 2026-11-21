@@ -10,6 +10,7 @@
   --amber:#ffb81c;   /* airport signage amber: buttons, highlights, logo */
   --ok:#3ddc84;      /* "on time" green */
   --bad:#ff6b6b;     /* "cancelled" red */
+  --orange:#ff9f43;  /* the middle of the grade color scale */
   --blue:#1c3556;    /* deep blue: the Show Clue button */
   --blue-hi:#2b4d7d; /* its lighter blue: border and hover */
   --bg:var(--ink-0);--surface:var(--ink-1);--surface-2:var(--ink-2);--border:#2f3745;
@@ -79,10 +80,9 @@ h2.top{display:flex;align-items:center;justify-content:center;gap:.6em}
 #flap span{width:1.3em;line-height:1.7em;background:linear-gradient(var(--a) 49%,var(--ink-0) 50%,var(--b) 51%);color:var(--t);font:700 1.6em ui-monospace,Consolas,monospace;border-radius:.15em;display:inline-block;box-shadow:0 2px 6px #0008}
 #flap .nm{flex-basis:100%;margin-top:.5em;font:12px/1.2 Inter,system-ui,sans-serif;color:var(--muted);padding:0 .4em}
 #flap span.f{animation:flip .045s ease-out}
-@keyframes flip{from{transform:rotateX(-80deg)}to{transform:none}}
+@keyframes flip{from{transform:rotateX(-80deg);filter:blur(1.6px)}to{transform:none;filter:blur(0)}}
 
 /* form row (gap = space between the text box and the buttons) */
-#hint{margin:.8em;color:var(--text);font-weight:600}
 /* the answer area: its own panel, outlined in a muted amber */
 #f{display:flex;flex-wrap:wrap;gap:.6em .8em;justify-content:center;align-items:center;width:90%;max-width:1000px;margin:.8em auto 0;padding:.9em 1em;
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
@@ -146,3 +146,14 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:.6e
 .fx{position:fixed;inset:0;z-index:0;pointer-events:none}
 .fx.front{z-index:3} /* the few big planes that fly over the containers (menu background) */
 main,footer{position:relative;z-index:1}
+/* results screen: big letter grade, percentage underneath; its color is set from the score (red -> orange -> green) */
+#grade{margin:.1em 0 .5em;line-height:1}
+#grade .letter{font-size:7rem;font-weight:900;letter-spacing:-.02em;text-shadow:0 0 30px color-mix(in srgb,currentColor 35%,transparent)}
+#grade .pct{font-size:1.6rem;font-weight:700;margin-top:.1em}
+/* logo: large on the title screen (menu and custom setup), the usual size once a game is showing */
+h2.top svg{width:320px;height:auto}
+main:has(#game:not([hidden])) h2.top svg{width:190px}
+/* logo tiles squash briefly each time they flip */
+.tile{transform-box:fill-box;transform-origin:center}
+.tile.f{animation:tileflip .12s ease-out}
+@keyframes tileflip{from{transform:scaleY(.15);filter:blur(2.2px)}to{transform:none;filter:blur(0)}} /* a flip smears, then snaps sharp: motion blur */

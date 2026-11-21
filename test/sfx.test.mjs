@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { cueNames, packNames } from "uisfx";
-import { createSound, EVENTS, PACK, KEY } from "../sfx.mjs";
+import { createSound, EVENTS, PACK, KEY, DEFAULT_VOLUME } from "../sfx.mjs";
 
 // Fakes: a recording uisfx player, an AudioContext, and a Storage.
 function rig({ stored = {}, files = {} } = {}) {
@@ -68,7 +68,7 @@ test("unlock creates ONE player and ONE context however many gestures or remount
   const r = rig(), s = r.make();
   s.unlock(); s.unlock(); s.unlock();
   assert.deepEqual(r.counts(), { players: 1, contexts: 1 });
-  assert.deepEqual(r.log.find((l) => l[0] === "create"), ["create", PACK, 0.7, true, true]); // shared context is passed in
+  assert.deepEqual(r.log.find((l) => l[0] === "create"), ["create", PACK, 0.2, true, true]); // shared context is passed in
 });
 
 test("user files win over the pack, and the pack covers events without a file", async () => {
@@ -87,7 +87,7 @@ test("mute: stops everything first, persists, silences all events, and survives 
   assert.deepEqual(r.log, ["stopAll", ["setEnabled", false]]); // stopAll BEFORE disabling => immediate
   assert.equal(s.play("correct"), null);
   assert.equal(s.play("wrong"), null);
-  assert.deepEqual(JSON.parse(r.store[KEY]), { enabled: false, volume: 0.7 });
+  assert.deepEqual(JSON.parse(r.store[KEY]), { enabled: false, volume: 0.2 });
   const again = r.make(); again.unlock(); // "reload"
   assert.equal(again.enabled, false);
   assert.equal(again.play("correct"), null);
@@ -129,3 +129,13 @@ test("teardown destroys the player first, then closes the context, and a remount
 });
 // Not applicable here: loops (the game has no long-running visible process, so none of the six loop cues are used) and
 // keyboard/pointer de-duplication (cues are played from state changes, never from raw input events, so one activation = one cue).
+
+test("first visit defaults to 20% volume, and whatever is set afterwards is what's saved and restored", () => {
+  assert.equal(DEFAULT_VOLUME, 0.2);
+  const r = rig(), s = r.make();
+  assert.equal(s.volume, 0.2);          // nothing saved yet
+  s.setVolume(0.55);                    // the slider
+  assert.deepEqual(JSON.parse(r.store[KEY]), { enabled: true, volume: 0.55 });
+  const again = r.make();               // next visit
+  assert.equal(again.volume, 0.55);
+});
