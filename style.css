@@ -171,16 +171,26 @@ body{min-height:100dvh}
 button,input,select{touch-action:manipulation} /* no double-tap zoom on the controls */
 footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bottom))}
 @media (max-width:820px){
-  main{padding:.6em}
+  main{padding:.5em}
+  h2.top{margin:.2em}
   h2.top svg{max-width:80vw}
-  /* the board stacks: the map across the top, then the flippers (left) and guesses + clues (right) */
-  #board{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"map map" "left right";height:auto;width:100%;gap:.6em;margin:.6em auto}
-  #map{grid-area:map;height:40vh;min-height:230px}
-  #lcol{grid-area:left}#col{grid-area:right}
-  #lcol,#col{width:auto;min-width:0}
-  #flap{min-height:300px}
-  #flap .w.cur{font-size:.9em;gap:.15em .5em} /* four tiles must fit the half-width column */
-  #nav button{padding:.5em .2em;font-size:.85em;white-space:nowrap}
+  /* everything on one screen: the five flippers in a row above the map, then guesses and clues each in a row, then Back / Next */
+  #board{display:flex;flex-direction:column;gap:.4em;height:auto;width:100%;margin:.3em auto}
+  #lcol,#col{display:contents}
+  #flap{order:1;flex:none;flex-direction:row;width:100%;min-height:0;padding:.25em .1em}
+  #flap .w,#flap .w.cur{flex:1;min-width:0;flex-wrap:nowrap;gap:.15em .3em;padding:.35em .15em;font-size:.42em;border-bottom:0;border-right:1px solid var(--border)}
+  #flap .w:last-child{border-right:0}
+  #flap .nm{display:none} /* too small to read here */
+  #map{order:2;flex:none;height:30dvh;min-height:190px}
+  #guesses{order:3;display:flex;align-items:stretch;gap:.35em;padding:.35em .4em;overflow:visible}
+  #cluebox{order:4;flex:none;flex-direction:row;align-items:stretch;gap:.35em;padding:.35em .4em;min-height:0;overflow:visible}
+  #nav{order:5;flex:none;justify-content:space-between}
+  #nav button{flex:0 0 auto;min-width:5.5em;min-height:34px;padding:.15em .7em;font-size:.75em;white-space:nowrap} /* small Back / Next at the two ends of the row */
+  /* the guess and clue boxes run sideways: a small label, then equal boxes that wrap their text */
+  #guesses b,#cluebox b{flex:0 0 3.2em;align-self:center;font-size:.6em;line-height:1.2;text-align:center}
+  #guesses hr{display:none}
+  #guesses div,#cluebox div{flex:1;min-width:0;margin:0;padding:.25em .2em;font-size:.68em;line-height:1.15;letter-spacing:0;display:flex;align-items:center;justify-content:center;text-align:center;overflow-wrap:anywhere}
+  #cluebox #clue{margin:0 0 0 auto;width:auto;flex:0 0 auto;padding:.35em .7em;font-size:.78em}
   /* answer panel: [back] [?] [text box] on one row, Guess + Skip / Give up full width underneath */
   #f{gap:.6em;padding:.8em;width:100%}
   #menuBack{position:static;width:3em;height:3.4rem}
@@ -191,12 +201,9 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
   #help::after{left:0;transform:none} /* the tooltip would run off the left edge if it were centered */
   #stats{width:100%}
 }
+@media (max-width:360px){#flap .w,#flap .w.cur{font-size:.36em}} /* the smallest phones: slightly smaller flippers so all four tiles fit in a fifth of the width */
 @media (pointer:coarse){
   button{min-height:44px}
   #menu #datebar button{padding:.55em .8em}
 }
 #timer{margin-left:auto}
-@media (max-width:360px){ /* the smallest phones: slightly smaller flippers so all four tiles stay on one line */
-  #flap .w{font-size:.6em}
-  #flap .w.cur{font-size:.78em;gap:.15em .4em}
-}
