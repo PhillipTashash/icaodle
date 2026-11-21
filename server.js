@@ -51,6 +51,17 @@ function chartOfTheDay() {
   for (let i = 0; i < files.length; i++) { const f = files[(((day() * 2654435761) >>> 0) + i) % files.length]; if (!todays.has(f.slice(0, -4))) return f; }
   return null;
 }
+// ZIP code -> coordinates, from the free zippopotam.us lookup (no key); answers are kept in memory since a ZIP never moves.
+const dist = (a, b, c, d) => { const r = Math.PI / 180, h = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 3959 * 2 * Math.asin(Math.sqrt(h)); };
+const zips = new Map();
+async function zipPoint(zip) {
+  if (zips.has(zip)) return zips.get(zip);
+  const r = await fetch("https://api.zippopotam.us/us/" + zip, { signal: AbortSignal.timeout(5000) });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error("lookup failed");
+  const pl = (await r.json()).places[0], p = { lat: +pl.latitude, lon: +pl.longitude };
+  zips.set(zip, p); return p;
+}
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
 const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
 // Cache busting: the page asks for /style.css?v=<hash of the files>, so after an update every visitor (and Cloudflare) sees a new address and fetches the new file.
@@ -74,12 +85,23 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
   }
-  if (req.method === "GET" && u.pathname === "/api/decoys") { // last-guess multiple choice: 3 other airports from the answer's own tier
+  if (req.method === "GET" && u.pathname === "/api/decoys") { // last-guess multiple choice: 3 other airports that start with the same letter as the answer (after the K)
     const c = (u.searchParams.get("code") || "").toUpperCase(), tier = Object.keys(AIR).find(t => AIR[t].some(a => a[0] === c));
     if (!tier) return json({ error: "bad request" }, 400);
-    const pool = AIR[tier].filter(a => a[0] !== c).map(a => a[0]), out = [];
-    while (out.length < 3) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    // Every option starts with the same letter after the K (the "Starts with" clue): own tier first, then any tier, then anything, so there are always four options.
+    const same = l => l.filter(a => a[0] !== c && a[0][1] === c[1]).map(a => a[0]), out = [];
+    for (const pool of [same(AIR[tier]), same([...ALL.values()]), [...ALL.keys()].filter(k => k !== c)]) while (out.length < 3 && pool.length) { const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!out.includes(x)) out.push(x); }
     return json(out);
+  }
+  if (req.method === "GET" && u.pathname === "/api/near") { // "Airports near me": up to PER random airports within N miles of a US ZIP code (any difficulty)
+    const zip = u.searchParams.get("zip") || "", miles = +u.searchParams.get("miles");
+    if (!/^\d{5}$/.test(zip) || ![25, 50, 100, 250, 500].includes(miles)) return json({ error: "Enter a 5-digit ZIP code." }, 400);
+    return zipPoint(zip).then(p => {
+      if (!p) return json({ error: "Couldn't find that ZIP code." }, 404);
+      const near = [...ALL.values()].filter(a => dist(p.lat, p.lon, a[3], a[4]) <= miles), pick = [];
+      while (pick.length < PER && near.length) pick.push(near.splice(Math.floor(Math.random() * near.length), 1)[0]);
+      json(pick.length ? { day: day(), airports: pick } : { error: `No airports within ${miles} miles of ${zip}. Try a bigger distance.` });
+    }).catch(() => json({ error: "Couldn't look that ZIP up right now. Try again." }, 502));
   }
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
   if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to

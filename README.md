@@ -1,6 +1,6 @@
 # ICAOdle
 
-A daily airport guessing game: five rounds a day, you see an airport on a satellite map (or just its city and state) and guess its ICAO code. Easy, Medium and Hard daily sets are the same for everyone; a Custom game gives you random practice rounds, optionally in one state.
+A daily airport guessing game: five rounds a day, you see an airport on a satellite map (or just its city and state) and guess its ICAO code. Normal, Hard and Extra Hard daily sets are the same for everyone; a Custom game gives you random practice rounds, optionally in one state.
 
 ## Run it with Docker Compose
 
