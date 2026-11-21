@@ -15,7 +15,8 @@ export const EVENTS = {
   forward: { cue: "forward" },        // review Next
   correct: { file: "correct", cue: "success" },   // round solved
   wrong: { file: "wrong", cue: "error" },         // wrong guess
-  skip: { file: "skip", cue: "skip-next" },       // a guess passed with Skip
+  skip: { file: "skip", cue: "skip-next" },
+  clue: { cue: "info" },                  // Show Clue pressed (costs a guess)       // a guess passed with Skip
   lost: { file: "lost", cue: "blocked" },         // round lost (4th miss, or Skip on the last guess)
   finish: { file: "finish", cue: "complete" },    // all 5 rounds done
   perfect: { cue: "achievement" },                // all 5 solved

@@ -3,12 +3,9 @@ const http = require("http"), fs = require("fs");
 const FILE = "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
 try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
 const AIR = JSON.parse(fs.readFileSync("airports.json"));
-// Famous-landmark clue: landmarks.json comes from build-landmarks.js; airports without one simply don't offer that clue (a[8] = null).
-let LM = {}; try { LM = JSON.parse(fs.readFileSync("landmarks.json")); } catch {}
-for (const a of Object.values(AIR).flat()) a[8] = LM[a[0]] || null;
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
 // States with at least PER airports can be played as practice games.
-const STATES = [...new Set([...ALL.values()].map(a => a[2]))].filter(s => [...ALL.values()].filter(a => a[2] === s).length >= PER).sort();
+const STATES = Object.entries([...ALL.values()].reduce((c, a) => (c[a[2]] = (c[a[2]] || 0) + 1, c), {})).filter(([, n]) => n >= PER).map(([st]) => st).sort();
 const ORDER = { easy: ["easy", "medium", "hard"], medium: ["medium", "hard", "easy"], hard: ["hard", "medium", "easy"] };
 let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...JSON.parse(fs.readFileSync(FILE)) }; } catch {}
 // db.sets["day:mode"] = 5 airports; db.used[mode] = icaos already served (no repeats until the pool runs out); db.scores["day:mode"] = {playerId: total}
@@ -33,18 +30,16 @@ function ensure(d) {
 // dist = how many players got each total; avg / avgRight = mean points / mean rounds solved
 const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const counts = k => { const dist = {}, s = Object.values(db.scores[k] || {}); for (const t of s) dist[t] = (dist[t] || 0) + 1; return { dist, n: s.length, avg: mean(s), avgRight: mean(Object.values(db.right[k] || {})) }; };
+// Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
+const STATIC = { "/": "index.html", "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
+const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg" };
+const serve = (res, f) => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] }), res.end(fs.readFileSync(f)));
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json" }), res.end(JSON.stringify(o)));
-  if (req.method === "GET" && u.pathname === "/") return res.writeHead(200, { "content-type": "text/html" }), res.end(fs.readFileSync("index.html"));
-  if (req.method === "GET" && u.pathname === "/style.css") return res.writeHead(200, { "content-type": "text/css" }), res.end(fs.readFileSync("style.css"));
+  if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
   if (req.method === "GET" && u.pathname === "/api/sounds") return json(fs.existsSync("sounds") ? fs.readdirSync("sounds").filter(f => /\.(mp3|wav|ogg)$/.test(f)) : []); // which of your sound files exist (so the page never probes for missing ones)
-  if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) { // sound effects the user drops in ./sounds
-    const f = "sounds/" + u.pathname.slice(8), type = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg" }[f.split(".").pop()];
-    if (!fs.existsSync(f)) return json({ error: "not found" }, 404);
-    return res.writeHead(200, { "content-type": type }), res.end(fs.readFileSync(f));
-  }
-  if (req.method === "GET" && (u.pathname === "/sfx.js" || u.pathname === "/vendor/uisfx.js")) // game audio module + the uisfx player (self-contained ES module)
-    return res.writeHead(200, { "content-type": "text/javascript" }), res.end(fs.readFileSync(u.pathname === "/sfx.js" ? "sfx.mjs" : "node_modules/uisfx/dist/index.js"));
+  if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) // sound effects you drop in ./sounds
+    return fs.existsSync("." + u.pathname) ? serve(res, "." + u.pathname) : json({ error: "not found" }, 404);
   if (req.method === "GET" && u.pathname === "/api/config") return json({ key: process.env.GOOGLE_MAPS_KEY || "" });
   if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
@@ -52,9 +47,9 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
     const st = u.searchParams.get("state");
-    if (!MODES.includes(mode) || !STATES.includes(st)) return json({ error: "bad request" }, 400);
+    if (!MODES.includes(mode) || (st !== "ALL" && !STATES.includes(st))) return json({ error: "bad request" }, 400); // "ALL" = any state
     const pick = [];
-    for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => a[2] === st); while (pick.length < PER && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
+    for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => st === "ALL" || a[2] === st); while (pick.length < PER && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
     return json({ day: day(), airports: pick });
   }
   if (req.method === "GET" && u.pathname === "/api/today") {

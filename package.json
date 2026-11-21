@@ -1,24 +1,12 @@
 {
   "name": "icaodle",
   "version": "1.0.0",
-  "description": "",
+  "private": true,
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/PhillipTashash/icaodle.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/PhillipTashash/icaodle/issues"
-  },
-  "homepage": "https://github.com/PhillipTashash/icaodle#readme",
   "dependencies": {
     "uisfx": "^0.4.0"
-  },
-  "private": true
+  }
 }
