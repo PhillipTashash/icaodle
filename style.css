@@ -10,6 +10,8 @@
   --amber:#ffb81c;   /* airport signage amber: buttons, highlights, logo */
   --ok:#3ddc84;      /* "on time" green */
   --bad:#ff6b6b;     /* "cancelled" red */
+  --blue:#1c3556;    /* deep blue: the Show Clue button */
+  --blue-hi:#2b4d7d; /* its lighter blue: border and hover */
   --bg:var(--ink-0);--surface:var(--ink-1);--surface-2:var(--ink-2);--border:#2f3745;
   --accent:var(--amber);--brand:var(--amber);
   --on-accent:var(--ink-0);  /* text on amber */
@@ -130,9 +132,9 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:.6e
 /* right column: Guesses on top (its own height), Clues fills the rest with "Show Clue" pinned to the bottom */
 #guesses{flex:0 0 auto}
 #cluebox{flex:1;min-height:0;display:flex;flex-direction:column}
-#cluebox #clue{margin-top:auto;width:100%;padding:.55em;background:var(--surface-2);color:var(--text);border:1px solid var(--border)} /* muted: a raised grey button */
-#cluebox #clue:hover:not(:disabled){border-color:var(--accent);filter:none}
-#cluebox #clue:disabled{color:var(--dim);opacity:.6}
+#cluebox #clue{margin-top:auto;width:100%;padding:.55em;background:var(--blue);color:var(--text);border:1px solid var(--blue-hi)} /* a deep, quiet blue */
+#cluebox #clue:hover:not(:disabled){background:var(--blue-hi);filter:none}
+#cluebox #clue:disabled{background:var(--blue);color:var(--dim);opacity:.5}
 /* custom screen buttons: Start is the longer, main one */
 #customGo{min-width:12em;padding:.7em 2em}
 #customBack{padding:.7em 1.4em}

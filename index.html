@@ -94,20 +94,19 @@ const NOSE=(()=>{try{
   return width(hi-span*.25,hi)<width(lo,lo+span*.25)?a:a+Math.PI;
 }catch{return -Math.PI/4}})();
 
-// Correct answer: about a second of plain-colored airplanes falling behind the containers (canvas z-index 0, the page content sits above it).
-function planes(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second
+// Correct answer: confetti falls behind the containers (canvas z-index 0, the page content sits above it).
+function confetti(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second
   if(matchMedia("(prefers-reduced-motion: reduce)").matches)return; // a visual effect, so respect the motion preference
   const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx";document.body.append(c);
-  const cols=["--accent","--text","--ok","--muted"].map(css);
-  const P=Array.from({length:70},()=>({x:Math.random()*W,y:-30-Math.random()*H*.35,vy:speed*100*(.8+Math.random()*.4),vx:(Math.random()-.5)*60,s:18+Math.random()*18,r:Math.PI/2+(Math.random()-.5)*.9,vr:(Math.random()-.5)*2,c:cols[Math.floor(Math.random()*cols.length)]}));
-  x.textAlign="center";x.textBaseline="middle";
-  const dur=(H*1.35+40)/(speed*100*.8)*1000+300; // long enough for the slowest plane (and the spawn offset) to clear the screen
+  const cols=["--accent","--text","--ok","--muted"].map(css),rnd=Math.random;
+  const P=Array.from({length:110},()=>({x:rnd()*W,y:-30-rnd()*H*.35,vy:speed*100*(.8+rnd()*.4),vx:(rnd()-.5)*70,w:6+rnd()*6,h:10+rnd()*8,r:rnd()*6.3,vr:(rnd()-.5)*8,f:rnd()*6.3,vf:3+rnd()*5,c:cols[Math.floor(rnd()*cols.length)]}));
+  const dur=(H*1.35+40)/(speed*100*.8)*1000+300; // long enough for the slowest piece (and the spawn offset) to clear the screen
   setTimeout(()=>c.remove(),dur+600); // safety net: if animation frames are paused (background tab) the canvas still goes away
   let last=performance.now();const t0=last;
   (function f(n){const dt=Math.min(.05,(n-last)/1e3);last=n;x.clearRect(0,0,W,H);
-    const left=dur-(n-t0);x.globalAlpha=Math.max(0,Math.min(1,left/300)); // fade out over the last 0.3 s
-    for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;x.save();x.translate(p.x,p.y);x.rotate(p.r-NOSE);x.fillStyle=p.c;x.font=p.s+"px "+PLANE_FONT;x.fillText("\u2708\uFE0E",0,0);x.restore()} // text-style plane, so it takes the fill color; rotated nose-down
-    left>0?requestAnimationFrame(f):c.remove()})(last)}
+    x.globalAlpha=Math.max(0,Math.min(1,(dur-(n-t0))/300)); // fade out over the last 0.3 s
+    for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;p.f+=p.vf*dt;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.f));x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()} // the cosine flips each piece like paper tumbling
+    dur-(n-t0)>0?requestAnimationFrame(f):c.remove()})(last)}
 // Split-flap display: each cell steps through the ring one flap at a time until it lands on the target letter.
 const RING="-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // One flap word per round (PER of them), each starting as K---; a solved/lost round keeps its answer.
@@ -219,7 +218,7 @@ $("f").onsubmit=async e=>{e.preventDefault();
   busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
   if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
     if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
-  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent="";snd("correct");planes()}
+  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent="";snd("correct");confetti()}
   else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl})`;snd("lost")}
   else snd("wrong")
   busy=0;save();S.i>i0?reveal(c):show()};
