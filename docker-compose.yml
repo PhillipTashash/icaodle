@@ -1,0 +1,14 @@
+services:
+  icaodle:
+    build: .
+    image: icaodle:latest
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:?put your Google Maps key in .env (see .env.example)}
+    volumes:
+      - icaodle-data:/data            # daily sets + scores
+      # - ./sounds:/app/sounds:ro     # uncomment to change the sound files without rebuilding the image
+volumes:
+  icaodle-data:

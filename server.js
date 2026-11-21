@@ -1,6 +1,6 @@
 // node server.js — zero dependencies. Serves the page, daily airport sets, and score stats.
 const http = require("http"), fs = require("fs");
-const FILE = "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
+const FILE = process.env.DATA_FILE || "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
 try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
 const AIR = JSON.parse(fs.readFileSync("airports.json"));
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));

@@ -1,0 +1,12 @@
+.git
+.env
+.gitignore
+node_modules
+data.json
+test
+build-airports.js
+build-charts.py
+*.md
+!sounds/README.md
+Dockerfile
+docker-compose.yml

@@ -107,15 +107,21 @@ function confetti(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 
     x.globalAlpha=Math.max(0,Math.min(1,(dur-(n-t0))/300)); // fade out over the last 0.3 s
     for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;p.f+=p.vf*dt;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.f));x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()} // the cosine flips each piece like paper tumbling
     dur-(n-t0)>0?requestAnimationFrame(f):c.remove()})(last)}
-// Title-screen intro: the logo's tiles flip like a split-flap board and land on I, C, A, O. Each tile starts a few letters before its own letter
-// (4 to 9 flips, a little random) and counts forward through the alphabet, so it looks random but always resolves; the tiles start one after another.
+// Title-screen intro: all four logo tiles start flipping at once, then settle on I, C, A, O one after another, left to right.
+// Each tile counts forward through the alphabet at its own steady pace for exactly as long as it needs to land on its letter at its settle time.
 (function logoFlip(){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const today=Math.floor(Date.now()/864e5); // once a day: after the first play, the logo just sits on ICAO until tomorrow
+  try{if(localStorage["icaodle:intro"]==today)return;localStorage["icaodle:intro"]=today}catch{}
   const ABC="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   document.querySelectorAll("h2.top .tile").forEach((g,i)=>{
-    const text=g.querySelector("text"),t=ABC.indexOf(text.textContent);let k=4+Math.floor(Math.random()*6);
-    text.textContent=ABC[(t-k+26)%26];
-    setTimeout(function step(){k--;text.textContent=ABC[(t-k+26)%26];g.classList.remove("f");void g.getBoundingClientRect();g.classList.add("f");if(k>0)setTimeout(step,70+Math.random()*50)},i*170+Math.random()*80)});
+    const text=g.querySelector("text"),t=ABC.indexOf(text.textContent),
+      gap=75+Math.random()*20,                      // ms per flap
+      settle=1000+i*450+Math.random()*120;          // when this tile lands: I first, O last
+    let k=Math.round(settle/gap);                   // flaps still to go
+    const show=()=>text.textContent=ABC[(((t-k)%26)+26)%26];
+    show();
+    setTimeout(function step(){k--;show();g.classList.remove("f");void g.getBoundingClientRect();g.classList.add("f");if(k>0)setTimeout(step,gap)},gap)});
 })();
 // Split-flap display: each cell steps through the ring one flap at a time until it lands on the target letter.
 const RING="-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
