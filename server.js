@@ -52,12 +52,16 @@ function chartOfTheDay() {
   return null;
 }
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
-const STATIC = { "/": "index.html", "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
+const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
+// Cache busting: the page asks for /style.css?v=<hash of the files>, so after an update every visitor (and Cloudflare) sees a new address and fetches the new file.
+const VERSION = require("crypto").createHash("md5").update(["style.css", "sfx.mjs", "node_modules/uisfx/dist/index.js"].map(f => fs.readFileSync(f)).join("")).digest("hex").slice(0, 10);
+const page = () => fs.readFileSync("index.html", "utf8").replace(/(\/style\.css|\/sfx\.js|\/vendor\/uisfx\.js)(?=["'])/g, "$1?v=" + VERSION);
 const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
 // The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
 const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
 http.createServer((req, res) => {
   const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
+  if (req.method === "GET" && u.pathname === "/") return (res.writeHead(200, { "content-type": "text/html", "cache-control": "no-cache" }), res.end(page()));
   if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
   if (req.method === "GET" && u.pathname === "/chart.jpg") { // today's faint background chart
     const f = chartOfTheDay();
