@@ -1,5 +1,5 @@
 <!doctype html>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ICAOdle</title>
 <link rel="stylesheet" href="/style.css">
 <main>
@@ -76,6 +76,8 @@ fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);c
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
 let SND=null;
+// On a phone, focusing the text box pops the keyboard over the board, so only desktops get the automatic focus.
+const focusInput=()=>{if(!matchMedia("(pointer:coarse)").matches)$("g").focus()};
 const snd=e=>SND&&SND.play(e);
 const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 Sound on":"🔇 Sound off";$("mute").setAttribute("aria-pressed",String(!on));if(SND)$("vol").value=SND.volume};
 (async()=>{try{
@@ -155,8 +157,8 @@ const navs=()=>{$("back").disabled=V<=0;$("next").disabled=V>=S.i;[...$("flap").
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
 function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
   $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=$("back").disabled=$("next").disabled=true;
-  setTimeout(()=>{$("msg").textContent="";if(S.i>=PER)snd(S.scores.every(v=>v>0)?"perfect":"finish");show();$("g").focus()},1500)}
-$("next").onclick=()=>{snd("forward");$("msg").textContent="";V+1<S.i?view(V+1):(show(),$("g").focus())};
+  setTimeout(()=>{$("msg").textContent="";if(S.i>=PER)snd(S.scores.every(v=>v>0)?"perfect":"finish");show();focusInput()},1500)}
+$("next").onclick=()=>{snd("forward");$("msg").textContent="";V+1<S.i?view(V+1):(show(),focusInput())};
 $("back").onclick=()=>{snd("back");$("msg").textContent="";view(V-1)};
 function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
 // The key lives in .env on the server (never in this file or git); the browser still has to receive it, so restrict it by referrer in Google Cloud.
@@ -186,8 +188,8 @@ SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice 
   sky.stop(); // the menu background only runs on the menu
   today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
   if(FMT=="city")$("map").classList.add("txt"); // no map in this format: the city and state are the whole prompt
-  else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,gestureHandling:"greedy",center:{lat:39,lng:-98},zoom:4})}
-  show();$("g").focus()}
+  else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
+  show();focusInput()}
 // Right column: Guesses (used/4), and under it Clues. "Show Clue" reveals the next clue and costs one guess: region, then city/state, then the first letter.
 const REGION={};
 for(const [r,list] of Object.entries({"Pacific Northwest":"WA OR","West Coast":"CA","Mountain West":"ID MT WY CO UT NV","Southwest":"AZ NM TX OK","Great Plains":"ND SD NE KS","Midwest":"MN IA MO WI IL IN MI OH","South":"AR LA MS AL TN KY","Southeast":"FL GA SC NC VA WV","Mid-Atlantic":"NY NJ PA DE MD DC","New England":"ME NH VT MA RI CT",Alaska:"AK",Hawaii:"HI"}))for(const st of list.split(" "))REGION[st]=r;
