@@ -74,6 +74,13 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
   }
+  if (req.method === "GET" && u.pathname === "/api/decoys") { // last-guess multiple choice: 3 other airports from the answer's own tier
+    const c = (u.searchParams.get("code") || "").toUpperCase(), tier = Object.keys(AIR).find(t => AIR[t].some(a => a[0] === c));
+    if (!tier) return json({ error: "bad request" }, 400);
+    const pool = AIR[tier].filter(a => a[0] !== c).map(a => a[0]), out = [];
+    while (out.length < 3) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    return json(out);
+  }
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
   if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others

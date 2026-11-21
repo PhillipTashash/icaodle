@@ -37,6 +37,7 @@
   <div id="board"><div id="lcol"><div id="flap"></div>
     <div id="nav"><button id="back">&#9664; Back</button><button id="next">Next &#9654;</button></div></div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
   <form id="f"><button id="menuBack" type="button" title="Back to the main menu" aria-label="Back to the main menu"><svg viewBox="0 0 24 32" width="24" height="32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 30V17C17 11 14 9 6 9"/><path d="M11 3 4.5 9 11 15"/></svg></button><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
+  <div id="choices" hidden></div>
   <div id="msg"></div>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
@@ -184,18 +185,19 @@ SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice 
 // Right column: Guesses (used/4), and under it Clues. Each miss unlocks the next clue and it pops in: region, then city/state, then the first letter.
 const REGION={};
 for(const [r,list] of Object.entries({"Pacific Northwest":"WA OR","West Coast":"CA","Mountain West":"ID MT WY CO UT NV","Southwest":"AZ NM TX OK","Great Plains":"ND SD NE KS","Midwest":"MN IA MO WI IL IN MI OH","South":"AR LA MS AL TN KY","Southeast":"FL GA SC NC VA WV","Mid-Atlantic":"NY NJ PA DE MD DC","New England":"ME NH VT MA RI CT",Alaska:"AK",Hawaii:"HI"}))for(const st of list.split(" "))REGION[st]=r;
-const CLUE_KEYS=["region","loc","first"];
+const CLUE_KEYS=[["region"],["loc"],["name","first"]]; // 1st miss: region (and the map gains place names); 2nd: city/state; 3rd: the airport name with its city blanked out, plus the first letter
 let seenClues={i:-1,n:0}; // how many clues of this round were already showing, so only a newly unlocked one pops up
 function side(){
   const t=today[S.i],f=S.fails,n=Math.min(f,CLUE_KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
   val={region:REGION[t[2]]||t[2],
     loc:FMT=="city"?`Elevation: ${t[7].toLocaleString()} ft`:`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the elevation
-    first:`Starts with ${t[0][1]}`}, // the letter after the K
+    first:`Starts with ${t[0][1]}`, // the letter after the K
+    name:t[6].replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
   $("guesses").innerHTML=`<b>Guesses ${f}/${TRIES}</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
-  $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((k,j)=>`<div${j>=known?' class="pop"':""}>${val[k]}</div>`).join("")}
-function forfeit(text){const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
+  $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("")}
+function forfeit(text){CH.hidden=true;const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
 $("skip").onclick=()=>{if(S.i>=PER||busy)return;
   if(S.fails>=TRIES-1)return forfeit("Skipped");
@@ -223,9 +225,16 @@ function show(){
   const t=today[S.i],[c,city,st,,,z]=t,f=S.fails;
   $("round").textContent=`${MODE}${dateTag()} ${S.i+1}/${PER}`;
   side();setMap(t,f>=1?10:z,f>=1?10:z-1);
-}
+  if(FMT!="city")map.setMapTypeId(f>=1?"hybrid":"satellite"); // after a miss the map gains road and place names
+  choose(c,f)}
+// Last guess: four buttons (the answer and three decoys from its tier) instead of typing from scratch. The box still works.
+const CH=$("choices");
+async function choose(c,f){CH.hidden=true;CH.innerHTML="";if(f<TRIES-1||S.i>=PER)return;
+  const d=await fetch("/api/decoys?code="+c).then(r=>r.json()).catch(()=>null);if(!d||S.fails<TRIES-1||today[S.i][0]!=c)return; // the round moved on while loading
+  CH.innerHTML=[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false}
+CH.onclick=e=>{if(e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}};
 function view(v){ // review a finished round: its airport, answer and result; no guessing
-  V=v;navs();$("cluebox").hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
+  V=v;navs();$("cluebox").hidden=CH.hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   $("round").textContent=`${MODE}${dateTag()} ${v+1}/${PER}`;
   $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
   setMap(t,t[5],t[5]-1)}
@@ -243,7 +252,7 @@ $("f").onsubmit=async e=>{e.preventDefault();
   if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("correct");confetti()}
   else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
   else snd("wrong")
-  busy=0;save();S.i>i0?reveal(c):show()};
+  busy=0;CH.hidden=true;save();S.i>i0?reveal(c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
 $("review").onclick=()=>{snd("open");$("stats").hidden=true;$("board").hidden=$("nav").hidden=false;$("msg").textContent="";view(0)};
 // Letter grade for the results screen: points out of the maximum, as a percentage. The color slides red -> orange -> green as the score

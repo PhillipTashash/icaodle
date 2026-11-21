@@ -18,9 +18,9 @@ function parse(t) {
   const out = { easy: [], medium: [], hard: [] };
   for (const r of rows) {
     if (!/^K[A-Z]{3}$/.test(r[i("ident")]) || r[i("iso_country")] !== "US" || !r[i("municipality")]) continue;
-    const type = r[i("type")], intl = /international/i.test(r[i("name")]);
-    // easy: big airports. medium: mid-size "International" fields (business/private-jet, e.g. KFTW). hard: everything small/local.
-    const tier = type === "large_airport" ? "easy" : type === "medium_airport" && intl ? "medium" : type === "small_airport" || type === "medium_airport" ? "hard" : null;
+    const type = r[i("type")], sched = r[i("scheduled_service")] === "yes", iata = !!r[i("iata_code")];
+    // easy: big airports. medium: other airports with airline service (places a lay-person has flown). hard: airports with an IATA code but no airline service. No-code private strips are left out.
+    const tier = type === "large_airport" ? "easy" : sched && (type === "medium_airport" || type === "small_airport") ? "medium" : iata && (type === "medium_airport" || type === "small_airport") ? "hard" : null;
     // [icao, city, state, lat, lon, zoom, name, elevation_ft] — zoom by size; tune per airport if a boundary is cut off.
     if (tier) out[tier].push([r[i("ident")], r[i("municipality")], r[i("iso_region")].slice(3), +r[i("latitude_deg")], +r[i("longitude_deg")], { easy: 14, medium: 15, hard: 16 }[tier], r[i("name")], Math.round(+r[i("elevation_ft")] || 0)]);
   }
