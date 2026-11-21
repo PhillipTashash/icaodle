@@ -208,3 +208,4 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 /* a clue unlocked by a miss pops in with a brief amber glow */
 #cluebox .pop{animation:cluepop .7s cubic-bezier(.2,1.3,.4,1)}
 @keyframes cluepop{0%{transform:scale(.4);opacity:0}55%{transform:scale(1.1);opacity:1;border-color:var(--accent);box-shadow:0 0 14px color-mix(in srgb,var(--accent) 55%,transparent)}100%{transform:none;border-color:var(--border);box-shadow:none}}
+#guesses .dir{display:inline-block;margin:0 .15em}

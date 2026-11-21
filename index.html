@@ -193,7 +193,7 @@ function side(){
     first:`Starts with ${t[0][1]}`}, // the letter after the K
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
-  $("guesses").innerHTML=`<b>Guesses ${f}/${TRIES}</b>`+Array.from({length:TRIES},(_,k)=>`<div>${(S.guesses||[])[k]||"&mdash;"}</div>`).join("");
+  $("guesses").innerHTML=`<b>Guesses ${f}/${TRIES}</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
   $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((k,j)=>`<div${j>=known?' class="pop"':""}>${val[k]}</div>`).join("")}
 function forfeit(text){const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
@@ -230,6 +230,7 @@ function view(v){ // review a finished round: its airport, answer and result; no
   $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
   setMap(t,t[5],t[5]-1)}
 const HOT=500; // miles: within this = hot, otherwise cold
+const bearing=(a,b,c,d)=>{const r=Math.PI/180;return Math.round((Math.atan2(Math.sin((d-b)*r)*Math.cos(c*r),Math.cos(a*r)*Math.sin(c*r)-Math.sin(a*r)*Math.cos(c*r)*Math.cos((d-b)*r))/r+360)%360)}; // compass degrees from the guess to the answer
 const miles=(a,b,c,d)=>{const r=Math.PI/180,h=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 3959*2*Math.asin(Math.sqrt(h))};
 let busy;
 $("f").onsubmit=async e=>{e.preventDefault();
@@ -238,9 +239,9 @@ $("f").onsubmit=async e=>{e.preventDefault();
   if(g.length==3)g="K"+g; if(!/^K[A-Z]{3}$/.test(g))return;
   busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
   if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
-    if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
+    if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,t[3],t[4])+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
   if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("correct");confetti()}
-  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl})`;snd("lost")}
+  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
   else snd("wrong")
   busy=0;save();S.i>i0?reveal(c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
