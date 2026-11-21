@@ -1,0 +1,212 @@
+<!doctype html>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ICAOdle</title>
+<link rel="stylesheet" href="/style.css">
+<main>
+<h2 class="top">
+  <!-- Logo: four split-flap tiles spelling ICAO + "dle". Link to "/" = back to the menu (progress is saved in localStorage). -->
+  <a href="/" title="Back to menu" aria-label="ICAOdle, back to menu"><svg width="190" height="48" viewBox="0 0 250 56" role="img">
+    <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset=".49" stop-color="#262c38"/><stop offset=".5" stop-color="#0d1014"/><stop offset=".51" stop-color="#1a1f28"/></linearGradient></defs>
+    <g font-family="monospace" font-weight="bold" font-size="34" fill="#ffb81c" text-anchor="middle">
+      <rect x="2" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="22" y="39">I</text>
+      <rect x="48" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="68" y="39">C</text>
+      <rect x="94" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="114" y="39">A</text>
+      <rect x="140" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="160" y="39">O</text>
+    </g>
+    <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
+  <small id="round"></small></h2>
+<div id="menu">
+  <p>Guess the airport's ICAO code.</p>
+  <button data-m="easy">Easy<small>Major international airports</small></button>
+  <button data-m="medium">Medium<small>International &amp; private-jet airports</small></button>
+  <button data-m="hard">Hard<small>Local, small airports</small></button>
+  <button id="customBtn">Custom game&hellip;</button>
+</div>
+<div id="custom" hidden>
+  <p>Set up a custom game.</p>
+  <div id="opts">
+    <label>Format <select id="fmt"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label>
+    <label>State <select id="st"><option value="">All states (daily set)</option></select></label>
+    <label>Difficulty <select id="diff"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label>
+    <small class="note">Pick a state to practice 5 random airports there (not scored globally).</small>
+  </div>
+  <button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button>
+</div>
+<div id="game" hidden>
+  <div id="board"><div id="lcol"><div id="flap"></div>
+    <div id="nav"><button id="back">&#9664; Back</button><button id="next">Next &#9654;</button></div></div><div id="map"></div><div id="col"><div id="guesses"></div></div></div>
+  <div id="hint"></div>
+  <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K prefix or without." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <button id="go">Guess</button> <button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button> <button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)">Give up</button></form>
+  <div id="msg"></div>
+  <div id="stats" hidden>
+    <div id="statline"></div>
+    <canvas id="chart" width="600" height="220" hidden></canvas>
+    <div id="endbtns"><button id="review" class="ghost">Review rounds</button><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href='/'">Play another difficulty</button></div>
+  </div>
+</div>
+<p><button id="reset" hidden>Dev: reset all stats</button></p>
+</main>
+<footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.7" aria-label="Volume"></div><div id="timer"></div></footer>
+<script>
+if(location.hostname=="localhost"){$reset=document.getElementById("reset");$reset.hidden=false;
+  $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
+    await fetch("/api/reset",{method:"POST"});try{localStorage.clear()}catch{}location.reload()}}
+const PER=5, TRIES=4; // 3 hint stages => 4th guess is the last
+let DAY,MODE,today,SAVE,S,map,mark,$=id=>document.getElementById(id);
+// New sets generate at UTC midnight (matches server.js).
+function tick(){const m=Math.floor(((Math.floor(Date.now()/864e5)+1)*864e5-Date.now())/6e4);$("timer").textContent=`New set in ${Math.floor(m/60)}h ${m%60}m`}
+tick();setInterval(tick,3e4);
+// Menu: a difficulty already finished today (this browser) shows a green check + your score; click it to see the results and review the rounds.
+document.querySelectorAll("#menu button[data-m]").forEach(b=>{try{
+  const s=JSON.parse(localStorage[`icaodle${Math.floor(Date.now()/864e5)}${b.dataset.m}`]); // same UTC day key the game saves under
+  if(s.scores.length>=PER){b.classList.add("done");b.title="View today's results";
+    b.insertAdjacentHTML("beforeend",`<span class="check">✓ ${s.scores.reduce((a,c)=>a+c,0)}/${PER*TRIES}</span>`)}}catch{}});
+// Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
+// pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
+let SND=null;
+const snd=e=>SND&&SND.play(e);
+const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 Sound on":"🔇 Sound off";$("mute").setAttribute("aria-pressed",String(!on));if(SND)$("vol").value=SND.volume};
+(async()=>{try{
+  const [{createSound},{createUISFX}]=await Promise.all([import("/sfx.js"),import("/vendor/uisfx.js")]);
+  SND=createSound({createUISFX,storage:localStorage,AudioContextCtor:window.AudioContext||window.webkitAudioContext});
+  for(const ev of ["pointerdown","keydown"])addEventListener(ev,()=>SND.unlock(),{capture:true}); // genuine gestures only
+  addEventListener("pagehide",()=>SND.destroy()); // final teardown: player first, then its AudioContext
+  paintSound();
+}catch{}})();
+$("mute").onclick=()=>{if(!SND)return;SND.unlock();SND.setEnabled(!SND.enabled);paintSound()};
+$("vol").oninput=()=>SND&&SND.setVolume($("vol").value);
+paintSound();
+// Split-flap display: each cell steps through the ring one flap at a time until it lands on the target letter.
+const RING="-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+// One flap word per round (PER of them), each starting as K---; a solved/lost round keeps its answer.
+$("flap").innerHTML=Array.from({length:PER},()=>`<div class="w">${[..."K---"].map(c=>`<span>${c}</span>`).join("")}<div class="nm"></div></div>`).join("");
+function flap(word,r,i=0){ // left to right: each letter lands before the next one starts
+  if(i>=word.length)return;const el=$("flap").children[r].children[i];
+  const n=(RING.indexOf(word[i])-RING.indexOf(el.textContent)+RING.length)%RING.length,gap=500/(n||1); // each letter takes ~0.5s however far it has to flip
+  (function step(){if(el.textContent==word[i])return flap(word,r,i+1);el.textContent=RING[(RING.indexOf(el.textContent)+1)%RING.length];snd("flap");
+    el.classList.remove("f");void el.offsetWidth;el.classList.add("f");setTimeout(step,gap)})()}
+// Round over: flap to the answer, then wait for Next (which flaps back to K--- and loads the next round).
+const nameOf=r=>$("flap").children[r].querySelector(".nm").textContent=today[r][6];
+const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
+// V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next; Next from the last finished round returns to play.
+let V=0;
+const navs=()=>{$("back").disabled=V<=0;$("next").disabled=V>=S.i;[...$("flap").children].forEach((g,i)=>g.classList.toggle("cur",i==V))};
+// Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
+function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
+  $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=$("back").disabled=$("next").disabled=true;
+  setTimeout(()=>{$("msg").textContent="";if(S.i>=PER)snd(S.scores.every(v=>v>0)?"perfect":"finish");show();$("g").focus()},1500)}
+$("next").onclick=()=>{snd("forward");$("msg").textContent="";V+1<S.i?view(V+1):(show(),$("g").focus())};
+$("back").onclick=()=>{snd("back");$("msg").textContent="";view(V-1)};
+function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
+// The key lives in .env on the server (never in this file or git); the browser still has to receive it, so restrict it by referrer in Google Cloud.
+function loadMaps(){return fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
+  window.gm_authFailure=()=>{$("map").textContent="Google Maps rejected the API key (check key, enabled APIs, billing, referrer)."};
+  const s=document.createElement("script");s.src=`https://maps.googleapis.com/maps/api/js?key=${key}`;s.onload=ok;s.onerror=bad;document.head.append(s)}))}
+let FMT="map",ST="",PRACTICE=false;
+// Menu options persist (localStorage) so "Change state" returns to the same selection; ?go=&fmt=&st= auto-starts (used by Play again).
+fetch("/api/states").then(r=>r.json()).then(list=>{
+  $("st").innerHTML+=list.map(x=>`<option>${x}</option>`).join("");
+  const p=new URLSearchParams(location.search);let o={};try{o=JSON.parse(localStorage.icaoOpts)}catch{}
+  $("fmt").value=p.get("fmt")||o.fmt||"map";$("st").value=p.get("st")??o.st??"";
+  $("diff").value=o.diff||"easy";
+  if(p.get("go"))start(p.get("go"),p.get("fmt")||"map",p.get("st")||"")});
+document.querySelectorAll("#menu button[data-m]").forEach(b=>b.onclick=()=>start(b.dataset.m,"map","")); // daily: map, all states
+$("customBtn").onclick=()=>{snd("open");$("menu").hidden=true;$("custom").hidden=false};
+$("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidden=false};
+$("customGo").onclick=()=>{try{localStorage.icaoOpts=JSON.stringify({fmt:$("fmt").value,st:$("st").value,diff:$("diff").value})}catch{}start($("diff").value,$("fmt").value,$("st").value)};
+async function start(m,fmt,st){
+  MODE=m;FMT=fmt;ST=st;PRACTICE=!!ST;
+  const d=await fetch(PRACTICE?`/api/state?mode=${m}&state=${ST}`:"/api/today?mode="+m).then(r=>r.json());
+  DAY=d.day;today=d.airports;SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
+  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
+  snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
+  $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
+  today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
+  if(FMT=="city")$("map").classList.add("txt"); // no map in this format: the city and state are the whole prompt
+  else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,gestureHandling:"greedy",center:{lat:39,lng:-98},zoom:4})}
+  show();$("g").focus()}
+// Right column: your guesses (4 slots = guesses left), then the clue buttons. A clue button costs one guess and turns into its answer.
+const REGION={};
+for(const [r,list] of Object.entries({Northeast:"CT ME MA NH RI VT NJ NY PA",Midwest:"IL IN MI OH WI IA KS MN MO NE ND SD",South:"DE FL GA MD NC SC VA DC WV AL KY MS TN AR LA OK TX",West:"AZ CO ID MT NV NM UT WY AK CA HI OR WA"}))for(const st of list.split(" "))REGION[st]=r;
+const LABEL={loc:"City, State",name:"Airport name",region:"Region",landmark:"Famous landmark",elev:"Elevation"};
+function side(){
+  const t=today[S.i],f=S.fails,c=t[0],city=FMT=="city",bought=Array.isArray(S.clues)?S.clues:[],
+  mask=x=>x.replace(/(\S)(\S*)/g,(m,p,q)=>p+"_".repeat(q.length)),
+  val={loc:`${t[1]}, ${t[2]}`,name:mask(t[6]),region:REGION[t[2]]||"Unknown",landmark:t[8],elev:`${t[7].toLocaleString()} ft`},
+  keys=(city?["name","region","landmark","elev"]:["loc","region","landmark","elev"]).filter(k=>val[k]), // no landmark data = no landmark button
+  free=city?[]:f>=2?["loc"]:[], // map format: the 2nd miss gives the city and state for free (the game's original hint ladder)
+  canBuy=f<TRIES-1; // a clue can't spend your last guess
+  $("guesses").innerHTML="<b>Guesses</b>"+Array.from({length:TRIES},(_,k)=>`<div>${(S.guesses||[])[k]||"&mdash;"}</div>`).join("")
+    +(!CLUES?"":"<hr><b>Clues</b>"+keys.map(k=>bought.includes(k)||free.includes(k)?`<div>${val[k]}</div>`:`<button data-k="${k}" ${canBuy?"":"disabled"}>${LABEL[k]}</button>`).join("")
+    +(f>=TRIES-1?`<div>Starts with K${c[1]}</div>`:""))} // last guess: the first letter, as in the original hint ladder
+const CLUES=false; // clues are switched off for now (no buttons, no free hints); set to true to bring the Clues section back
+$("guesses").onclick=e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k||busy||S.fails>=TRIES-1)return;
+  (S.clues=Array.isArray(S.clues)?S.clues:[]).push(k);S.fails++;(S.guesses||=[]).push(LABEL[k]);snd("wrong");save();show()};
+// Skip (next to Guess): passes this guess without a clue. On the last guess it forfeits the round (counts as a loss).
+function forfeit(text){const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];S.clues=[];
+  $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
+$("skip").onclick=()=>{if(S.i>=PER||busy)return;
+  if(S.fails>=TRIES-1)return forfeit("Skipped");
+  S.fails++;(S.guesses||=[]).push("skip");snd("skip");save();show()};
+// Give up (next to Skip): ends this round now as a loss, whatever guesses are left.
+$("giveup").onclick=()=>{if(S.i>=PER||busy)return;if(confirm("Give up this round? It counts as a loss."))forfeit("Gave up")};
+function setMap(t,zoom,minZ){
+  if(FMT=="city"){$("map").innerHTML=`<span>${t[1]}<br>${t[2]}</span>`;return}const lat=t[3],lon=t[4],B=.03;
+  // Free pan/zoom, but limited: can't pan far from the airport, can't zoom out past the starting view until the zoom-out hint (1st miss) unlocks it.
+  map.setOptions({minZoom:minZ,maxZoom:Math.min(20,t[5]+3),restriction:{latLngBounds:{north:lat+B,south:lat-B,east:lon+B,west:lon-B}}});
+  map.setCenter({lat,lng:lon});map.setZoom(zoom)}
+function show(){
+  V=S.i;navs();
+  if(S.i>=PER)return end();
+  $("g").disabled=$("go").disabled=false;$("skip").disabled=$("giveup").disabled=false;
+  const t=today[S.i],[c,city,st,,,z]=t,f=S.fails;
+  $("round").textContent=`${MODE} ${S.i+1}/${PER}`;
+  side();setMap(t,f>=1?10:z,f>=1?10:z-1);
+  $("hint").textContent=""; // clues live in the right column now; the guess count is the empty slots in Guesses
+}
+function view(v){ // review a finished round: its airport, answer and result; no guessing
+  V=v;navs();const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
+  $("round").textContent=`${MODE} ${v+1}/${PER}`;
+  $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
+  setMap(t,t[5],t[5]-1);$("hint").textContent=""}
+const HOT=500; // miles: within this = hot, otherwise cold
+const miles=(a,b,c,d)=>{const r=Math.PI/180,h=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 3959*2*Math.asin(Math.sqrt(h))};
+let busy;
+$("f").onsubmit=async e=>{e.preventDefault();
+  if(S.i>=PER||busy)return;
+  let g=$("g").value.trim().toUpperCase(); $("g").value="";
+  if(g.length==3)g="K"+g; if(!/^K[A-Z]{3}$/.test(g))return;
+  busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
+  if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
+    if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
+  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent="";snd("correct")}
+  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl})`;snd("lost")}
+  else snd("wrong")
+  busy=0;save();S.i>i0?reveal(c):show()};
+// Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
+$("review").onclick=()=>{snd("open");$("stats").hidden=true;$("board").hidden=$("nav").hidden=false;$("msg").textContent="";$("hint").textContent="";view(0)};
+function end(){
+  const t=S.scores.reduce((a,b)=>a+b,0);
+  $("f").hidden=$("board").hidden=$("nav").hidden=true;$("stats").hidden=$("again").hidden=false;$("board").hidden=true;
+  const right=S.scores.filter(v=>v>0).length;
+  $("statline").innerHTML=`You: <b>${right}/${PER}</b> right &middot; <b>${t}/${PER*TRIES}</b> points`;
+  $("hint").textContent=`Done! ${MODE}${PRACTICE?" · "+ST:""} score ${t}/${PER*TRIES}`;
+  $("again").textContent=PRACTICE?"Change state":"Play another difficulty";
+  $("msg").textContent=today.map((a,i)=>a[0]+":"+S.scores[i]).join("  ");
+  if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
+  let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
+  fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score:t,right})}).then(r=>r.json()).then(d=>chart(d,t,right)).catch(()=>{$("msg").textContent+="  (no global stats yet)"})}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function chart(d,me,right){
+  const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1),w=c.width/n,base=190;
+  c.hidden=false;x.clearRect(0,0,c.width,c.height);
+  for(let k=0;k<n;k++){const h=(dist[k]||0)/m*150;x.globalAlpha=k==me?1:.35;x.fillStyle=k==me?css("--brand"):css("--text");x.fillRect(k*w+2,base-h,w-4,h);x.globalAlpha=1}
+  x.fillStyle=css("--muted");x.font="11px system-ui";x.textAlign="center";for(let k=0;k<n;k+=5)x.fillText(k,k*w+w/2,base+14);
+  // dotted vertical lines: the average player's score and yours; labels sit on opposite sides so they don't collide
+  const mark=(v,col,label,y,align)=>{const px=(v+.5)*w;x.strokeStyle=x.fillStyle=col;x.lineWidth=2;x.setLineDash([4,4]);
+    x.beginPath();x.moveTo(px,34);x.lineTo(px,base);x.stroke();x.setLineDash([]);x.font="bold 12px system-ui";x.textAlign=align;x.fillText(label,px+(align=="left"?5:-5),y)};
+  const lowAvg=d.avg<=me;
+  mark(d.avg,css("--text"),`Average ${d.avg.toFixed(1)}`,12,lowAvg?"right":"left");
+  mark(me,css("--brand"),`You ${me}`,26,lowAvg?"left":"right");
+  $("statline").innerHTML=`You: <b>${right}/${PER}</b> right &middot; <b>${me}/${PER*TRIES}</b> points<br>Average player (${d.n} played): <b>${d.avgRight==null?"–":d.avgRight.toFixed(1)}/${PER}</b> right &middot; <b>${d.avg.toFixed(1)}</b> points`}
+</script>

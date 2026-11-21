@@ -1,0 +1,81 @@
+// node server.js — zero dependencies. Serves the page, daily airport sets, and score stats.
+const http = require("http"), fs = require("fs");
+const FILE = "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
+try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
+const AIR = JSON.parse(fs.readFileSync("airports.json"));
+// Famous-landmark clue: landmarks.json comes from build-landmarks.js; airports without one simply don't offer that clue (a[8] = null).
+let LM = {}; try { LM = JSON.parse(fs.readFileSync("landmarks.json")); } catch {}
+for (const a of Object.values(AIR).flat()) a[8] = LM[a[0]] || null;
+const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
+// States with at least PER airports can be played as practice games.
+const STATES = [...new Set([...ALL.values()].map(a => a[2]))].filter(s => [...ALL.values()].filter(a => a[2] === s).length >= PER).sort();
+const ORDER = { easy: ["easy", "medium", "hard"], medium: ["medium", "hard", "easy"], hard: ["hard", "medium", "easy"] };
+let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...JSON.parse(fs.readFileSync(FILE)) }; } catch {}
+// db.sets["day:mode"] = 5 airports; db.used[mode] = icaos already served (no repeats until the pool runs out); db.scores["day:mode"] = {playerId: total}
+const day = () => Math.floor(Date.now() / 864e5), save = () => fs.writeFileSync(FILE, JSON.stringify(db));
+
+function ensure(d) {
+  for (const m of MODES) {
+    if (db.sets[d + ":" + m]) continue;
+    let pool = AIR[m].filter(a => !(db.used[m] || []).includes(a[0]));
+    if (pool.length < PER) { db.used[m] = []; pool = AIR[m]; } // pool exhausted: start over
+    const pick = [];
+    while (pick.length < PER) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    db.sets[d + ":" + m] = pick;
+    (db.used[m] ||= []).push(...pick.map(a => a[0]));
+  }
+  for (const k of Object.keys(db.sets)) if (+k.split(":")[0] < d - 2) delete db.sets[k]; // keep the file small
+  save();
+}
+// Daily loop: generate tomorrow's sets at each UTC midnight. ensure() on startup + per request also covers downtime.
+(function tick() { ensure(day()); setTimeout(tick, (day() + 1) * 864e5 - Date.now() + 1000); })();
+
+// dist = how many players got each total; avg / avgRight = mean points / mean rounds solved
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const counts = k => { const dist = {}, s = Object.values(db.scores[k] || {}); for (const t of s) dist[t] = (dist[t] || 0) + 1; return { dist, n: s.length, avg: mean(s), avgRight: mean(Object.values(db.right[k] || {})) }; };
+http.createServer((req, res) => {
+  const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json" }), res.end(JSON.stringify(o)));
+  if (req.method === "GET" && u.pathname === "/") return res.writeHead(200, { "content-type": "text/html" }), res.end(fs.readFileSync("index.html"));
+  if (req.method === "GET" && u.pathname === "/style.css") return res.writeHead(200, { "content-type": "text/css" }), res.end(fs.readFileSync("style.css"));
+  if (req.method === "GET" && u.pathname === "/api/sounds") return json(fs.existsSync("sounds") ? fs.readdirSync("sounds").filter(f => /\.(mp3|wav|ogg)$/.test(f)) : []); // which of your sound files exist (so the page never probes for missing ones)
+  if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) { // sound effects the user drops in ./sounds
+    const f = "sounds/" + u.pathname.slice(8), type = { mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg" }[f.split(".").pop()];
+    if (!fs.existsSync(f)) return json({ error: "not found" }, 404);
+    return res.writeHead(200, { "content-type": type }), res.end(fs.readFileSync(f));
+  }
+  if (req.method === "GET" && (u.pathname === "/sfx.js" || u.pathname === "/vendor/uisfx.js")) // game audio module + the uisfx player (self-contained ES module)
+    return res.writeHead(200, { "content-type": "text/javascript" }), res.end(fs.readFileSync(u.pathname === "/sfx.js" ? "sfx.mjs" : "node_modules/uisfx/dist/index.js"));
+  if (req.method === "GET" && u.pathname === "/api/config") return json({ key: process.env.GOOGLE_MAPS_KEY || "" });
+  if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
+    const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
+  }
+  if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
+  if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
+    const st = u.searchParams.get("state");
+    if (!MODES.includes(mode) || !STATES.includes(st)) return json({ error: "bad request" }, 400);
+    const pick = [];
+    for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => a[2] === st); while (pick.length < PER && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
+    return json({ day: day(), airports: pick });
+  }
+  if (req.method === "GET" && u.pathname === "/api/today") {
+    if (!MODES.includes(mode)) return json({ error: "bad mode" }, 400);
+    ensure(day()); return json({ day: day(), airports: db.sets[day() + ":" + mode].map(a => ALL.get(a[0]) || a) });
+  }
+  if (req.method === "POST" && u.pathname === "/api/reset") { // dev only: loopback clients can wipe all score stats
+    if (!/^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress)) return json({ error: "forbidden" }, 403);
+    db.scores = {}; db.right = {}; save(); return json({ ok: true });
+  }
+  if (req.method === "POST" && u.pathname === "/api/score") {
+    let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
+    return req.on("end", () => {
+      let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && typeof p.id === "string" && p.id.length <= 64 && /^(easy|medium|hard)(-city)?$/.test(p.mode) && Math.abs(p.day - day()) <= 1 && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
+      if (!ok) return json({ error: "invalid" }, 400);
+      const k = p.day + ":" + p.mode, d = (db.scores[k] ||= {});
+      if (!(p.id in d)) { d[p.id] = p.score; if (p.right !== undefined) (db.right[k] ||= {})[p.id] = p.right; save(); } // first submission per player per day+mode wins
+      json(counts(k));
+    });
+  }
+  json({ error: "not found" }, 404);
+}).listen(process.env.PORT || 3000, () => console.log("http://localhost:" + (process.env.PORT || 3000)));
+// ponytail: JSON file + sync write, one process. Swap for SQLite/Redis if traffic outgrows it. Player id is client-generated, so not cheat-proof; answers are sent to the client.
