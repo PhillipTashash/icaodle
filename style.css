@@ -195,6 +195,7 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
   #menuBack{position:static;width:3em;height:3.4rem}
   #f input{flex:1;min-width:0;width:auto;height:3.4rem;align-self:auto}
   #acts{flex:1 1 100%;width:100%}
+  #giveup{grid-column:1;grid-row:2} #skip{grid-column:2;grid-row:2} /* phone: Give up on the left, Skip on the right */
   #go{height:3.4rem}
   #skip,#giveup{font-size:.9em;padding:.65em 1em}
   #help::after{left:0;transform:none} /* the tooltip would run off the left edge if it were centered */
