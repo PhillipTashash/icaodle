@@ -68,7 +68,7 @@ function paintMenu(){
   document.querySelectorAll("#menu button[data-m]").forEach(b=>{b.classList.remove("done");b.title="";const old=b.querySelector(".check");if(old)old.remove();try{
     const s=JSON.parse(localStorage[`icaodle${PICK}${b.dataset.m}`]); // the same key the game saves under
     if(s.scores.length>=PER){b.classList.add("done");b.title="View results";
-      b.insertAdjacentHTML("beforeend",`<span class="check">✓ ${s.scores.reduce((a,c)=>a+c,0)}/${PER*TRIES}</span>`)}}catch{}})}
+      b.firstChild.after(Object.assign(document.createElement("span"),{className:"check",textContent:`✓ ${s.scores.reduce((a,c)=>a+c,0)}/${PER*TRIES}`}))}}catch{}})} // the check and score sit inside the button, after its name
 $("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
 $("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
 paintMenu();
@@ -181,24 +181,21 @@ SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice 
   if(FMT=="city")$("map").classList.add("txt"); // no map in this format: the city and state are the whole prompt
   else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
   show();focusInput()}
-// Right column: Guesses (used/4), and under it Clues. "Show Clue" reveals the next clue and costs one guess: region, then city/state, then the first letter.
+// Right column: Guesses (used/4), and under it Clues. Each miss unlocks the next clue and it pops in: region, then city/state, then the first letter.
 const REGION={};
 for(const [r,list] of Object.entries({"Pacific Northwest":"WA OR","West Coast":"CA","Mountain West":"ID MT WY CO UT NV","Southwest":"AZ NM TX OK","Great Plains":"ND SD NE KS","Midwest":"MN IA MO WI IL IN MI OH","South":"AR LA MS AL TN KY","Southeast":"FL GA SC NC VA WV","Mid-Atlantic":"NY NJ PA DE MD DC","New England":"ME NH VT MA RI CT",Alaska:"AK",Hawaii:"HI"}))for(const st of list.split(" "))REGION[st]=r;
 const CLUE_KEYS=["region","loc","first"];
+let seenClues={i:-1,n:0}; // how many clues of this round were already showing, so only a newly unlocked one pops up
 function side(){
-  const t=today[S.i],f=S.fails,got=S.clues||[],
+  const t=today[S.i],f=S.fails,n=Math.min(f,CLUE_KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
   val={region:REGION[t[2]]||t[2],
     loc:FMT=="city"?`Elevation: ${t[7].toLocaleString()} ft`:`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the elevation
-    first:`Starts with ${t[0][1]}`}; // the letter after the K
+    first:`Starts with ${t[0][1]}`}, // the letter after the K
+  known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
+  seenClues={i:S.i,n};
   $("guesses").innerHTML=`<b>Guesses ${f}/${TRIES}</b>`+Array.from({length:TRIES},(_,k)=>`<div>${(S.guesses||[])[k]||"&mdash;"}</div>`).join("");
-  $("cluebox").innerHTML="<b>Clues</b>"+got.map(k=>`<div>${val[k]}</div>`).join("")
-    +`<button id="clue" ${got.length>=CLUE_KEYS.length||f>=TRIES-1?"disabled":""}>Show Clue</button>`} // can't spend your last guess
-$("cluebox").onclick=e=>{if(e.target.id!="clue"||busy||S.i>=PER)return;
-  const got=S.clues||(S.clues=[]);
-  if(got.length>=CLUE_KEYS.length||S.fails>=TRIES-1)return;
-  got.push(CLUE_KEYS[got.length]);S.fails++;(S.guesses||=[]).push("clue");snd("clue");save();show()};
-// Skip (next to Guess): passes this guess without a clue. On the last guess it forfeits the round (counts as a loss).
-function forfeit(text){const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];S.clues=[];
+  $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((k,j)=>`<div${j>=known?' class="pop"':""}>${val[k]}</div>`).join("")}
+function forfeit(text){const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
 $("skip").onclick=()=>{if(S.i>=PER||busy)return;
   if(S.fails>=TRIES-1)return forfeit("Skipped");
@@ -242,8 +239,8 @@ $("f").onsubmit=async e=>{e.preventDefault();
   busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
   if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
     if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
-  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent="";snd("correct");confetti()}
-  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];S.clues=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl})`;snd("lost")}
+  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("correct");confetti()}
+  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl})`;snd("lost")}
   else snd("wrong")
   busy=0;save();S.i>i0?reveal(c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
