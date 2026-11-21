@@ -17,6 +17,7 @@
   <small id="round"></small></h2>
 <div id="menu">
   <p>Guess the airport's ICAO code.</p>
+  <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
   <button data-m="easy">Easy<small>Major international airports</small></button>
   <button data-m="medium">Medium<small>International &amp; private-jet airports</small></button>
   <button data-m="hard">Hard<small>Local, small airports</small></button>
@@ -41,7 +42,7 @@
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="statline"></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="endbtns"><button id="review" class="ghost">Review rounds</button><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href='/'">Play another difficulty</button></div>
+    <div id="endbtns"><button id="review" class="ghost">Review rounds</button><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Play another difficulty</button></div>
   </div>
 </div>
 <p><button id="reset" hidden>Dev: reset all stats</button></p>
@@ -56,11 +57,22 @@ let DAY,MODE,today,SAVE,S,map,$=id=>document.getElementById(id);
 // New sets generate at UTC midnight (matches server.js).
 function tick(){const m=Math.floor(((Math.floor(Date.now()/864e5)+1)*864e5-Date.now())/6e4);$("timer").textContent=`New set in ${Math.floor(m/60)}h ${m%60}m`}
 tick();setInterval(tick,3e4);
-// Menu: a difficulty already finished today (this browser) shows a green check + your score; click it to see the results and review the rounds.
-document.querySelectorAll("#menu button[data-m]").forEach(b=>{try{
-  const s=JSON.parse(localStorage[`icaodle${Math.floor(Date.now()/864e5)}${b.dataset.m}`]); // same UTC day key the game saves under
-  if(s.scores.length>=PER){b.classList.add("done");b.title="View today's results";
-    b.insertAdjacentHTML("beforeend",`<span class="check">✓ ${s.scores.reduce((a,c)=>a+c,0)}/${PER*TRIES}</span>`)}}catch{}});
+// Menu date picker: the daily sets can be opened for any earlier day back to FIRST, the day the server's database was started. Games played on an
+// earlier day count in that day's stats too. A difficulty already finished on the chosen day shows a green check + score; click it to see the results.
+const TODAY=Math.floor(Date.now()/864e5);
+let PICK=TODAY,FIRST=TODAY; // FIRST is replaced by the server's answer just below (until then there is nothing earlier to open)
+const dayText=(n,short)=>new Date(n*864e5).toLocaleDateString(undefined,short?{month:"short",day:"numeric",timeZone:"UTC"}:{weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}); // days are UTC, like the server
+function paintMenu(){
+  $("dlabel").innerHTML=dayText(PICK)+(PICK==TODAY?"<small>Today</small>":"");
+  $("dprev").disabled=PICK<=FIRST;$("dnext").disabled=PICK>=TODAY;
+  document.querySelectorAll("#menu button[data-m]").forEach(b=>{b.classList.remove("done");b.title="";const old=b.querySelector(".check");if(old)old.remove();try{
+    const s=JSON.parse(localStorage[`icaodle${PICK}${b.dataset.m}`]); // the same key the game saves under
+    if(s.scores.length>=PER){b.classList.add("done");b.title="View results";
+      b.insertAdjacentHTML("beforeend",`<span class="check">✓ ${s.scores.reduce((a,c)=>a+c,0)}/${PER*TRIES}</span>`)}}catch{}})}
+$("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
+$("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
+paintMenu();
+fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
 let SND=null;
@@ -74,7 +86,9 @@ const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 
   paintSound();
 }catch{}})();
 // Back-arrow button (left edge of the answer panel): leave to the main menu. Daily progress is saved; a practice game isn't, so that one asks first.
-$("menuBack").onclick=()=>{if(PRACTICE&&S&&S.i<PER&&!confirm("Leave this practice game? Practice games aren't saved."))return;location.href="/"};
+const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "easy · Nov 20 1/5" on an earlier day
+const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
+$("menuBack").onclick=()=>{if(PRACTICE&&S&&S.i<PER&&!confirm("Leave this practice game? Practice games aren't saved."))return;location.href=menuUrl()};
 $("mute").onclick=()=>{if(!SND)return;SND.unlock();SND.setEnabled(!SND.enabled);paintSound()};
 $("vol").oninput=()=>SND&&SND.setVolume($("vol").value);
 paintSound();
@@ -163,8 +177,9 @@ $("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidde
 $("customGo").onclick=()=>{try{localStorage.icaoOpts=JSON.stringify({fmt:$("fmt").value,st:$("st").value,diff:$("diff").value})}catch{}start($("diff").value,$("fmt").value,$("st").value||"ALL")}; // a custom game is never the daily set: no state = random airports from any state
 async function start(m,fmt,st){
   MODE=m;FMT=fmt;ST=st;PRACTICE=!!ST;
-  const d=await fetch(PRACTICE?`/api/state?mode=${m}&state=${ST}`:"/api/today?mode="+m).then(r=>r.json());
-  DAY=d.day;today=d.airports;SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
+  const d=await fetch(PRACTICE?`/api/state?mode=${m}&state=${ST}`:`/api/today?mode=${m}&day=${PICK}`).then(r=>r.json());
+  DAY=d.day;today=d.airports;document.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
+SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
   S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
   snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
@@ -216,12 +231,12 @@ function show(){
   if(S.i>=PER)return end();
   $("g").disabled=$("go").disabled=false;$("skip").disabled=$("giveup").disabled=false;
   const t=today[S.i],[c,city,st,,,z]=t,f=S.fails;
-  $("round").textContent=`${MODE} ${S.i+1}/${PER}`;
+  $("round").textContent=`${MODE}${dateTag()} ${S.i+1}/${PER}`;
   side();setMap(t,f>=1?10:z,f>=1?10:z-1);
 }
 function view(v){ // review a finished round: its airport, answer and result; no guessing
   V=v;navs();$("cluebox").hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
-  $("round").textContent=`${MODE} ${v+1}/${PER}`;
+  $("round").textContent=`${MODE}${dateTag()} ${v+1}/${PER}`;
   $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
   setMap(t,t[5],t[5]-1)}
 const HOT=500; // miles: within this = hot, otherwise cold

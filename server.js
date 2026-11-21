@@ -12,6 +12,7 @@ let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...J
 const day = () => Math.floor(Date.now() / 864e5), save = () => fs.writeFileSync(FILE, JSON.stringify(db));
 
 function ensure(d) {
+  db.first ??= d; // the archive starts the day this database was first started
   for (const m of MODES) {
     if (db.sets[d + ":" + m]) continue;
     let pool = AIR[m].filter(a => !(db.used[m] || []).includes(a[0]));
@@ -21,8 +22,21 @@ function ensure(d) {
     db.sets[d + ":" + m] = pick;
     (db.used[m] ||= []).push(...pick.map(a => a[0]));
   }
-  for (const k of Object.keys(db.sets)) if (+k.split(":")[0] < d - 2) delete db.sets[k]; // keep the file small
   save();
+}
+// Archive: players can open any day from db.first (the day this database was started) up to today. A day nobody has opened yet gets a stable
+// set from a seeded shuffle, stored so it never changes; today's sets come from ensure() above.
+const validDay = d => Number.isInteger(d) && d <= day() && d >= db.first;
+function setFor(d, m) {
+  const k = d + ":" + m;
+  if (!db.sets[k]) {
+    let a = ((d * 2654435761) + MODES.indexOf(m) * 40503) >>> 0;
+    const rand = () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pool = AIR[m].slice(), pick = [];
+    while (pick.length < PER) pick.push(pool.splice(Math.floor(rand() * pool.length), 1)[0]);
+    db.sets[k] = pick; save();
+  }
+  return db.sets[k].map(a => ALL.get(a[0]) || a);
 }
 // Daily loop: generate tomorrow's sets at each UTC midnight. ensure() on startup + per request also covers downtime.
 (function tick() { ensure(day()); setTimeout(tick, (day() + 1) * 864e5 - Date.now() + 1000); })();
@@ -56,6 +70,7 @@ http.createServer((req, res) => {
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
   }
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
+  if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
     const st = u.searchParams.get("state");
     if (!MODES.includes(mode) || (st !== "ALL" && !STATES.includes(st))) return json({ error: "bad request" }, 400); // "ALL" = any state
@@ -65,7 +80,9 @@ http.createServer((req, res) => {
   }
   if (req.method === "GET" && u.pathname === "/api/today") {
     if (!MODES.includes(mode)) return json({ error: "bad mode" }, 400);
-    ensure(day()); return json({ day: day(), airports: db.sets[day() + ":" + mode].map(a => ALL.get(a[0]) || a) });
+    const d = u.searchParams.has("day") ? +u.searchParams.get("day") : day(); // ?day=N (a UTC day number) opens an earlier day from the archive
+    if (!validDay(d)) return json({ error: "day out of range" }, 400);
+    ensure(day()); return json({ day: d, airports: setFor(d, mode) });
   }
   if (req.method === "POST" && u.pathname === "/api/reset") { // dev only: loopback clients can wipe all score stats
     if (!/^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress)) return json({ error: "forbidden" }, 403);
@@ -75,7 +92,7 @@ http.createServer((req, res) => {
     let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
     return req.on("end", () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
-      const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && typeof p.id === "string" && p.id.length <= 64 && /^(easy|medium|hard)(-city)?$/.test(p.mode) && Math.abs(p.day - day()) <= 1 && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
+      const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && typeof p.id === "string" && p.id.length <= 64 && /^(easy|medium|hard)(-city)?$/.test(p.mode) && validDay(p.day) && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
       if (!ok) return json({ error: "invalid" }, 400);
       const k = p.day + ":" + p.mode, d = (db.scores[k] ||= {});
       if (!(p.id in d)) { d[p.id] = p.score; if (p.right !== undefined) (db.right[k] ||= {})[p.id] = p.right; save(); } // first submission per player per day+mode wins

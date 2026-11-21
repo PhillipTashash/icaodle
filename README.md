@@ -28,6 +28,8 @@ The container listens on plain HTTP. For HTTPS, put a reverse proxy in front (Ca
 docker run --rm -v icaodle_icaodle-data:/data -v "$PWD":/backup alpine cp /data/data.json /backup/data.json
 ```
 
+**Past days.** The menu has a date picker. The archive starts the day the database is first created (today, on a fresh install) and grows by one day each day: players can step back to any earlier day and play that day's sets, and those games count in that day's stats. A day nobody has opened yet gets a stable set from a seeded shuffle.
+
 **Updating.** `git pull && docker compose up -d --build`. New daily sets are generated automatically at midnight UTC.
 
 **Sounds.** The game uses the built-in sound pack plus any `correct.wav`, `wrong.wav`, `lost.wav`, `skip.wav`, `finish.wav` or `flap.wav` in `sounds/` (see `sounds/README.md`). To swap files without rebuilding, uncomment the `./sounds` volume line in `docker-compose.yml`.
