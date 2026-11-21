@@ -94,26 +94,17 @@ $("menuBack").onclick=()=>{if(PRACTICE&&S&&S.i<PER&&!confirm("Leave this practic
 $("mute").onclick=()=>{if(!SND)return;SND.unlock();SND.setEnabled(!SND.enabled);paintSound()};
 $("vol").oninput=()=>SND&&SND.setVolume($("vol").value);
 paintSound();
-// Which way does the plane glyph's nose point? It depends on the font (right in Windows' Segoe UI Symbol, up-right in some others), so measure it once:
-// draw it off-screen, take its long axis, and call the narrower end (the nose; the tail has the wide stabilizers) the front. NOSE is an angle (0 = right).
-const PLANE_FONT="'Segoe UI Symbol','Apple Symbols','Noto Sans Symbols 2',sans-serif";
-const NOSE=(()=>{try{
-  const n=120,c=document.createElement("canvas");c.width=c.height=n;const x=c.getContext("2d");
-  x.font="90px "+PLANE_FONT;x.textAlign="center";x.textBaseline="middle";x.fillText("\u2708\uFE0E",n/2,n/2);
-  const d=x.getImageData(0,0,n,n).data,pts=[];let sx=0,sy=0;
-  for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(d[(i*n+j)*4+3]>128){pts.push([j,i]);sx+=j;sy+=i}
-  if(pts.length<50)return -Math.PI/4; // no glyph rendered: assume the common up-right plane
-  const mx=sx/pts.length,my=sy/pts.length;let sxx=0,syy=0,sxy=0;for(const [px,py] of pts){sxx+=(px-mx)**2;syy+=(py-my)**2;sxy+=(px-mx)*(py-my)}
-  const a=.5*Math.atan2(2*sxy,sxx-syy),ux=Math.cos(a),uy=Math.sin(a);let lo=1e9,hi=-1e9;
-  for(const [px,py] of pts){const t=(px-mx)*ux+(py-my)*uy;lo=Math.min(lo,t);hi=Math.max(hi,t)}
-  const span=hi-lo,width=(t0,t1)=>{let u=1e9,v=-1e9;for(const [px,py] of pts){const t=(px-mx)*ux+(py-my)*uy;if(t>=t0&&t<=t1){const s=-(px-mx)*uy+(py-my)*ux;u=Math.min(u,s);v=Math.max(v,s)}}return v-u};
-  return width(hi-span*.25,hi)<width(lo,lo+span*.25)?a:a+Math.PI;
-}catch{return -Math.PI/4}})();
+// The menu planes are drawn as a shape, not a font symbol: the symbol points a different way (and can turn into a color emoji) on different phones
+// and computers, so it could never be made to face the way it flies everywhere. This one always has its nose along +x, length 2, centered on 0.
+const PLANE=(()=>{const top=[[1,0],[.6,.08],[.2,.1],[-.15,.95],[-.35,.95],[-.25,.12],[-.75,.1],[-.95,.38],[-1.05,.38],[-1,0]],p=new Path2D();
+  p.moveTo(...top[0]);top.slice(1).forEach(([x,y])=>p.lineTo(x,y)); // down the upper side to the tail...
+  for(let i=top.length-2;i>=1;i--)p.lineTo(top[i][0],-top[i][1]);p.closePath();return p})(); // ...and back up the mirrored lower side
 
 // Correct answer: confetti falls behind the containers (canvas z-index 0, the page content sits above it).
 function confetti(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second
   if(matchMedia("(prefers-reduced-motion: reduce)").matches)return; // a visual effect, so respect the motion preference
-  const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx";document.body.append(c);
+  const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx"+(matchMedia("(max-width:820px)").matches?" front":""); // on a phone the panels cover almost the whole screen, so it falls in front there
+  document.body.append(c);
   const cols=["--accent","--text","--ok","--muted"].map(css),rnd=Math.random;
   const P=Array.from({length:110},()=>({x:rnd()*W,y:-30-rnd()*H*.35,vy:speed*100*(.8+rnd()*.4),vx:(rnd()-.5)*70,w:6+rnd()*6,h:10+rnd()*8,r:rnd()*6.3,vr:(rnd()-.5)*8,f:rnd()*6.3,vf:3+rnd()*5,c:cols[Math.floor(rnd()*cols.length)]}));
   const dur=(H*1.35+40)/(speed*100*.8)*1000+300; // long enough for the slowest piece (and the spawn offset) to clear the screen
@@ -298,7 +289,7 @@ const sky=(()=>{
   const rnd=(a,b)=>a+Math.random()*(b-a);
   function spawn(front,anywhere,at){ // a straight line across, left to right or right to left; `at` = start at a clicked point
     const ltr=Math.random()<.5,h=(ltr?0:Math.PI)+rnd(-.5,.5);
-    return{front,user:!!at,h,rot:h-NOSE,col:Math.random()<.5?0:1,
+    return{front,user:!!at,h,rot:h,col:Math.random()<.5?0:1,
       x:at?at.x:anywhere?rnd(0,W):(ltr?-M:W+M),y:at?at.y:rnd(0,H),
       speed:front?rnd(55,85):rnd(22,38),s:front?rnd(46,64):rnd(18,30),a:front?.14:.2}}
   function step(dt){
@@ -307,9 +298,9 @@ const sky=(()=>{
       if(p.x<-M-10||p.x>W+M+10||p.y<-M-10||p.y>H+M+10)p.user?planes.splice(i,1):planes[i]=spawn(p.front,false)} // flown off the screen: a plane you launched is gone for good; the starting ones are replaced by a new plane entering
   }
   function draw(){
-    for(const [cx] of [[xb],[xf]]){cx.clearRect(0,0,W,H);cx.textAlign="center";cx.textBaseline="middle"}
+    for(const cx of [xb,xf])cx.clearRect(0,0,W,H);
     for(const p of planes){const cx=p.front?xf:xb;cx.save();cx.translate(p.x,p.y);cx.rotate(p.rot);
-      cx.globalAlpha=p.a;cx.fillStyle=cols[p.col];cx.font=p.s+"px "+PLANE_FONT;cx.fillText("\u2708\uFE0E",0,0);cx.restore()}
+      cx.globalAlpha=p.a;cx.fillStyle=cols[p.col];cx.scale(p.s/2,p.s/2);cx.fill(PLANE);cx.restore()}
   }
   // a click on empty menu background (not a button, link, field, footer or the logo) launches another plane, up to MAX
   function onClick(e){if(planes.length>=MAX||e.target.closest("button,a,select,input,label,#opts,footer,h2"))return;planes.push(spawn(Math.random()<.3,false,{x:e.clientX,y:e.clientY}))}

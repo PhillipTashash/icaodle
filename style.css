@@ -174,17 +174,21 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
   main{padding:.5em}
   h2.top{margin:.2em}
   h2.top svg{max-width:80vw}
-  /* everything on one screen: the five flippers in a row above the map, then guesses and clues each in a row, then Back / Next */
-  #board{display:flex;flex-direction:column;gap:.4em;height:auto;width:100%;margin:.3em auto}
-  #lcol,#col{display:contents}
+  /* everything on one screen, top to bottom: flippers in a row, map, guesses row, clues row, the answer panel, and last Back / Next.
+     The board and its two columns dissolve (display:contents) so their parts can be ordered together with the answer panel. */
+  #game{display:flex;flex-direction:column;gap:.4em}
+  #board,#lcol,#col{display:contents}
   #flap{order:1;flex:none;flex-direction:row;width:100%;min-height:0;padding:.25em .1em}
   #flap .w,#flap .w.cur{flex:1;min-width:0;flex-wrap:nowrap;gap:.15em .3em;padding:.35em .15em;font-size:.42em;border-bottom:0;border-right:1px solid var(--border)}
   #flap .w:last-child{border-right:0}
+  #flap .w.cur span{outline:0} /* no yellow box around the current flipper's tiles; its yellow letters are enough */
   #flap .nm{display:none} /* too small to read here */
   #map{order:2;flex:none;height:30dvh;min-height:190px}
   #guesses{order:3;display:flex;align-items:stretch;gap:.35em;padding:.35em .4em;overflow:visible}
   #cluebox{order:4;flex:none;flex-direction:row;align-items:stretch;gap:.35em;padding:.35em .4em;min-height:0;overflow:visible}
-  #nav{order:5;flex:none;justify-content:space-between}
+  #f{order:5;margin:0}
+  #nav{order:6;flex:none;justify-content:space-between}
+  #msg{order:7}#stats{order:8}
   #nav button{flex:0 0 auto;min-width:5.5em;min-height:34px;padding:.15em .7em;font-size:.75em;white-space:nowrap} /* small Back / Next at the two ends of the row */
   /* the guess and clue boxes run sideways: a small label, then equal boxes that wrap their text */
   #guesses b,#cluebox b{flex:0 0 3.2em;align-self:center;font-size:.6em;line-height:1.2;text-align:center}
