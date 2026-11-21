@@ -83,8 +83,8 @@ h2.top{display:flex;align-items:center;justify-content:center;gap:.6em}
 #hint{margin:.8em;color:var(--text);font-weight:600}
 /* the answer area: its own panel, outlined in a muted amber */
 #f{display:flex;flex-wrap:wrap;gap:.6em .8em;justify-content:center;align-items:center;width:90%;max-width:1000px;margin:.8em auto 0;padding:.9em 1em;
-  background:var(--surface);border:2px solid color-mix(in srgb,var(--accent) 50%,var(--border));border-radius:var(--radius)}
-#f input{font-size:1.3em;width:5.5em;border:2px solid var(--border)} /* one quiet outline: a lighter shade of the page background */
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+#f input{font-size:1.3em;width:5.5em;border:2px solid color-mix(in srgb,var(--accent) 50%,var(--border))} /* the one highlighted element: a muted amber outline */
 #f input:focus{outline:none;background:var(--surface-2)} /* no outline; focus shows as a lighter box instead */
 #f input::placeholder{color:var(--muted);opacity:.6}
 #msg{min-height:1.4em;color:var(--muted)}
@@ -130,7 +130,9 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:.6e
 /* right column: Guesses on top (its own height), Clues fills the rest with "Show Clue" pinned to the bottom */
 #guesses{flex:0 0 auto}
 #cluebox{flex:1;min-height:0;display:flex;flex-direction:column}
-#cluebox #clue{margin-top:auto;width:100%;padding:.55em}
+#cluebox #clue{margin-top:auto;width:100%;padding:.55em;background:var(--surface-2);color:var(--text);border:1px solid var(--border)} /* muted: a raised grey button */
+#cluebox #clue:hover:not(:disabled){border-color:var(--accent);filter:none}
+#cluebox #clue:disabled{color:var(--dim);opacity:.6}
 /* custom screen buttons: Start is the longer, main one */
 #customGo{min-width:12em;padding:.7em 2em}
 #customBack{padding:.7em 1.4em}
