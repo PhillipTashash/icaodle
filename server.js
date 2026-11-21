@@ -54,9 +54,10 @@ function chartOfTheDay() {
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
 const STATIC = { "/": "index.html", "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
 const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
-const serve = (res, f) => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream" }), res.end(fs.readFileSync(f)));
+// The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
+const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
 http.createServer((req, res) => {
-  const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json" }), res.end(JSON.stringify(o)));
+  const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
   if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
   if (req.method === "GET" && u.pathname === "/chart.jpg") { // today's faint background chart
     const f = chartOfTheDay();
@@ -64,7 +65,7 @@ http.createServer((req, res) => {
   }
   if (req.method === "GET" && u.pathname === "/api/sounds") return json(fs.existsSync("sounds") ? fs.readdirSync("sounds").filter(f => /\.(mp3|wav|ogg)$/.test(f)) : []); // which of your sound files exist (so the page never probes for missing ones)
   if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) // sound effects you drop in ./sounds
-    return fs.existsSync("." + u.pathname) ? serve(res, "." + u.pathname) : json({ error: "not found" }, 404);
+    return fs.existsSync("." + u.pathname) ? serve(res, "." + u.pathname, "public, max-age=3600") : json({ error: "not found" }, 404);
   if (req.method === "GET" && u.pathname === "/api/config") return json({ key: process.env.GOOGLE_MAPS_KEY || "" });
   if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
