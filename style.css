@@ -260,3 +260,4 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #dev summary{cursor:pointer;opacity:.7}
 #dev button{margin-top:.5em}
 #flap .nm i{display:block;font-style:normal;margin-top:.2em}
+#ver{font-size:.75em;color:var(--muted);opacity:.7}
