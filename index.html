@@ -46,6 +46,11 @@
   <button id="vsCreate">Create</button>
   <div id="vsErr" role="alert"></div>
 </dialog>
+<dialog id="tmo">
+  <h3>Server Timeout</h3>
+  <p id="tmoText"></p>
+  <button id="tmoClose">Close</button>
+</dialog>
 <dialog id="ask">
   <p><b>Joining lobby <span id="askCode"></span></b></p>
   <label>Your name <input id="askName" maxlength="12" autocomplete="nickname" placeholder="Name"></label>
@@ -304,10 +309,16 @@ function enterLobby(d){$("menu").hidden=$("custom").hidden=true;$("lobby").hidde
 // In a background tab it only checks in every 30 s and says it is "away", so the lobby doesn't think you left (and a returning tab catches up at once).
 function pollLoop(){setTimeout(async()=>{await vsPoll();pollLoop()},document.hidden?30000:INGAME?3000:2000)}
 addEventListener("visibilitychange",()=>{if(ROOM)vsPoll()});
+// The server closed the lobby (5 minutes of nothing happening, or 10 minutes without a game starting): say so, then back to the main menu.
+function lobbyTimedOut(why){if(!ROOM)return;ROOM=null;INGAME=false;
+  $("tmoText").textContent=why=="nostart"?"The lobby timed out because there were 10 minutes without starting a game.":"The lobby timed out because there was 5 minutes of inactivity.";
+  $("tmo").showModal()}
+$("tmoClose").onclick=()=>{location.href="/"}; // Close (or Escape) returns to the main menu
+$("tmo").oncancel=()=>{location.href="/"};
 async function vsPoll(){
   if(!ROOM)return;
   const o={action:"sync",away:document.hidden};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,done:S.i>=PER});
-  try{vsHandle(await vsPost(o))}catch(e){if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
+  try{vsHandle(await vsPost(o))}catch(e){if(e&&e.timeout)return lobbyTimedOut(e.timeout);if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
 function vsHandle(d){
   VSD=d;CDEND=d.cd!=null?Date.now()+d.cd:0;
   if(INGAME){ // on the board: the right-hand tab lists everyone

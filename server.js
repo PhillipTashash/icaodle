@@ -79,9 +79,18 @@ function limited(req, route, max) {
 }
 const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c)) return c; } };
 const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000;
+// Lobby time-outs (never while a game is being played): 5 minutes with nothing happening (nobody joining, leaving, renaming, pressing Ready or starting over;
+// the page checking in does not count), and 10 minutes since the lobby opened or the last game ended without a new game starting, which keeps a lobby that
+// keeps almost-starting (everyone readies, someone backs out) from lasting forever. A timed-out lobby tells its players once, then disappears.
+const IDLE_MS = +process.env.ROOM_IDLE_MS || 5 * 60000, NOSTART_MS = +process.env.ROOM_NOSTART_MS || 10 * 60000;
 // Lobby -> playing -> over. Everyone Ready (2 or more) starts a 5-second countdown that any un-ready cancels; then 5 minutes; over when all are done or time is up.
 function roomTick(r) {
   const now = Date.now();
+  if (!r.closed && r.phase !== "playing") {
+    if (now - r.act > IDLE_MS) r.closed = { why: "idle", at: now };
+    else if (now - r.since > NOSTART_MS) r.closed = { why: "nostart", at: now };
+  }
+  if (r.closed) return;
   if (r.phase === "lobby") {
     for (const [k, q] of Object.entries(r.players)) if (now - q.seen > (q.away ? 600000 : 15000)) delete r.players[k]; // players who closed the page (a player whose tab is just in the background is "away" and gets much longer)
     const ps = Object.values(r.players);
@@ -89,7 +98,7 @@ function roomTick(r) {
     if (r.cd && now - r.cd >= CD_MS) { r.phase = "playing"; r.end = r.cd + CD_MS + GAME_MS; }
   }
   if (r.phase === "playing" && (now >= r.end || Object.values(r.players).filter(q => !q.late).every(q => q.done))) {
-    r.phase = "over"; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
+    r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
   }
 }
@@ -112,7 +121,7 @@ const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: 
 // The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
 const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
 // Every 30 seconds: let lobbies tidy themselves (players who left are dropped) and delete lobbies nobody is in.
-setInterval(() => { for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length) rooms.delete(k); } }, 30000).unref();
+setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length || (r.closed && now - r.closed.at > 300000)) rooms.delete(k); } }, 30000).unref();
 http.createServer((req, res) => {
   res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "same-origin");
   res.setHeader("content-security-policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"); // no framing, no <base> tricks, no plugins
@@ -173,10 +182,12 @@ http.createServer((req, res) => {
         if (!MODES.includes(p.mode) || !name) return json({ error: "Enter your name." }, 400);
         for (const [k, v] of rooms) if (now - v.at > 864e5) rooms.delete(k);
         if (rooms.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
-        code = roomCode(); rooms.set(code, r = { mode: p.mode, airports: randomSet(p.mode, "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now });
+        code = roomCode(); rooms.set(code, r = { mode: p.mode, airports: randomSet(p.mode, "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now });
       } else if (!(r = rooms.get(code))) return json({ error: "No game with that code." }, 404);
+      roomTick(r); // also notices a lobby that has timed out
+      if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
       if (p.action === "leave") { // leaving takes you off the list at once (an empty game is deleted)
-        delete r.players[p.id]; if (!Object.keys(r.players).length) rooms.delete(code); else roomTick(r);
+        delete r.players[p.id]; r.act = now; if (!Object.keys(r.players).length) rooms.delete(code); else roomTick(r);
         return json({ left: true });
       }
       let me = r.players[p.id];
@@ -186,7 +197,8 @@ http.createServer((req, res) => {
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
         me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby" }; // late = joined while a game is on (or just finished)
       }
-      me.seen = now; if ("away" in p) me.away = !!p.away; if (name) me.name = name;
+      me.seen = now; if ("away" in p) me.away = !!p.away; if (name) { if (name !== me.name) r.act = now; me.name = name; }
+      if (p.action === "join" || p.action === "ready" || p.action === "reset") r.act = now; // things people do count as activity; plain check-ins do not
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
       if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), done: !!p.done });
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
