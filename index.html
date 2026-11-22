@@ -203,7 +203,8 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
   const p=new URLSearchParams(location.search);let o={};try{o=JSON.parse(localStorage.icaoOpts)}catch{}
   $("fmt").value=p.get("fmt")||o.fmt||"map";$("st").value=p.get("st")??o.st??"";
   $("diff").value=o.diff||"easy";
-  if(p.get("go"))start(p.get("go"),p.get("fmt")||"map",p.get("st")||"")});
+  if(p.get("go"))start(p.get("go"),p.get("fmt")||"map",p.get("st")||"");
+  if(p.get("near"))$("nearGo").click()}); // Play again for Zip Code games: reuses the saved zip and miles
 document.querySelectorAll("#menu button[data-m]").forEach(b=>b.onclick=()=>start(b.dataset.m,"map","")); // daily: map, all states
 $("customBtn").onclick=()=>{snd("open");$("menu").hidden=true;$("custom").hidden=false};
 $("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidden=false};
@@ -332,7 +333,7 @@ function end(){
   const q=QUIPS[GRADES.findIndex(([m])=>Math.round(pct)>=m)]; // same tiers as the letter grade
   $("quip").textContent=q[Math.floor(Math.random()*q.length)];
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
-  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
+  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";$("replay").hidden=false;$("replay").onclick=()=>location.href="/?near=1";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
