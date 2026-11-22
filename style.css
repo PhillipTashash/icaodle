@@ -255,3 +255,11 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #flap .nm b.st3{color:var(--orange)}
 #flap .nm b.st4{color:var(--bad)}
 #devAnswers{display:block;margin-top:.5em;color:var(--muted);white-space:pre-line;font-family:ui-monospace,Consolas,monospace}
+/* results XP bar */
+#xpbar{margin-top:.7em}
+#xpTop{display:flex;justify-content:space-between;align-items:baseline}
+#xpTop b{color:var(--amber)}#xpTop span{color:var(--muted);font-size:.85em}
+#xpTrack{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden;margin-top:.3em}
+#xpTrack i{display:block;height:100%;width:0;background:var(--amber);border-radius:5px}
+#xpbar.pop #xpTrack{animation:xppop .4s ease-out}
+@keyframes xppop{30%{transform:scaleY(1.7);box-shadow:0 0 0 1px var(--amber)}to{transform:scaleY(1)}}

@@ -49,7 +49,8 @@
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
-    <div id="result"><div id="statline"></div><div id="quip"></div><div id="xp"></div></div>
+    <div id="result"><div id="statline"></div><div id="quip"></div>
+      <div id="xpbar" hidden><div id="xpTop"><b id="xpRank"></b><span id="xpNum"></span></div><div id="xpTrack"><i></i></div></div><div id="xp"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
     <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
@@ -180,7 +181,8 @@ const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
 let V=0;
 const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",i==V);g.classList.toggle("go",i<=Math.min(S.i,PER-1))}); // "go" = a round you can click: finished ones and the current one
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
-function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
+let LIVE=false; // true once a round has just been played in this page, so the results animate; reopening a finished game just shows them
+function reveal(c){LIVE=true;nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
   $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   setTimeout(()=>{$("msg").textContent="";if(S.i>=PER){const top=LOCAL?S.scores.every(v=>v>0):S.scores.reduce((a,b)=>a+b,0)==PER*TRIES;
       if(runAt(PER-1)<PER)snd("endGame"); // a 5-in-a-row already played streak5 as its end-of-game sound
@@ -322,7 +324,7 @@ const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practicall
   ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
 function end(){
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
-  $("xp").textContent="";
+  $("xp").textContent="";$("xpbar").hidden=true;
   $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
   if(FMT!="city"&&map)setTimeout(()=>{google.maps.event.trigger(map,"resize");map.setCenter({lat:today[V][3],lng:today[V][4]})})
@@ -332,11 +334,27 @@ function end(){
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
   if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER,S.scores);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
-    $("xp").innerHTML=`+${r.gain} XP`+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"")}
+    $("xp").innerHTML=`+${r.gain} XP`+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"");
+    xpBar(r.state.xp-r.gain,r.state.xp,r.rankUp,LIVE&&!matchMedia("(prefers-reduced-motion: reduce)").matches)}
   else if(!PRACTICE&&DAY!==TODAY)$("xp").textContent="Past days don't earn XP.";
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
+// The XP bar under the quip: starts where you were, then SNAPS forward (the easing overshoots the mark and settles) with a sound. If the gain fills a
+// rank it snaps to full, rolls over into the next rank and plays the rank-up sound. Not live (a reopened game): it just shows where you are now.
+function xpBar(from,to,up,live){
+  const R=XPM.RANKS,bar=$("xpbar"),fill=bar.querySelector("i");
+  const pct=xp=>{const k=XPM.rankIndex(xp),n=R[k+1];return n?100*(xp-R[k][0])/(n[0]-R[k][0]):100};
+  const label=xp=>{const k=XPM.rankIndex(xp),n=R[k+1];$("xpRank").textContent=R[k][1];$("xpNum").textContent=n?`${xp} / ${n[0]} XP`:`${xp} XP`};
+  const snap=w=>{fill.style.transition="width .32s cubic-bezier(.2,1.6,.4,1)";fill.style.width=w+"%"};
+  const set=(xp)=>{fill.style.transition="none";fill.style.width=pct(xp)+"%";label(xp)};
+  bar.hidden=false;bar.classList.remove("pop");set(live?from:to);
+  if(!live)return;
+  setTimeout(()=>{bar.classList.add("pop");
+    if(!up){snd("xpSnap");label(to);snap(pct(to));return}
+    snd("xpSnap");snap(100); // fills the old rank...
+    setTimeout(()=>{snd("rankUp");label(to);fill.style.transition="none";fill.style.width="0%";void fill.offsetWidth;snap(pct(to))},420)}, // ...then rolls into the new one
+  600)}
 // The score goes to the global stats once, when the game is over; the reply feeds the distribution chart.
 let SUB;
 function postScore(){
