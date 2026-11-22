@@ -1,6 +1,22 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "icaodle", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 3000 }
+    {
+      "name": "icaodle",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "start"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "feedback-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dashboard"
+      ],
+      "port": 4000
+    }
   ]
 }

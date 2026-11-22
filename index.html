@@ -16,11 +16,19 @@
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
   <small id="round"></small></h2>
 <div id="menu">
+  <div id="streak" hidden></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
+  <div class="lbl">Daily</div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
   <button data-m="hard">Extra Hard<small>Small local airports</small></button>
-  <div id="more"><button id="nearBtn" title="Airports near where you live">Zip Code</button><button id="customBtn" title="Pick a state and format, just for fun">Custom game</button></div>
+  <div class="lbl">Friends</div>
+  <div id="joinrow"><input id="vsCode" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Lobby code" aria-label="Lobby code"><button id="vsJoin">Join</button></div>
+  <div id="joinErr" role="alert"></div>
+  <button id="vsBtn" title="Same five airports as a friend, with a 4-letter join code">Start Lobby</button>
+  <div class="lbl">Practice</div>
+  <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
+  <button id="customBtn" title="Pick a state and format, just for fun">Custom Game</button>
 </div>
 <dialog id="near">
   <p><b>Zip Code</b></p>
@@ -30,6 +38,26 @@
   <div id="nearErr" role="alert"></div>
   <div id="nearBtns"><button id="nearGo">Start</button> <button id="nearCancel" class="ghost">Cancel</button></div>
 </dialog>
+<dialog id="vs">
+  <button id="vsCancel" class="ghost" aria-label="Close" title="Close">✕</button>
+  <p><b>Start a lobby</b></p>
+  <div id="vsRow"><label>Your name <input id="vsName" maxlength="12" autocomplete="nickname" placeholder="Name"></label>
+  <label>Difficulty <select id="vsDiff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label></div>
+  <button id="vsCreate">Create</button>
+  <div id="vsErr" role="alert"></div>
+</dialog>
+<dialog id="ask">
+  <p><b>Joining lobby <span id="askCode"></span></b></p>
+  <label>Your name <input id="askName" maxlength="12" autocomplete="nickname" placeholder="Name"></label>
+  <div id="askErr" role="alert"></div>
+  <div id="askBtns"><button id="askJoin">Join</button> <button id="askCancel" class="ghost">Cancel</button></div>
+</dialog>
+<div id="lobby" hidden>
+  <div id="lbHead"><h3 id="lbTitle"></h3><span id="lbTip">Copied!</span></div>
+  <div id="lbPlayers"></div>
+  <div id="lbMsg"></div>
+  <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
+</div>
 <div id="custom" hidden>
   <p>Set up a custom game.</p>
   <div id="opts">
@@ -38,17 +66,23 @@
     <label>Difficulty <select id="diff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
     <small class="note">Custom games are practice: 5 random airports, <b>not</b> part of the daily set or the global scores.</small>
   </div>
-  <button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button>
+  <div><button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button></div>
 </div>
 <div id="game" hidden>
+  <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
-</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
+</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div><div id="pcol"></div></div>
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="result"><div id="statline"></div><div id="quip"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
+    <div id="fbInline" hidden>
+      <div id="fbQ"><b id="fbTitle">How was this game?</b><span id="fbRate"><button data-r="fun">😄 Fun</button><button data-r="meh">😐 Meh</button><button data-r="hard">😣 Too hard</button></span><button id="fbSkip" class="ghost">Skip</button></div>
+      <div id="fbWhy" hidden><div id="fbAir"></div></div>
+      <div id="fbFoot"><button id="fbSend" hidden>Send</button></div>
+    </div>
+    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="share" hidden>Share</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
   <div id="choices" hidden></div>
   <div id="msg"></div>
@@ -84,6 +118,10 @@ function paintMenu(){
 $("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
 $("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
 paintMenu();
+// Streak: consecutive UTC days with at least one finished daily game (any difficulty), read from the saves. Today not played yet doesn't break it.
+(()=>{const days=new Set();try{for(const k of Object.keys(localStorage)){const m=k.match(/^icaodle([0-9]+)(easy|medium|hard)/);if(m&&JSON.parse(localStorage[k]).scores.length>=5)days.add(+m[1])}}catch{}
+  let d=days.has(TODAY)?TODAY:TODAY-1,n=0;while(days.has(d)){n++;d--}
+  if(n){$("streak").hidden=false;$("streak").textContent=`🔥 ${n} day streak`}})();
 fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
@@ -100,11 +138,12 @@ const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 
   paintSound();
 }catch{}})();
 // Back-arrow button (left edge of the answer panel): leave to the main menu. Daily progress is saved; a practice game isn't, so that one asks first.
+let ROOM=null; // {code} for a "Play a friend" game
 let LOCAL=null; // {zip,miles} for an "Airports near me" game
-const tag=()=>LOCAL?`Near ${LOCAL.zip}`:NAME[MODE]+dateTag();
+const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:NAME[MODE]+dateTag();
 const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "Normal · Nov 20 1/5" on an earlier day
 const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
-$("menuBack").onclick=()=>{if(PRACTICE&&S&&S.i<PER&&!confirm("Leave this practice game? Practice games aren't saved."))return;location.href=menuUrl()};
+$("menuBack").onclick=async()=>{if(PRACTICE&&S&&S.i<PER&&!confirm(ROOM?"Leave this game? You'll drop out for everyone.":"Leave this practice game? Practice games aren't saved."))return;await vsLeave();location.href=menuUrl()};
 // Settings: the gear fades the sound and particle controls in above it; a click elsewhere or Escape tucks them away again.
 const setOpen=on=>{$("soundctl").classList.toggle("open",on);$("gear").setAttribute("aria-expanded",String(on))};
 $("gear").onclick=()=>setOpen(!$("soundctl").classList.contains("open"));
@@ -204,7 +243,10 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
   $("fmt").value=p.get("fmt")||o.fmt||"map";$("st").value=p.get("st")??o.st??"";
   $("diff").value=o.diff||"easy";
   if(p.get("go"))start(p.get("go"),p.get("fmt")||"map",p.get("st")||"");
-  if(p.get("near"))$("nearGo").click()}); // Play again for Zip Code games: reuses the saved zip and miles
+  if(p.get("near"))$("nearGo").click();
+  if(p.get("join")){setCode(p.get("join"));try{$("vsName").value=localStorage.vsName||""}catch{}
+    if(p.get("auto")&&$("vsName").value)vsGo({action:"join",code:getCode()}); // auto=1 is the page reload that starts a rematch: straight back in
+    else openAsk()}}); // an invite link asks for a name first // an invite link opens the popup with the code filled in, so you can pick your name first
 document.querySelectorAll("#menu button[data-m]").forEach(b=>b.onclick=()=>start(b.dataset.m,"map","")); // daily: map, all states
 $("customBtn").onclick=()=>{snd("open");$("menu").hidden=true;$("custom").hidden=false};
 $("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidden=false};
@@ -221,14 +263,84 @@ $("nearGo").onclick=async()=>{const zip=$("zip").value.trim(),miles=$("miles").v
   try{localStorage.icaoNear=JSON.stringify({zip,miles})}catch{}
   LOCAL={zip,miles};NEAR.close();start("easy","map","NEAR",d)};
 $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
+// Play a friend: create or join a game by 4-letter code, get ready in the lobby, play the same five airports within 5 minutes, then compare results back in the lobby.
+// The server owns the phases (lobby -> playing -> over); this page polls it once a second.
+const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
+const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
+let lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
+const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
+$("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
+$("vsCancel").onclick=()=>{snd("back");VS.close()};
+async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");
+  try{localStorage.vsName=name}catch{}
+  vsErr("Working…");try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){vsErr(e.error||"Couldn't reach the server. Try again.")}}
+$("vsCreate").onclick=()=>vsGo({action:"create",mode:$("vsDiff").value,code:null});
+$("vsJoin").onclick=()=>{if(getCode().length!=4)return $("joinErr").textContent="Enter the 4-letter code.";openAsk()};
+function openAsk(){let n="";try{n=localStorage.vsName||""}catch{}$("askName").value=n||fakeName();$("askCode").textContent=getCode();vsErr("");$("ask").showModal();$("askName").select()}
+// The lobby code field on the menu: letters only, uppercase. Join asks for a name in the small popup, then joins.
+const getCode=()=>$("vsCode").value.trim().toUpperCase(),setCode=t=>$("vsCode").value=String(t).replace(/[^a-z]/gi,"").toUpperCase().slice(0,4);
+$("vsCode").oninput=()=>{setCode($("vsCode").value);$("joinErr").textContent=""};
+$("vsCode").onkeydown=e=>{if(e.key=="Enter")$("vsJoin").click()};
+// An invite link asks for a name in a small popup of its own, then joins; the Play a friend popup isn't involved.
+$("askJoin").onclick=()=>{$("vsName").value=$("askName").value;vsGo({action:"join",code:getCode()})};
+$("askCancel").onclick=()=>{$("ask").close();history.replaceState(null,"","/")};
+$("askName").onkeydown=e=>{if(e.key=="Enter")$("askJoin").click()};
+$("vsName").onkeydown=e=>{if(e.key=="Enter")$("vsCreate").click()};
+const vsLink=()=>location.origin+"/?join="+ROOM.code;
+$("lbTitle").onclick=async e=>{if(!e.target.closest("b"))return;try{await navigator.clipboard.writeText(vsLink());const t=$("lbTip");t.classList.remove("show");void t.offsetWidth;t.classList.add("show")}catch{prompt("Copy this link:",vsLink())}}; // click the lobby code to copy the invite link; "Copied!" pops up beside it and fades
+$("lbReady").onclick=()=>{const me=VSD.players.find(p=>p.me);vsPost({action:"ready",value:VSD.phase=="over"||!me.ready}).then(vsHandle).catch(()=>{})};
+// Leaving tells the server right away (so the others see you go), then returns to the menu. Closing the page from the lobby does the same; a page that is starting the next game does not.
+async function vsLeave(){if(!ROOM)return;const c=ROOM.code;ROOM=null;INGAME=false;try{await fetch("/api/room",{method:"POST",keepalive:true,body:JSON.stringify({id:vsId(),code:c,action:"leave"})})}catch{}}
+$("lbPlayers").onchange=e=>{const n=e.target.value.trim();if(!n)return;try{localStorage.vsName=n}catch{}vsPost({action:"sync",name:n}).then(vsHandle).catch(()=>{})}; // rename: sent to everyone on the next refresh
+$("lbPlayers").onkeydown=e=>{if(e.key=="Enter")e.target.blur()};
+$("lbLeave").onclick=async()=>{await vsLeave();location.href="/"};
+addEventListener("pagehide",()=>{if(ROOM&&!INGAME&&VSD&&VSD.phase!="playing")navigator.sendBeacon("/api/room",JSON.stringify({id:vsId(),code:ROOM.code,action:"leave"}))});
+function enterLobby(d){$("menu").hidden=$("custom").hidden=true;$("lobby").hidden=false;sky.stop();snd("open");vsHandle(d);pollLoop()}
+// Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
+// plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
+function pollLoop(){setTimeout(async()=>{if(!document.hidden)await vsPoll();pollLoop()},INGAME?3000:2000)}
+addEventListener("visibilitychange",()=>{if(!document.hidden&&ROOM)vsPoll()}); // catch up the moment you come back to the tab
+async function vsPoll(){
+  if(!ROOM)return;
+  const o={action:"sync"};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,done:S.i>=PER});
+  try{vsHandle(await vsPost(o))}catch(e){if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
+function vsHandle(d){
+  VSD=d;CDEND=d.cd!=null?Date.now()+d.cd:0;
+  if(INGAME){ // on the board: the right-hand tab lists everyone
+    $("pcol").innerHTML="<b>Players</b>"+d.players.map(p=>`<div class="${p.me?"me":""}">${esc(p.name)}<span>${p.done?"✓ Finished":p.rounds+"/"+PER+" rounds"} · ${p.total} pts</span></div>`).join("");
+    if(d.left!=null)ENDS=Date.now()+d.left;
+    if(d.phase=="over"){if(S.i<PER)vsTimeout();INGAME=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;renderLobby(d);askFeedback()}
+    return}
+  renderLobby(d);if(d.phase=="playing")beginGame(d)}
+function renderLobby(d){
+  const over=d.phase=="over",ps=[...d.players],me=ps.find(p=>p.me);if(over)ps.sort((a,b)=>b.total-a.total);
+  $("lbTitle").innerHTML=`Lobby · <b title="Click to copy the invite link">${d.code}</b>`;
+  if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=ps.map((p,i)=>`<div class="${p.me?"me":""}"><span>${over?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${over?`${p.total} pts · ${p.right}/5 solved`:p.ready?"✓ Ready":"Not ready"}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`).join("");
+  const rdy=!over&&me&&me.ready;$("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
+  $("lbMsg").textContent=over?(ps.length>1&&ps[0].total==ps[1].total?"Game over: it's a tie!":`Game over: ${ps[0].name} wins! 🏆`):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":ps.length<2?"Waiting for friends: share the code or the link.":""}
+function beginGame(d){
+  if(PLAYED){location.href="/?join="+ROOM.code+"&auto=1";return} // a second game: a fresh page is the simplest clean slate (it rejoins this game and starts right away)
+  INGAME=PLAYED=true;ENDS=Date.now()+d.left;$("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
+  start(d.mode||"easy","map","ROOM",{day:d.day,airports:d.airports})}
+// Time is up: every round you haven't finished counts as missed, and you land on the results.
+function vsTimeout(){while(S.scores.length<PER)S.scores.push(0);S.i=PER;S.fails=0;S.guesses=[];hideCH();show()}
+setInterval(()=>{
+  if(INGAME&&S){const ms=Math.max(0,ENDS-Date.now());$("vsTimer").textContent="⏱ "+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");if(!ms&&S.i<PER)vsTimeout();
+    const sec=Math.ceil(ms/1e3); // sounds while you're still playing: a beep at each minute mark, then one a second for the last 5 seconds
+    if(sec<lastSec){lastSec=sec;if(S.i<PER){if(sec>=1&&sec<=5)snd("tick");else if(sec%60==0&&sec<300)snd("minute")}}}
+  else if(CDEND&&!INGAME){const n=Math.max(0,Math.ceil((CDEND-Date.now())/1e3));$("lbMsg").textContent="Starting in "+n+"…";
+    if(n!=lastTick){lastTick=n;if(n>=1&&n<=3)snd("tick");if(n==0)vsPoll()}} // a beep for each of the last three seconds
+  else lastTick=-1},250);
 async function start(m,fmt,st,data){
   MODE=m;FMT=fmt;ST=st;PRACTICE=!!ST;
-  const d=data||await fetch(PRACTICE?`/api/state?mode=${m}&state=${ST}`:`/api/today?mode=${m}&day=${PICK}`).then(r=>r.json());
+  const d=data||await fetch(PRACTICE?`/api/state?mode=${encodeURIComponent(m)}&state=${encodeURIComponent(ST)}`:`/api/today?mode=${encodeURIComponent(m)}&day=${+PICK}`).then(r=>r.json());
   DAY=d.day;today=d.airports;PER=today.length;buildFlap();
   if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
   S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
-  snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
+  snd(S.i>=PER?"open":ROOM?"go":"start"); // reopening a finished game just opens its results
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
   today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
@@ -336,8 +448,47 @@ function end(){
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";$("replay").hidden=false;$("replay").onclick=()=>location.href="/?near=1";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
+  if(ROOM){vsPoll();return} // friend games: tell the server you're done right now; your own results show while the others finish, then everyone returns to the lobby, where the feedback question is asked
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
+  $("share").hidden=false;$("share").onclick=share;askFeedback();
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
+// Share: a spoiler-free emoji row per round (green = first guess, yellow = later guess, orange = last guess, red = missed), via the phone share sheet or the clipboard.
+async function share(){
+  const SQ=["#f85149","#e8833a","#d29922","#d29922","#3fb950"],t=S.scores.reduce((a,b)=>a+b,0),name=tag().replace(" · "," "),
+  text="I got "+t+"/"+PER*TRIES+" on ICAOdle "+name+". Challenge me! "+location.origin;
+  const c=document.createElement("canvas");c.width=c.height=1080;const x=c.getContext("2d"),mid=540;x.textAlign="center";
+  x.fillStyle="#0d1014";x.fillRect(0,0,1080,1080);
+  for(let k=0;k<4;k++){const px=mid-4*70+k*150-5; // four split-flap tiles spelling ICAO
+    x.fillStyle="#1a1f28";x.beginPath();x.roundRect(px,110,130,160,16);x.fill();x.fillStyle="#0d1014";x.fillRect(px,189,130,3);
+    x.fillStyle="#ffb81c";x.font="bold 110px monospace";x.fillText("ICAO"[k],px+65,230)}
+  x.fillStyle="#e8eaee";x.font="bold 70px system-ui,sans-serif";x.fillText("ICAOdle "+name,mid,370);
+  S.scores.forEach((v,k)=>{x.fillStyle=SQ[v];x.beginPath();x.roundRect(mid-PER*60+k*120+6,430,108,108,18);x.fill()});
+  x.fillStyle="#ffb81c";x.font="bold 190px system-ui,sans-serif";x.fillText(t+"/"+PER*TRIES,mid,760);
+  x.fillStyle="#e8eaee";x.font="bold 64px system-ui,sans-serif";x.fillText("I played this. Challenge me!",mid,890);
+  x.fillStyle="#9aa3b2";x.font="48px system-ui,sans-serif";x.fillText(location.host,mid,970);
+  try{const f=new File([await new Promise(r=>c.toBlob(r))],"icaodle.png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],text});
+    else{const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(f),download:"icaodle.png"});a.click();URL.revokeObjectURL(a.href); // no share sheet (desktop): save the picture
+      try{await navigator.clipboard.writeText(text)}catch{}$("share").textContent="Saved!";setTimeout(()=>$("share").textContent="Share",1500)}}catch{}}
+// Feedback popup after a daily or friend game: Fun / Meh / Too hard; for the last two, which airports bothered you. Asked once per game; the
+// answers are saved on the server (feedback.jsonl) for the dashboard. Practice, custom and ZIP games never ask.
+let FBASKED=false,FBR="";
+function askFeedback(){
+  if(FBASKED)return;const key="icaofb"+DAY+MODE;
+  if(!ROOM){try{if(localStorage[key])return;localStorage[key]=1}catch{}} // a daily is asked once, even if you reopen its results later
+  FBASKED=true;
+  setTimeout(()=>{$("fbTitle").textContent="How was this game?";$("fbRate").hidden=false;$("fbWhy").hidden=true;$("fbSend").hidden=true;$("fbFoot").hidden=false;$("fbSkip").hidden=false;
+    $("fbAir").innerHTML=today.map(a=>`<button type="button" class="ghost" data-c="${a[0]}" aria-pressed="false">${a[0]}<small>${esc(a[1])}, ${a[2]}</small></button>`).join("");$("fbInline").hidden=false;if($("game").hidden)$("lobby").append($("fbInline"))},500)} // friend games ask in the lobby, after the game
+function fbSend(rating,airports){fetch("/api/feedback",{method:"POST",body:JSON.stringify({kind:ROOM?"friend":"daily",day:DAY,mode:MODE,rating,airports})}).catch(()=>{});fbClose(true)}
+$("fbRate").onclick=e=>{const b=e.target.closest("button");if(!b)return;FBR=b.dataset.r;if(FBR=="fun")return fbSend(FBR,[]);
+  $("fbTitle").textContent="Which airports bothered you?";$("fbRate").hidden=true;$("fbWhy").hidden=false;$("fbSend").hidden=false};
+$("fbAir").onclick=e=>{const b=e.target.closest("button");if(b)b.setAttribute("aria-pressed",b.classList.toggle("on"))};
+$("fbSend").onclick=()=>fbSend(FBR,[...$("fbAir").querySelectorAll(".on")].map(b=>b.dataset.c));
+$("fbSkip").onclick=()=>fbClose(false);
+// Closing the panel (Send, Skip or a Fun tap); after a send it says thanks for a moment first. Not answering is fine.
+function fbClose(sent){
+  if(!sent)return void($("fbInline").hidden=true);
+  $("fbTitle").textContent="Thanks for the feedback!";$("fbRate").hidden=$("fbWhy").hidden=$("fbFoot").hidden=$("fbSkip").hidden=true;setTimeout(()=>$("fbInline").hidden=true,1800)}
 // The score goes to the global stats once, when the game is over; the reply feeds the distribution chart.
 let SUB;
 function postScore(){

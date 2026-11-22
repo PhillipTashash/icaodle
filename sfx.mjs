@@ -26,6 +26,9 @@ export const EVENTS = {
   lost: { file: "lost", cue: "blocked" },         // round lost (4th miss, or Skip on the last guess)
   flap: { file: "flap", cue: "typing", volume: 0.3 }, // each split-flap flip (typing = a brief key contact, never throttled)
   preview: { cue: "volume-change" },              // a short blip while dragging the volume slider, so you hear the level you are choosing
+  tick: { file: "countdown", cue: "progress-step", tone: { freq: 660, dur: 0.14 } },   // lobby countdown: one beep each of the last 3 seconds
+  minute: { file: "minute", cue: "notification", tone: { freq: 880, dur: 0.3 } }, // friend game: one beep as each minute of the 5 runs out
+  go: { file: "go", cue: "start", tone: { freq: 1320, dur: 0.5 } },            // the lobby countdown hits zero and the friend game starts (a longer, higher beep)
   soundOn: { cue: "toggle-on" },                  // sound switched back on (muting is silent: mute must be immediate)
 };
 
@@ -66,6 +69,18 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     } catch { return false; }
   }
 
+  // A short synthesized beep for events with a `tone` and no file of their own (the cue is the fallback if the beep can't play): a square wave with a quick fade-out.
+  function beep({ freq, dur }, vol = 1) {
+    if (!ctx) return false;
+    try {
+      const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+      o.type = "square"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.25 * vol * volume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur);
+      return true;
+    } catch { return false; }
+  }
+
   return {
     get enabled() { return enabled; },
     get volume() { return volume; },
@@ -88,6 +103,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
       const e = EVENTS[event];
       if (!e || !ui || !enabled) return null;
       if (e.file && playFile(e.file, e.volume)) return "file";
+      if (e.tone) return beep(e.tone, e.volume) ? "tone" : null;
       const o = { ...(e.volume === undefined ? {} : { volume: e.volume }), ...extra };
       return ui.play(e.cue, Object.keys(o).length ? o : undefined) ? "cue" : null; // play() can return null
     },
