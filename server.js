@@ -3,6 +3,28 @@ const http = require("http"), fs = require("fs");
 const FEEDBACK = process.env.FEEDBACK_FILE || "feedback.jsonl", FILE = process.env.DATA_FILE || "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
 try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
 const AIR = JSON.parse(fs.readFileSync("airports.json"));
+// Lobby trivia: trivia.json is a list of [question, correct answer, three wrong answers, Wikipedia article about the answer]. Each lobby run gets 5 random ones,
+// with the answer positions shuffled; the answer key stays on the server and is only revealed to a player question by question, as they answer.
+let TRIVIA = []; try { TRIVIA = JSON.parse(fs.readFileSync("trivia.json", "utf8")); } catch {}
+const TQ = 5;
+function newTrivia() {
+  if (TRIVIA.length < TQ) return null;
+  const pool = TRIVIA.slice(), qs = [];
+  while (qs.length < TQ) {
+    const [q, c, x, y, z, w] = pool.splice(Math.floor(Math.random() * pool.length), 1)[0], o = [c, x, y, z];
+    for (let i = 3; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } // Fisher–Yates
+    qs.push({ q, o, a: o.indexOf(c), w });
+  }
+  return { id: Math.random().toString(36).slice(2, 8), qs, ans: Object.create(null) };
+}
+// What one player may see of the trivia: the questions (once), their own answers with the key for those, and everyone's right/wrong only after they have finished all five.
+function triviaFor(r, id, tv) {
+  const t = r.trivia; if (!t) return undefined;
+  const mine = t.ans[id] || [], out = { id: t.id, mine: t.qs.map((x, i) => mine[i] == null ? null : { c: mine[i], a: x.a }) };
+  if (tv !== t.id) out.qs = t.qs.map(x => ({ q: x.q, o: x.o, w: x.w }));
+  if (t.qs.every((_, i) => mine[i] != null)) out.others = Object.entries(r.players).filter(([k, q]) => k !== id && !q.late).map(([k, q]) => ({ name: q.name, res: t.qs.map((x, i) => { const v = (t.ans[k] || [])[i]; return v == null ? null : v === x.a ? 1 : 0; }) }));
+  return out;
+}
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
 // States with at least PER airports can be played as practice games.
 const STATES = Object.entries([...ALL.values()].reduce((c, a) => (c[a[2]] = (c[a[2]] || 0) + 1, c), {})).filter(([, n]) => n >= PER).map(([st]) => st).sort();
@@ -92,7 +114,7 @@ function roomTick(r) {
   }
   if (r.closed) return;
   if (r.phase === "lobby") {
-    for (const [k, q] of Object.entries(r.players)) if (now - q.seen > (q.away ? 600000 : 15000)) delete r.players[k]; // players who closed the page (a player whose tab is just in the background is "away" and gets much longer)
+    for (const [k, q] of Object.entries(r.players)) if (now - q.seen > 15000) delete r.players[k]; // players who closed the page
     const ps = Object.values(r.players);
     if (ps.length >= 2 && ps.every(q => q.ready)) r.cd ??= now; else r.cd = null;
     if (r.cd && now - r.cd >= CD_MS) { r.phase = "playing"; r.end = r.cd + CD_MS + GAME_MS; }
@@ -182,7 +204,7 @@ http.createServer((req, res) => {
         if (!MODES.includes(p.mode) || !name) return json({ error: "Enter your name." }, 400);
         for (const [k, v] of rooms) if (now - v.at > 864e5) rooms.delete(k);
         if (rooms.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
-        code = roomCode(); rooms.set(code, r = { mode: p.mode, airports: randomSet(p.mode, "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now });
+        code = roomCode(); rooms.set(code, r = { mode: p.mode, airports: randomSet(p.mode, "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now, trivia: newTrivia() });
       } else if (!(r = rooms.get(code))) return json({ error: "No game with that code." }, 404);
       roomTick(r); // also notices a lobby that has timed out
       if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
@@ -197,18 +219,22 @@ http.createServer((req, res) => {
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
         me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby" }; // late = joined while a game is on (or just finished)
       }
-      me.seen = now; if ("away" in p) me.away = !!p.away; if (name) { if (name !== me.name) r.act = now; me.name = name; }
+      me.seen = now; if (name) { if (name !== me.name) r.act = now; me.name = name; }
       if (p.action === "join" || p.action === "ready" || p.action === "reset") r.act = now; // things people do count as activity; plain check-ins do not
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
-      if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), done: !!p.done });
+      if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), streak: num(p.streak, PER), done: !!p.done });
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
-        r.airports = randomSet(r.mode, "ALL"); r.phase = "lobby"; r.cd = null;
-        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, done: false, late: false });
+        r.airports = randomSet(r.mode, "ALL"); r.phase = "lobby"; r.cd = null; r.trivia = newTrivia(); // a new game: new questions
+        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, late: false });
       }
       if (p.action === "ready" && r.phase === "lobby") me.ready = !!p.value;
+      if (p.action === "trivia" && r.phase === "lobby" && r.trivia && !me.late && Number.isInteger(p.q) && p.q >= 0 && p.q < TQ && Number.isInteger(p.choice) && p.choice >= 0 && p.choice < 4) {
+        const mine = (r.trivia.ans[p.id] ||= Array(TQ).fill(null)); if (mine[p.q] == null) { mine[p.q] = p.choice; r.act = now; } // one answer per question, no changing it
+      }
       roomTick(r);
       json({ code, day: day(), mode: r.mode, phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
-        airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, done: q.done, late: !!q.late, away: !!q.away, wins: q.wins || 0, me: k === p.id })) });
+        closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
+        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
     });
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.

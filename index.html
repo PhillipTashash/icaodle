@@ -59,9 +59,11 @@
 </dialog>
 <div id="lobby" hidden>
   <div id="lbHead"><h3 id="lbTitle"></h3><span id="lbTip">Copied!</span></div>
-  <div id="lbPlayers"></div>
   <div id="lbMsg"></div>
+  <div id="lbPlayers"></div>
+  <div id="lbStreak" hidden></div>
   <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
+  <div id="trivia" hidden></div>
 </div>
 <div id="custom" hidden>
   <p>Set up a custom game.</p>
@@ -80,13 +82,8 @@
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
-    <div id="result"><div id="statline"></div><div id="quip"></div></div>
+    <div id="result"><div id="statline"></div><div id="bestline" title="Most rounds solved on the first guess in a row"></div><div id="quip"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="fbInline" hidden>
-      <div id="fbQ"><b id="fbTitle">How was this game?</b><span id="fbRate"><button data-r="fun">😄 Fun</button><button data-r="meh">😐 Meh</button><button data-r="hard">😣 Too hard</button></span><button id="fbSkip" class="ghost">Skip</button></div>
-      <div id="fbWhy" hidden><div id="fbAir"></div></div>
-      <div id="fbFoot"><button id="fbSend" hidden>Send</button></div>
-    </div>
     <div id="endbtns"><button id="replay" hidden>Play again</button><button id="share" hidden>Share</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
   <div id="choices" hidden></div>
@@ -95,7 +92,7 @@
 </div>
 <details id="dev" hidden><summary>Dev</summary><button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
 </main>
-<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙️</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><div id="timer"></div></footer>
+<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙️</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button data-r="fun">😄 Fun</button><button data-r="meh">😐 Meh</button><button data-r="hard">😣 Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
   $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
@@ -273,8 +270,8 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 // The server owns the phases (lobby -> playing -> over); this page polls it once a second.
 const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
 const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
-const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
-let LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
+let CLOSEEND=0,TV=null,TVD=null,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
 $("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
@@ -306,9 +303,9 @@ addEventListener("pagehide",()=>{if(ROOM&&!INGAME&&VSD&&VSD.phase!="playing")nav
 function enterLobby(d){$("menu").hidden=$("custom").hidden=true;$("lobby").hidden=false;sky.stop();snd("open");vsHandle(d);pollLoop()}
 // Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
 // plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
-// In a background tab it only checks in every 30 s and says it is "away", so the lobby doesn't think you left (and a returning tab catches up at once).
-function pollLoop(){setTimeout(async()=>{await vsPoll();pollLoop()},document.hidden?30000:INGAME?3000:2000)}
-addEventListener("visibilitychange",()=>{if(ROOM)vsPoll()});
+// Gentle polling: every 2 s in the lobby, every 3 s in a game (a background tab is throttled by the browser but keeps checking, so it still gets put into the game when it starts).
+function pollLoop(){setTimeout(async()=>{await vsPoll();pollLoop()},INGAME?3000:2000)}
+addEventListener("visibilitychange",()=>{if(!document.hidden&&ROOM)vsPoll()}); // catch up the moment you come back to the tab
 // The server closed the lobby (5 minutes of nothing happening, or 10 minutes without a game starting): say so, then back to the main menu.
 function lobbyTimedOut(why){if(!ROOM)return;ROOM=null;INGAME=false;
   $("tmoText").textContent=why=="nostart"?"The lobby timed out because there were 10 minutes without starting a game.":"The lobby timed out because there was 5 minutes of inactivity.";
@@ -317,7 +314,7 @@ $("tmoClose").onclick=()=>{location.href="/"}; // Close (or Escape) returns to t
 $("tmo").oncancel=()=>{location.href="/"};
 async function vsPoll(){
   if(!ROOM)return;
-  const o={action:"sync",away:document.hidden};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,done:S.i>=PER});
+  const o={action:"sync"};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,streak:bestRun(),done:S.i>=PER});
   try{vsHandle(await vsPost(o))}catch(e){if(e&&e.timeout)return lobbyTimedOut(e.timeout);if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
 function vsHandle(d){
   VSD=d;CDEND=d.cd!=null?Date.now()+d.cd:0;
@@ -326,6 +323,8 @@ function vsHandle(d){
     if(d.left!=null)ENDS=Date.now()+d.left;
     if(d.phase=="over"){if(S.i<PER)vsTimeout();INGAME=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;renderLobby(d);askFeedback()}
     return}
+  CLOSEEND=d.closeIn!=null?Date.now()+d.closeIn:0; // when this lobby will time out if nothing happens
+  if(d.trivia){if(d.trivia.qs)TV={id:d.trivia.id,qs:d.trivia.qs};TVD=d.trivia}else TVD=null; // lobby trivia (the question text is only sent once per set)
   const me=d.players.find(p=>p.me);LATEEND=d.phase=="playing"&&d.left!=null?Date.now()+d.left:0;
   renderLobby(d);if(d.phase=="playing"&&!(me&&me.late))beginGame(d)}
 // The lobby has three faces: waiting (Ready toggles), a game in progress (live scores; players who joined late only watch), and game over (ranked results).
@@ -333,12 +332,55 @@ const lateMsg=ms=>"A game is in progress ("+Math.floor(ms/6e4)+":"+String(Math.f
 function renderLobby(d){
   const over=d.phase=="over",playing=d.phase=="playing",me=d.players.find(p=>p.me);
   const ranked=over?d.players.filter(p=>!p.late).sort((a,b)=>b.total-a.total):d.players,latecomers=over?d.players.filter(p=>p.late):[]; // after a game, anyone who joined late is listed below the ranking
-  const status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/5 solved`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts`:`${p.rounds}/5 rounds · ${p.total} pts`):p.away?"Away":(p.ready?"✓ Ready":"Not ready");
+  const status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/5 solved`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts`:`${p.rounds}/5 rounds · ${p.total} pts`):(p.ready?"✓ Ready":"Not ready");
   const row=(p,i)=>`<div class="${p.me?"me":""}"><span>${over&&!p.late?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${status(p)}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`;
   $("lbTitle").innerHTML=`Lobby · <b title="Click to copy the invite link">${d.code}</b>`;
   if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=[...ranked.map(row),...latecomers.map(row)].join("");
-  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
-  $("lbMsg").textContent=over?(ranked.length>1&&ranked[0].total==ranked[1].total?"Game over: it's a tie!":ranked.length?`Game over: ${ranked[0].name} wins! 🏆`:"Game over"):playing?lateMsg(d.left||0):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":""}
+  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=d.players.length<2;$("lbReady").title=d.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
+  $("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
+  // After a game: one callout with the longest first-guess streak in the lobby (everyone who shares it is named).
+  const best=over?Math.max(0,...ranked.map(p=>p.streak||0)):0,who=ranked.filter(p=>(p.streak||0)==best).map(p=>p.name);
+  $("lbStreak").hidden=!(over&&best>0);
+  if(over&&best>0)$("lbStreak").textContent="🔥 Best streak: "+(who.length>2?who.slice(0,-1).join(", ")+" and "+who[who.length-1]:who.join(" and "))+", "+best+" in a row";
+  $("lbMsg").textContent=over?"":playing?lateMsg(d.left||0):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
+// ---- Lobby trivia (desktop browsers only): 5 questions while you wait. After the last one you see everyone's right and wrong.
+// It floats in the empty space under the Ready/Leave buttons, centered between them and the bottom of the screen (or sits right under them if the screen is short).
+const PCQ=matchMedia("(hover:hover) and (pointer:fine) and (min-width:821px)");
+const mk=(t,p,...k)=>{const e=document.createElement(t);Object.assign(e,p||{});e.append(...k);return e};
+const pips=res=>mk("span",{className:"tvpips"},...res.map(v=>mk("i",{className:v==null?"":v?"ok":"bad",textContent:v==null?"•":v?"✓":"✗"})));
+function placeTrivia(){
+  const box=$("trivia");if(box.hidden)return;
+  const btns=$("lbBtns").getBoundingClientRect(),foot=document.querySelector("footer").getBoundingClientRect(),limit=Math.min(foot.top,innerHeight),hgt=box.scrollHeight;
+  const top=Math.max(btns.bottom+12,btns.bottom+(limit-btns.bottom-hgt)/2); // midway; never closer than 12px to the buttons
+  box.style.top=Math.round(top)+"px";box.style.maxHeight=Math.max(150,limit-top-6)+"px"} // never runs under the footer: on a short window the card scrolls inside itself // on a very short window the card scrolls inside itself instead of running off the screen
+function renderTrivia(){
+  const box=$("trivia");
+  if(!(PCQ.matches&&TVD&&TV&&TV.id==TVD.id)){box.hidden=true;return}
+  box.hidden=false;const mine=TVD.mine,n=TV.qs.length;
+  if(tvId!=TV.id){tvId=TV.id;tvIdx=mine.findIndex(m=>!m);if(tvIdx<0)tvIdx=n} // a new set starts at its first unanswered question
+  const sig=JSON.stringify([TV.id,tvIdx,mine,TVD.others]);if(sig==tvSig){placeTrivia();return;}tvSig=sig; // only rebuild when something changed (the lobby refreshes every 2 s)
+  const head=mk("div",{className:"tvhead"},mk("b",{textContent:"Trivia while you wait"}),mk("span",{textContent:tvIdx<n?(tvIdx+1)+"/"+n:"Results"}));
+  const body=mk("div",{});
+  if(tvIdx<n){
+    const q=TV.qs[tvIdx],a=mine[tvIdx],opts=mk("div",{className:"tvopts"});body.append(mk("p",{className:"tvq",textContent:q.q}));
+    q.o.forEach((o,i)=>{const bt=mk("button",{type:"button",className:"ghost tvopt"+(a?(i==a.a?" ok":i==a.c?" bad":" dim"):""),textContent:o,disabled:!!a});
+      if(!a)bt.onclick=()=>vsPost({action:"trivia",q:tvIdx,choice:i}).then(vsHandle).catch(()=>{});opts.append(bt)});
+    body.append(opts);
+    if(!a)body.append(mk("div",{className:"tvbar"})); // reserves the row the result and Next button appear in, so the card never changes height when you answer
+    if(a)body.append(mk("div",{className:"tvbar"},mk("span",{className:"tvres "+(a.c==a.a?"ok":"bad"),textContent:a.c==a.a?"Correct!":"Answer: "+q.o[a.a]}),
+      mk("button",{type:"button",textContent:tvIdx<n-1?"Next":"Results",onclick:()=>{tvIdx++;tvSig="";renderTrivia()}})))
+  }else{
+    const me=VSD&&VSD.players.find(p=>p.me),score=mine.filter(m=>m&&m.c==m.a).length;
+    body.append(mk("p",{className:"tvq",textContent:"You got "+score+" of "+n+" right"}),
+      mk("div",{className:"tvrow me"},mk("span",{textContent:me?me.name:"You"}),pips(mine.map(m=>m?(m.c==m.a?1:0):null))));
+    for(const o of TVD.others||[])body.append(mk("div",{className:"tvrow"},mk("span",{textContent:o.name}),pips(o.res)));
+    if(!(TVD.others||[]).length)body.append(mk("p",{className:"tvres",textContent:"Nobody else is here yet."}))}
+  box.replaceChildren(head,body);placeTrivia()}
+PCQ.addEventListener("change",()=>{tvSig="";if(VSD)renderLobby(VSD)});
+addEventListener("resize",()=>placeTrivia());
+// Footer, next to the version: how long until the lobby closes for inactivity (resets whenever someone joins, leaves, readies up or answers trivia).
+setInterval(()=>{const el=$("lobbyClock"),ms=ROOM&&!INGAME&&CLOSEEND?Math.max(0,CLOSEEND-Date.now()):-1;el.hidden=ms<0;
+  if(ms>=0){el.textContent="Lobby closes in "+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");el.classList.toggle("soon",ms<60000)}},500);
 function beginGame(d){
   if(PLAYED){location.href="/?join="+ROOM.code+"&auto=1";return} // a second game: a fresh page is the simplest clean slate (it rejoins this game and starts right away)
   INGAME=PLAYED=true;ENDS=Date.now()+d.left;$("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
@@ -457,7 +499,10 @@ const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practicall
   ["Dead average. The airports didn't even notice you landed.","A C: you showed up, you landed, nobody's talking about it.","Half right, like a departure board in a thunderstorm."],
   ["A D. Did you navigate by vibes?","Impressive, if the goal was to find every wrong airport.","The map was right there. It's a big map."],
   ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
+// Longest run of rounds solved on the very first guess (the same streak the answer board counts), for the results panel.
+const bestRun=()=>{let m=0,c=0;for(const v of S.scores){c=v==TRIES?c+1:0;m=Math.max(m,c)}return m};
 function end(){
+  $("bestline").textContent="🔥 Best streak: "+bestRun()+" in a row";
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
   $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
@@ -497,18 +542,15 @@ function askFeedback(){
   if(FBASKED)return;const key="icaofb"+DAY+MODE;
   if(!ROOM){try{if(localStorage[key])return;localStorage[key]=1}catch{}} // a daily is asked once, even if you reopen its results later
   FBASKED=true;
-  setTimeout(()=>{$("fbTitle").textContent="How was this game?";$("fbRate").hidden=false;$("fbWhy").hidden=true;$("fbSend").hidden=true;$("fbFoot").hidden=false;$("fbSkip").hidden=false;
-    $("fbAir").innerHTML=today.map(a=>`<button type="button" class="ghost" data-c="${a[0]}" aria-pressed="false">${a[0]}<small>${esc(a[1])}, ${a[2]}</small></button>`).join("");$("fbInline").hidden=false;if($("game").hidden)$("lobby").append($("fbInline"))},500)} // friend games ask in the lobby, after the game
-function fbSend(rating,airports){fetch("/api/feedback",{method:"POST",body:JSON.stringify({kind:ROOM?"friend":"daily",day:DAY,mode:MODE,rating,airports})}).catch(()=>{});fbClose(true)}
+  setTimeout(()=>{$("fbTitle").textContent="How was this game?";$("fbRate").hidden=false;$("fbWhy").hidden=true;
+    $("fbAir").innerHTML=today.map(a=>`<button type="button" class="ghost" data-c="${a[0]}" title="${esc(a[1])}, ${a[2]}" aria-pressed="false">${a[0]}</button>`).join("");$("fbInline").hidden=false},500)} // friend games ask in the lobby, after the game
+function fbSend(rating,airports){fetch("/api/feedback",{method:"POST",body:JSON.stringify({kind:ROOM?"friend":"daily",day:DAY,mode:MODE,rating,airports})}).catch(()=>{});fbClose()}
 $("fbRate").onclick=e=>{const b=e.target.closest("button");if(!b)return;FBR=b.dataset.r;if(FBR=="fun")return fbSend(FBR,[]);
-  $("fbTitle").textContent="Which airports bothered you?";$("fbRate").hidden=true;$("fbWhy").hidden=false;$("fbSend").hidden=false};
+  $("fbTitle").textContent="Which airports bothered you?";$("fbRate").hidden=true;$("fbWhy").hidden=false};
 $("fbAir").onclick=e=>{const b=e.target.closest("button");if(b)b.setAttribute("aria-pressed",b.classList.toggle("on"))};
 $("fbSend").onclick=()=>fbSend(FBR,[...$("fbAir").querySelectorAll(".on")].map(b=>b.dataset.c));
-$("fbSkip").onclick=()=>fbClose(false);
-// Closing the panel (Send, Skip or a Fun tap); after a send it says thanks for a moment first. Not answering is fine.
-function fbClose(sent){
-  if(!sent)return void($("fbInline").hidden=true);
-  $("fbTitle").textContent="Thanks for the feedback!";$("fbRate").hidden=$("fbWhy").hidden=$("fbFoot").hidden=$("fbSkip").hidden=true;setTimeout(()=>$("fbInline").hidden=true,1800)}
+// After an answer it says thanks for a moment and goes away. Not answering is fine: it just stays in the footer.
+function fbClose(){$("fbTitle").textContent="Thanks for the feedback!";$("fbRate").hidden=$("fbWhy").hidden=true;setTimeout(()=>$("fbInline").hidden=true,1800)}
 // The score goes to the global stats once, when the game is over; the reply feeds the distribution chart.
 let SUB;
 function postScore(){
