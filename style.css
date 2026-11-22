@@ -157,12 +157,12 @@ main:has(#game:not([hidden])) h2.top svg{width:190px}
 .tile.f{animation:tileflip .12s ease-out}
 @keyframes tileflip{from{transform:scaleY(.15);filter:blur(2.2px)}to{transform:none;filter:blur(0)}} /* a flip smears, then snaps sharp: motion blur */
 /* menu date picker: a small arrow either side of the date, inside the width of the Normal button */
-#datebar{display:flex;align-items:center;justify-content:space-between;width:14em;margin:.1em auto .8em} /* a little narrower than the Normal button (16em): the arrows sit just outside the date */
+#datebar{display:flex;align-items:center;justify-content:space-between;width:12.5em;margin:.1em auto .8em} /* a little narrower than the Normal button (16em): the arrows sit just outside the date */
 #menu #datebar button{display:inline-block;width:auto;margin:0;padding:.15em .3em;font-size:.85em;background:none;border:0;color:var(--text)} /* beats the wide menu-card button style */
 #menu #datebar button:hover:not(:disabled){background:none;color:var(--accent)}
 #menu #datebar button:disabled{opacity:.3;background:none;color:var(--muted)}
-#dlabel{font-weight:700;line-height:1.2;font-size:.95em;white-space:nowrap}
-#dlabel small{display:block;font-weight:500;color:var(--accent)}
+#dlabel{font-weight:700;line-height:1.2;font-size:.85em;white-space:nowrap}
+#dlabel small{display:block;font-weight:500;color:var(--muted)}
 
 /* ---- phones and narrow windows ---- */
 html{-webkit-text-size-adjust:100%}
@@ -249,7 +249,6 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #rankTop b{color:var(--amber)}#rankTop span{color:var(--muted);font-size:.85em}
 #rankBar{height:6px;border-radius:3px;background:var(--surface-2);margin:.3em 0;overflow:hidden}
 #rankBar i{display:block;height:100%;background:var(--amber);border-radius:3px;transition:width .4s ease}
-#rank small{color:var(--muted)}
 #xp{margin-top:.5em;color:var(--amber);font-weight:700}
 /* the streak line under an airport name changes color with the run */
 #flap .nm b.st3{color:var(--orange)}
@@ -263,3 +262,9 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #xpTrack i{display:block;height:100%;width:0;background:var(--amber);border-radius:5px}
 #xpbar.pop #xpTrack{animation:xppop .4s ease-out}
 @keyframes xppop{30%{transform:scaleY(1.7);box-shadow:0 0 0 1px var(--amber)}to{transform:scaleY(1)}}
+/* menu: Zip Code and Custom game share one row; the dev tools hide behind a small toggle */
+#more{display:flex;gap:.6em;width:16em;margin:.8em auto}
+#menu #more button{flex:1;width:auto;margin:0;padding:.7em .4em}
+#dev{margin-top:1em;text-align:center;color:var(--muted);font-size:.85em}
+#dev summary{cursor:pointer;opacity:.7}
+#dev button{margin-top:.5em}

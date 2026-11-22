@@ -16,14 +16,12 @@
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
   <small id="round"></small></h2>
 <div id="menu">
-  <p>Guess the airport's ICAO code.</p>
-  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div><small></small></div>
+  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
   <button data-m="hard">Extra Hard<small>Small local airports</small></button>
-  <button id="nearBtn">Zip Code<small>Airports near where you live</small></button>
-  <button id="customBtn">Custom game<small>Pick a state and format, just for fun</small></button>
+  <div id="more"><button id="nearBtn" title="Airports near where you live">Zip Code</button><button id="customBtn" title="Pick a state and format, just for fun">Custom game</button></div>
 </div>
 <dialog id="near">
   <p><b>Zip Code</b></p>
@@ -57,11 +55,11 @@
   <div id="choices" hidden></div>
   <div id="msg"></div>
 </div>
-<p><button id="reset" hidden>Dev: reset all stats</button><small id="devAnswers"></small></p>
+<details id="dev" hidden><summary>Dev</summary><button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
 </main>
 <footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div><div id="timer"></div></footer>
 <script>
-if(location.hostname=="localhost"){$reset=document.getElementById("reset");$reset.hidden=false;
+if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
   $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
     await fetch("/api/reset",{method:"POST"});try{localStorage.clear()}catch{}location.reload()}
   // dev only: today's answers, on the menu for all three difficulties (and, once a game starts, for that game)
@@ -79,7 +77,7 @@ const TODAY=Math.floor(Date.now()/864e5);
 let PICK=TODAY,FIRST=TODAY; // FIRST is replaced by the server's answer just below (until then there is nothing earlier to open)
 const dayText=(n,short)=>new Date(n*864e5).toLocaleDateString(undefined,short?{month:"short",day:"numeric",timeZone:"UTC"}:{weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}); // days are UTC, like the server
 function paintMenu(){
-  $("dlabel").innerHTML=dayText(PICK)+(PICK==TODAY?"<small>Today</small>":"");
+  $("dlabel").innerHTML=dayText(PICK)+(PICK==TODAY?"":"<small>Past day</small>");
   $("dprev").disabled=PICK<=FIRST;$("dnext").disabled=PICK>=TODAY;
   document.querySelectorAll("#menu button[data-m]").forEach(b=>{b.classList.remove("done");b.title="";const old=b.querySelector(".check");if(old)old.remove();try{
     const s=JSON.parse(localStorage[`icaodle${PICK}${b.dataset.m}`]); // the same key the game saves under
@@ -94,9 +92,8 @@ let XPM=null;const xpState=()=>{try{return JSON.parse(localStorage.icaoXp)}catch
 function paintRank(){
   const s=xpState(),i=XPM.rankIndex(s.xp),[min,name]=XPM.RANKS[i],nxt=XPM.RANKS[i+1],streak=XPM.liveStreak(s,TODAY);
   $("rank").querySelector("b").textContent=name;
-  $("rank").querySelector("span").textContent=nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`;
+  $("rank").querySelector("span").textContent=(nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`)+(streak>1?` · ${streak}-day streak`:""); // the streak only shows once there is one
   $("rankBar").firstChild.style.width=(nxt?100*(s.xp-min)/(nxt[0]-min):100)+"%";
-  $("rank").querySelector("small").textContent=streak?`${streak}-day streak`:"Finish today's games to earn XP";
   $("rank").hidden=false}
 import("/xp.js").then(m=>{XPM=m;paintRank()}).catch(()=>{});
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
