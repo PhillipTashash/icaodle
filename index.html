@@ -17,6 +17,7 @@
   <small id="round"></small></h2>
 <div id="menu">
   <p>Guess the airport's ICAO code.</p>
+  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div><small></small></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
@@ -48,7 +49,7 @@
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
-    <div id="result"><div id="statline"></div><div id="quip"></div></div>
+    <div id="result"><div id="statline"></div><div id="quip"></div><div id="xp"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
     <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
@@ -84,6 +85,16 @@ $("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
 $("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
 paintMenu();
 fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
+// XP and rank (per device, in localStorage): earned by finishing today's daily sets, shown here and on the results panel. Logic is in xp.js.
+let XPM=null;const xpState=()=>{try{return JSON.parse(localStorage.icaoXp)}catch{return XPM.fresh()}};
+function paintRank(){
+  const s=xpState(),i=XPM.rankIndex(s.xp),[min,name]=XPM.RANKS[i],nxt=XPM.RANKS[i+1],streak=XPM.liveStreak(s,TODAY);
+  $("rank").querySelector("b").textContent=name;
+  $("rank").querySelector("span").textContent=nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`;
+  $("rankBar").firstChild.style.width=(nxt?100*(s.xp-min)/(nxt[0]-min):100)+"%";
+  $("rank").querySelector("small").textContent=streak?`${streak}-day streak`:"Finish today's games to earn XP";
+  $("rank").hidden=false}
+import("/xp.js").then(m=>{XPM=m;paintRank()}).catch(()=>{});
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
 let SND=null;
@@ -298,6 +309,7 @@ const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practicall
   ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
 function end(){
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
+  $("xp").textContent="";
   $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
   if(FMT!="city"&&map)setTimeout(()=>{google.maps.event.trigger(map,"resize");map.setCenter({lat:today[V][3],lng:today[V][4]})})
@@ -306,6 +318,9 @@ function end(){
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
+  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
+    $("xp").innerHTML=`+${r.gain} XP`+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"")}
+  else if(!PRACTICE&&DAY!==TODAY)$("xp").textContent="Past days don't earn XP.";
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}

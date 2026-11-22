@@ -243,3 +243,11 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #flap .w.cur{background:color-mix(in srgb,var(--amber) 16%,transparent)} /* the round on screen */
 /* hovering a round that isn't the open one: it grows about a quarter of the way to the open round's size (.7em -> 1.05em), then eases back; the font-size transition on .w does the motion */
 #flap .w.go:not(.cur):hover{font-size:.79em}
+/* rank badge on the menu, and the XP line on the results */
+#rank{width:16em;margin:.2em auto .6em;text-align:left}
+#rankTop{display:flex;justify-content:space-between;align-items:baseline}
+#rankTop b{color:var(--amber)}#rankTop span{color:var(--muted);font-size:.85em}
+#rankBar{height:6px;border-radius:3px;background:var(--surface-2);margin:.3em 0;overflow:hidden}
+#rankBar i{display:block;height:100%;background:var(--amber);border-radius:3px;transition:width .4s ease}
+#rank small{color:var(--muted)}
+#xp{margin-top:.5em;color:var(--amber);font-weight:700}
