@@ -71,7 +71,7 @@
 <div id="game" hidden>
   <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
-</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div><div id="pcol"></div></div>
+</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
@@ -85,6 +85,7 @@
     <div id="endbtns"><button id="replay" hidden>Play again</button><button id="share" hidden>Share</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
   <div id="choices" hidden></div>
+  <div id="pcol"></div>
   <div id="msg"></div>
 </div>
 <details id="dev" hidden><summary>Dev</summary><button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
