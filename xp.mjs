@@ -9,10 +9,11 @@ export const streakXp = n => (n >= 2 ? 5 * n : 0);
 export const streakTotal = (scores, top = 4) => { let n = 0, sum = 0; for (const v of scores) { n = v === top ? n + 1 : 0; sum += streakXp(n); } return sum; };
 // Award a finished daily game, once per day + difficulty. Asking again just replays the same answer, so reopening a finished game can't double-pay.
 // gain = points x difficulty, +10 if every round was solved, + the in-game streak XP, + a daily streak bonus (2 per day in a row, up to 10) on the first game of a day.
-export function award(s, day, mode, points, right, rounds, scores = []) {
+export function award(s, day, mode, points, right, rounds, scores = [], mc = false) {
   const k = day + mode;
   if (k in s.done) { const [gain, rankUp] = s.done[k]; return { state: s, gain, rankUp }; }
-  let gain = Math.round(points * MULT[mode]) + (right === rounds ? 10 : 0) + streakTotal(scores), streak = s.streak;
+  // multiple choice earns half of the game XP (points, perfect bonus, in-game streaks); the daily-streak bonus below is for showing up, so it is not halved
+  let gain = Math.round((points * MULT[mode] + (right === rounds ? 10 : 0) + streakTotal(scores)) * (mc ? 0.5 : 1)), streak = s.streak;
   if (s.last !== day) { streak = s.last === day - 1 ? s.streak + 1 : 1; gain += Math.min(streak, 5) * 2; }
   const xp = s.xp + gain, up = rankIndex(xp) > rankIndex(s.xp) ? RANKS[rankIndex(xp)][1] : "";
   return { state: { xp, streak, last: day, done: { ...s.done, [k]: [gain, up] } }, gain, rankUp: up };

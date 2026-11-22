@@ -16,8 +16,9 @@
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
   <small id="round"></small></h2>
 <div id="menu">
-  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div></div>
+  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div><small></small></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
+  <div id="playmode" role="group" aria-label="How to answer"><button data-p="type" title="Type the code: full XP">Type it</button><button data-p="pick" title="Pick from a list: half XP">Multiple choice</button></div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
   <button data-m="hard">Extra Hard<small>Small local airports</small></button>
@@ -87,12 +88,18 @@ $("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
 $("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
 paintMenu();
 fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
+// How today's games are answered: type the code, or pick from six (half XP). It applies to games you start; a game already started keeps its mode.
+let PLAYMODE="type";try{if(localStorage.icaoPlay==="pick")PLAYMODE="pick"}catch{}
+const paintPlay=()=>document.querySelectorAll("#playmode button").forEach(b=>b.classList.toggle("on",b.dataset.p===PLAYMODE));
+document.querySelectorAll("#playmode button").forEach(b=>b.onclick=()=>{PLAYMODE=b.dataset.p;try{localStorage.icaoPlay=PLAYMODE}catch{}paintPlay()});
+paintPlay();
 // XP and rank (per device, in localStorage): earned by finishing today's daily sets, shown here and on the results panel. Logic is in xp.js.
 let XPM=null;const xpState=()=>{try{return JSON.parse(localStorage.icaoXp)}catch{return XPM.fresh()}};
 function paintRank(){
   const s=xpState(),i=XPM.rankIndex(s.xp),[min,name]=XPM.RANKS[i],nxt=XPM.RANKS[i+1],streak=XPM.liveStreak(s,TODAY);
   $("rank").querySelector("b").textContent=name;
-  $("rank").querySelector("span").textContent=(nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`)+(streak>1?` · ${streak}-day streak`:""); // the streak only shows once there is one
+  $("rank").querySelector("span").textContent=nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`;
+  const sm=$("rank").querySelector("small");sm.textContent=streak>1?`${streak}-day streak`:"";sm.hidden=streak<=1; // the streak only shows once there is one
   $("rankBar").firstChild.style.width=(nxt?100*(s.xp-min)/(nxt[0]-min):100)+"%";
   $("rank").hidden=false}
 import("/xp.js").then(m=>{XPM=m;paintRank()}).catch(()=>{});
@@ -225,7 +232,8 @@ async function start(m,fmt,st,data){
   DAY=d.day;today=d.airports;PER=today.length;buildFlap();
   if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
-  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
+  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[],mc:!PRACTICE&&PLAYMODE==="pick"}; // mc = multiple choice, fixed when the game is first opened so it cannot be swapped for typing later
+  if(SAVE&&!localStorage[SAVE])save();
   snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
@@ -280,11 +288,18 @@ function show(){
   choose(c,f)}
 // Last guess: four buttons (the answer and three decoys from its tier) instead of typing from scratch. The box still works.
 const CH=$("choices");
-const hideCH=()=>{CH.hidden=true;$("f").hidden=false}; // the answer panel and the Final guess panel take turns in the same spot
-async function choose(c,f){hideCH();CH.innerHTML="";if(f<TRIES-1||S.i>=PER)return;
-  const d=await fetch("/api/decoys?code="+c+"&skip="+ALT(today[S.i]).map(x=>x[0])).then(r=>r.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
-  if(S.fails<TRIES-1||today[S.i][0]!=c)return; // the round moved on while loading
-  CH.innerHTML="<b>Final guess</b>"+[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
+const hideCH=()=>{CH.hidden=true;$("f").hidden=!!(S&&S.mc&&S.i<PER)}; // the answer panel and the choices panel take turns in the same spot (a multiple-choice game only ever shows the choices)
+// Typing games: the last guess is picked from four. Multiple-choice games: every round is picked from six, saved with the game so a reload can't re-roll
+// (and reveal the answer as the one code that never changes); a wrong pick removes its button.
+async function choose(c,f){hideCH();CH.innerHTML="";if(S.i>=PER||(!S.mc&&f<TRIES-1))return;
+  const r=S.i,stillHere=()=>S.i==r&&today[r][0]==c&&(S.mc||S.fails>=TRIES-1);
+  let opts=S.mc?(S.opts||={})[r]:null;
+  if(!opts){
+    const d=await fetch(`/api/decoys?code=${c}&skip=${ALT(today[r]).map(x=>x[0])}${S.mc?"&any=1&n=5":""}`).then(x=>x.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
+    if(!stillHere())return; // the round moved on while loading
+    opts=[c,...d].sort(()=>Math.random()-.5);if(S.mc){S.opts[r]=opts;save()}}
+  const tried=new Set((S.guesses||[]).map(x=>x.slice(0,4)));
+  CH.innerHTML=`<b>${f>=TRIES-1?"Final guess":"Pick the airport"}</b>`+opts.filter(x=>!tried.has(x)).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
 CH.onclick=e=>{if(e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}};
 function view(v){ // review a finished round: its airport, answer and result; no guessing
   V=v;navs();$("cluebox").hidden=CH.hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
@@ -334,8 +349,8 @@ function end(){
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
-  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER,S.scores);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
-    $("xp").innerHTML=`+${r.gain} XP`+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"");
+  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER,S.scores,!!S.mc);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
+    $("xp").innerHTML=`+${r.gain} XP`+(S.mc?" (multiple choice: half XP)":"")+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"");
     xpBar(r.state.xp-r.gain,r.state.xp,r.rankUp,LIVE&&!matchMedia("(prefers-reduced-motion: reduce)").matches)}
   else if(!PRACTICE&&DAY!==TODAY)$("xp").textContent="Past days don't earn XP.";
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
@@ -360,7 +375,7 @@ function xpBar(from,to,up,live){
 let SUB;
 function postScore(){
   const score=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length;let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
-  return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score,right})}).then(r=>r.json())}
+  return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":"")+(S.mc?"-mc":""),score,right})}).then(r=>r.json())}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 function chart(d,me){
   const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1);

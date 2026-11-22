@@ -39,3 +39,8 @@ test("first-guess solves in a row: 2nd = 10 XP, 3rd = 15; any wrong guess, skip 
   assert.equal(streakTotal([3, 3, 3, 3, 3]), 0);
   assert.equal(award(fresh(), 9, "easy", 0, 0, 5, [4, 4]).gain, 10 + 2); // streak XP + day-1 daily bonus
 });
+test("multiple choice earns half the game XP, but the daily-streak bonus is not halved", () => {
+  const typed = award(fresh(), 5, "hard", 20, 5, 5, [4, 4, 4, 4, 4]), picked = award(fresh(), 5, "hard", 20, 5, 5, [4, 4, 4, 4, 4], true);
+  assert.equal(typed.gain, 40 + 10 + 70 + 2);          // 120 game XP + 2 daily streak
+  assert.equal(picked.gain, (40 + 10 + 70) / 2 + 2);   // 60 + 2
+});
