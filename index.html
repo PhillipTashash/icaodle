@@ -43,17 +43,17 @@
   <button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button>
 </div>
 <div id="game" hidden>
-  <div id="board"><div id="lcol"><div id="flap"></div>
-    <div id="nav"><button id="back">&#9664; Back</button><button id="next">Next &#9654;</button></div></div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
-  <form id="f"><button id="menuBack" type="button" title="Back to the main menu" aria-label="Back to the main menu"><svg viewBox="0 0 24 32" width="24" height="32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 30V17C17 11 14 9 6 9"/><path d="M11 3 4.5 9 11 15"/></svg></button><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
-  <div id="choices" hidden></div>
-  <div id="msg"></div>
+  <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
+</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
+  <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
-    <div id="statline"></div>
+    <div id="result"><div id="statline"></div><div id="quip"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="endbtns"><button id="review" class="ghost">Review rounds</button><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Play another difficulty</button></div>
+    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
+  <div id="choices" hidden></div>
+  <div id="msg"></div>
 </div>
 <p><button id="reset" hidden>Dev: reset all stats</button></p>
 </main>
@@ -156,15 +156,15 @@ function flap(word,r,i=0){ // left to right: each letter lands before the next o
 const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm");n.textContent=today[r][6];
   if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>")}; // solved with the last guess (score 1 of 4)
 const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
-// V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next; Next from the last finished round returns to play.
+// V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next.
 let V=0;
-const navs=()=>{$("back").disabled=V<=0;$("next").disabled=V>=S.i;[...$("flap").children].forEach((g,i)=>g.classList.toggle("cur",i==V))};
+const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",i==V);g.classList.toggle("go",i<=Math.min(S.i,PER-1))}); // "go" = a round you can click: finished ones and the current one
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
 function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
-  $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=$("back").disabled=$("next").disabled=true;
+  $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   setTimeout(()=>{$("msg").textContent="";if(S.i>=PER)snd(S.scores.every(v=>v>0)?"perfect":"finish");show();focusInput()},1500)}
-$("next").onclick=()=>{snd("forward");$("msg").textContent="";V+1<S.i?view(V+1):(show(),focusInput())};
-$("back").onclick=()=>{snd("back");$("msg").textContent="";view(V-1)};
+// Each airport row on the left is a button: click a finished round to review it, or the current round to get back to guessing.
+$("flap").onclick=e=>{const i=[...$("flap").children].indexOf(e.target.closest(".w"));if(i<0||i==V||i>Math.min(S.i,PER-1)||busy)return;snd("forward");$("msg").textContent="";i<S.i?view(i):(show(),focusInput())};
 function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
 // The key lives in .env on the server (never in this file or git); the browser still has to receive it, so restrict it by referrer in Google Cloud.
 function loadMaps(){return fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
@@ -245,7 +245,7 @@ function setMap(t,zoom,minZ){
   map.setCenter({lat,lng:lon});map.setZoom(zoom)}
 function show(){
   V=S.i;navs();disarm();$("cluebox").hidden=false;
-  if(S.i>=PER)return end();
+  if(S.i>=PER){view(PER-1);return end()} // game over: stay on the board (Back/Next review the rounds); the results take the answer panel's place
   $("g").disabled=$("go").disabled=false;$("skip").disabled=$("giveup").disabled=false;
   const t=today[S.i],[c,city,st,,,z]=t,f=S.fails;
   $("round").textContent=`${tag()} ${S.i+1}/${PER}`;
@@ -281,7 +281,6 @@ $("f").onsubmit=async e=>{e.preventDefault();
   else snd("wrong")
   busy=0;hideCH();save();S.i>i0?reveal(c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
-$("review").onclick=()=>{snd("open");$("stats").hidden=true;$("board").hidden=$("nav").hidden=false;$("msg").textContent="";view(0)};
 // Letter grade for the results screen: points out of the maximum, as a percentage. The color slides red -> orange -> green as the score
 // approaches the A line (so an A is fully green).
 const GRADES=[[70,"A"],[55,"B"],[40,"C"],[25,"D"],[0,"F"]]; // with only 20 points to earn, 14 of them (70%) is an A
@@ -291,30 +290,47 @@ function showGrade(points){
   const pct=Math.round(100*points/(PER*TRIES)),letter=GRADES.find(([min])=>pct>=min)[1];
   $("grade").style.color=gradeColor(Math.min(100,pct/.7));$("grade").setAttribute("aria-label",`Grade ${letter}, ${pct} percent`);
   $("grade").children[0].textContent=letter;$("grade").children[1].textContent=pct+"%"}
+// A roast to match the grade (A first, F last): the better you did, the less impressed we are.
+const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practically waving at you.","Congrats, you can read a map. Try not to let it go to your head."],
+  ["A B. Aggressively fine.","Solid B. Did your co-pilot do most of it?","Almost impressive, which is the most dangerous kind of mediocre."],
+  ["Dead average. The airports didn't even notice you landed.","A C: you showed up, you landed, nobody's talking about it.","Half right, like a departure board in a thunderstorm."],
+  ["A D. Did you navigate by vibes?","Impressive, if the goal was to find every wrong airport.","The map was right there. It's a big map."],
+  ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
 function end(){
-  const t=S.scores.reduce((a,b)=>a+b,0);
-  $("f").hidden=$("board").hidden=$("nav").hidden=true;$("stats").hidden=$("again").hidden=false;$("board").hidden=true;
-  const right=S.scores.filter(v=>v>0).length;
-  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b> right`;$("again").textContent="Back to menu";return} // near-me games: no grade, no score, nothing sent
+  const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
+  $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
+  $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
+  if(FMT!="city"&&map)setTimeout(()=>{google.maps.event.trigger(map,"resize");map.setCenter({lat:today[V][3],lng:today[V][4]})})
+  const q=QUIPS[GRADES.findIndex(([m])=>Math.round(pct)>=m)]; // same tiers as the letter grade
+  $("quip").textContent=q[Math.floor(Math.random()*q.length)];
+  $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
+  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
-  $("statline").innerHTML=`You: <b>${right}/${PER}</b> right &middot; <b>${t}/${PER*TRIES}</b> points`;
-  $("again").textContent=PRACTICE?"Change state":"Play another difficulty";
+  $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
-  let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
-  fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score:t,right})}).then(r=>r.json()).then(d=>chart(d,t,right)).catch(()=>{$("msg").textContent+="  (no global stats yet)"})}
+  (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
+// The score goes to the global stats once, when the game is over; the reply feeds the distribution chart.
+let SUB;
+function postScore(){
+  const score=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length;let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
+  return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score,right})}).then(r=>r.json())}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-function chart(d,me,right){
-  const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1),w=c.width/n,base=190;
-  c.hidden=false;x.clearRect(0,0,c.width,c.height);
+function chart(d,me){
+  const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1);
+  c.hidden=false;
+  // draw at the size it's shown (times the screen's pixel density) so the text stays sharp, instead of stretching a fixed 600px bitmap
+  const W=Math.max(300,c.clientWidth),H=220,dpr=devicePixelRatio||1,w=W/n,base=190;
+  c.width=W*dpr;c.height=H*dpr;c.style.height=H+"px";x.scale(dpr,dpr);
   for(let k=0;k<n;k++){const h=(dist[k]||0)/m*150;x.globalAlpha=k==me?1:.35;x.fillStyle=k==me?css("--brand"):css("--text");x.fillRect(k*w+2,base-h,w-4,h);x.globalAlpha=1}
   x.fillStyle=css("--muted");x.font="11px system-ui";x.textAlign="center";for(let k=0;k<n;k+=5)x.fillText(k,k*w+w/2,base+14);
-  // dotted vertical lines: the average player's score and yours; labels sit on opposite sides so they don't collide
+  // dotted vertical lines: the average player's score and yours; labels sit on opposite sides (and different heights) so they don't collide, and flip so they never run off the edge
   const mark=(v,col,label,y,align)=>{const px=(v+.5)*w;x.strokeStyle=x.fillStyle=col;x.lineWidth=2;x.setLineDash([4,4]);
-    x.beginPath();x.moveTo(px,34);x.lineTo(px,base);x.stroke();x.setLineDash([]);x.font="bold 12px system-ui";x.textAlign=align;x.fillText(label,px+(align=="left"?5:-5),y)};
+    x.beginPath();x.moveTo(px,34);x.lineTo(px,base);x.stroke();x.setLineDash([]);x.font="bold 12px system-ui";
+    const tw=x.measureText(label).width;if(align=="right"&&px-5-tw<0)align="left";else if(align=="left"&&px+5+tw>W)align="right";
+    x.textAlign=align;x.fillText(label,px+(align=="left"?5:-5),y)};
   const lowAvg=d.avg<=me;
   mark(d.avg,css("--text"),`Average ${d.avg.toFixed(1)}`,12,lowAvg?"right":"left");
-  mark(me,css("--brand"),`You ${me}`,26,lowAvg?"left":"right");
-  $("statline").innerHTML=`You: <b>${right}/${PER}</b> right &middot; <b>${me}/${PER*TRIES}</b> points<br>Average player (${d.n} played): <b>${d.avgRight==null?"–":d.avgRight.toFixed(1)}/${PER}</b> right &middot; <b>${d.avg.toFixed(1)}</b> points`}
+  mark(me,css("--brand"),`You ${me}`,26,lowAvg?"left":"right")}
 // Menu background: a few muted planes fly straight across the screen. Most are small and slow, behind the containers; a few are larger,
 // faster and fainter, passing in front of them for depth. Two colors only (amber and grey). Runs only while the menu / custom screen is
 // showing (start() stops it).
