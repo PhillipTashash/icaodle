@@ -56,13 +56,16 @@
   <div id="choices" hidden></div>
   <div id="msg"></div>
 </div>
-<p><button id="reset" hidden>Dev: reset all stats</button></p>
+<p><button id="reset" hidden>Dev: reset all stats</button><small id="devAnswers"></small></p>
 </main>
 <footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");$reset.hidden=false;
   $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
-    await fetch("/api/reset",{method:"POST"});try{localStorage.clear()}catch{}location.reload()}}
+    await fetch("/api/reset",{method:"POST"});try{localStorage.clear()}catch{}location.reload()}
+  // dev only: today's answers, on the menu for all three difficulties (and, once a game starts, for that game)
+  Promise.all(["easy","medium","hard"].map(m=>fetch(`/api/today?mode=${m}`).then(r=>r.json()))).then(ds=>{
+    document.getElementById("devAnswers").textContent=ds.map((d,i)=>["Normal","Hard","Extra Hard"][i]+": "+d.airports.map(a=>a[0]).join(" ")).join("\n")}).catch(()=>{})}
 let PER=5; const TRIES=4; // 3 hint stages => 4th guess is the last. PER is the rounds in this game: 5, or fewer in an "Airports near me" game
 const NAME={easy:"Normal",medium:"Hard",hard:"Extra Hard"}; // what players see; the keys stay easy/medium/hard in saves, scores and the server
 let DAY,MODE,today,SAVE,S,map,$=id=>document.getElementById(id);
@@ -165,8 +168,8 @@ function flap(word,r,i=0){ // left to right: each letter lands before the next o
   (function step(){if(el.textContent==word[i])return flap(word,r,i+1);el.textContent=RING[(RING.indexOf(el.textContent)+1)%RING.length];snd("flap");
     el.classList.remove("f");void el.offsetWidth;el.classList.add("f");setTimeout(step,gap)})()}
 // Round over: flap to the answer, then wait for Next (which flaps back to K--- and loads the next round).
-// rounds solved in a row, counting back from round r
-const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]>0)n++;return n};
+// rounds solved on the first guess in a row, counting back from round r (a wrong guess, skip or loss in a round breaks the run)
+const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]==TRIES)n++;return n};
 const xpGame=()=>!PRACTICE&&DAY===TODAY; // only today's daily games earn XP
 const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm");n.textContent=today[r][6];
   if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>"); // solved with the last guess (score 1 of 4)
@@ -217,7 +220,8 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 async function start(m,fmt,st,data){
   MODE=m;FMT=fmt;ST=st;PRACTICE=!!ST;
   const d=data||await fetch(PRACTICE?`/api/state?mode=${m}&state=${ST}`:`/api/today?mode=${m}&day=${PICK}`).then(r=>r.json());
-  DAY=d.day;today=d.airports;PER=today.length;buildFlap();document.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
+  DAY=d.day;today=d.airports;PER=today.length;buildFlap();
+  if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
   S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
   snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
@@ -296,7 +300,7 @@ $("f").onsubmit=async e=>{e.preventDefault();
   busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
   if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
     if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,t[3],t[4])+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
-  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.min(runAt(S.i-1),5));confetti()} // the solve sound climbs with the run: streak1 ... streak5
+  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.max(1,Math.min(runAt(S.i-1),5)));confetti()} // the solve sound climbs with the first-guess run: streak1 ... streak5 (streak1 also for a solve after a miss)
   else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
   else snd("wrong")
   busy=0;hideCH();save();S.i>i0?reveal(c):show()};

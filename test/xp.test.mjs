@@ -31,9 +31,11 @@ test("a streak only shows while alive", () => {
   const s = { xp: 0, streak: 4, last: 10, done: {} };
   assert.equal(liveStreak(s, 11), 4); assert.equal(liveStreak(s, 12), 0);
 });
-test("rounds solved in a row: 2nd = 10 XP, 3rd = 15, a miss resets", () => {
+test("first-guess solves in a row: 2nd = 10 XP, 3rd = 15; any wrong guess, skip or loss resets", () => {
   assert.deepEqual([1, 2, 3, 5].map(streakXp), [0, 10, 15, 25]);
-  assert.equal(streakTotal([4, 3, 0, 2, 1]), 10 + 10); // run of 2, a miss, run of 2
-  assert.equal(streakTotal([1, 1, 1, 1, 1]), 10 + 15 + 20 + 25);
+  assert.equal(streakTotal([4, 4, 0, 4, 4]), 10 + 10); // run of 2, a loss, run of 2
+  assert.equal(streakTotal([4, 4, 3, 4, 4]), 10 + 10); // solved on the 2nd guess: not a streak round, so it ends the run
+  assert.equal(streakTotal([4, 4, 4, 4, 4]), 10 + 15 + 20 + 25);
+  assert.equal(streakTotal([3, 3, 3, 3, 3]), 0);
   assert.equal(award(fresh(), 9, "easy", 0, 0, 5, [4, 4]).gain, 10 + 2); // streak XP + day-1 daily bonus
 });
