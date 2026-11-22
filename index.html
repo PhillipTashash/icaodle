@@ -125,18 +125,19 @@ const PLANE=(()=>{const top=[[1,0],[.6,.08],[.2,.1],[-.15,.95],[-.35,.95],[-.25,
   for(let i=top.length-2;i>=1;i--)p.lineTo(top[i][0],-top[i][1]);p.closePath();return p})(); // ...and back up the mirrored lower side
 
 // Correct answer: confetti falls behind the containers (canvas z-index 0, the page content sits above it).
-function confetti(speed=5){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second
+function confetti(speed=5,secs=0){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second; secs > 0 keeps it raining for that long
   if(matchMedia("(prefers-reduced-motion: reduce)").matches)return; // a visual effect, so respect the motion preference
-  const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx"+(matchMedia("(max-width:820px)").matches?" front":""); // on a phone the panels cover almost the whole screen, so it falls in front there
+  const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx"+(secs||matchMedia("(max-width:820px)").matches?" front":""); // on a phone the panels cover almost the whole screen, so it falls in front there
   document.body.append(c);
   const cols=["--accent","--text","--ok","--muted"].map(css),rnd=Math.random;
-  const P=Array.from({length:110},()=>({x:rnd()*W,y:-30-rnd()*H*.35,vy:speed*100*(.8+rnd()*.4),vx:(rnd()-.5)*70,w:6+rnd()*6,h:10+rnd()*8,r:rnd()*6.3,vr:(rnd()-.5)*8,f:rnd()*6.3,vf:3+rnd()*5,c:cols[Math.floor(rnd()*cols.length)]}));
-  const dur=(H*1.35+40)/(speed*100*.8)*1000+300; // long enough for the slowest piece (and the spawn offset) to clear the screen
+  const P=Array.from({length:secs?170:110},()=>({x:rnd()*W,y:-30-rnd()*H*.35,vy:speed*100*(.8+rnd()*.4),vx:(rnd()-.5)*70,w:6+rnd()*6,h:10+rnd()*8,r:rnd()*6.3,vr:(rnd()-.5)*8,f:rnd()*6.3,vf:3+rnd()*5,c:cols[Math.floor(rnd()*cols.length)]}));
+  const dur=secs?secs*1000:(H*1.35+40)/(speed*100*.8)*1000+300; // long enough for the slowest piece (and the spawn offset) to clear the screen
   setTimeout(()=>c.remove(),dur+600); // safety net: if animation frames are paused (background tab) the canvas still goes away
   let last=performance.now();const t0=last;
   (function f(n){const dt=Math.min(.05,(n-last)/1e3);last=n;x.clearRect(0,0,W,H);
     x.globalAlpha=Math.max(0,Math.min(1,(dur-(n-t0))/300)); // fade out over the last 0.3 s
-    for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;p.f+=p.vf*dt;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.f));x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()} // the cosine flips each piece like paper tumbling
+    for(const p of P){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;p.f+=p.vf*dt;if(secs&&p.y>H+30&&n-t0<dur-2500){p.y=-30;p.x=rnd()*W} // celebration: pieces re-enter at the top until the last few seconds
+      x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.f));x.fillStyle=p.c;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()} // the cosine flips each piece like paper tumbling
     dur-(n-t0)>0?requestAnimationFrame(f):c.remove()})(last)}
 // Title-screen intro: all four logo tiles start flipping at once, then settle on I, C, A, O one after another, left to right.
 // Each tile counts forward through the alphabet at its own steady pace for exactly as long as it needs to land on its letter at its settle time.
@@ -164,8 +165,13 @@ function flap(word,r,i=0){ // left to right: each letter lands before the next o
   (function step(){if(el.textContent==word[i])return flap(word,r,i+1);el.textContent=RING[(RING.indexOf(el.textContent)+1)%RING.length];snd("flap");
     el.classList.remove("f");void el.offsetWidth;el.classList.add("f");setTimeout(step,gap)})()}
 // Round over: flap to the answer, then wait for Next (which flaps back to K--- and loads the next round).
+// rounds solved in a row, counting back from round r
+const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]>0)n++;return n};
+const xpGame=()=>!PRACTICE&&DAY===TODAY; // only today's daily games earn XP
 const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm");n.textContent=today[r][6];
-  if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>")}; // solved with the last guess (score 1 of 4)
+  if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>"); // solved with the last guess (score 1 of 4)
+  const run=runAt(r);
+  if(run>=2)n.insertAdjacentHTML("beforeend",`<b class="st${Math.min(run,4)}">${xpGame()&&XPM?`+${XPM.streakXp(run)} XP &middot; `:""}${run}x streak</b>`)};
 const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
 // V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next.
 let V=0;
@@ -173,7 +179,10 @@ const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
 function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
   $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
-  setTimeout(()=>{$("msg").textContent="";if(S.i>=PER)snd(S.scores.every(v=>v>0)?"perfect":"finish");show();focusInput()},1500)}
+  setTimeout(()=>{$("msg").textContent="";if(S.i>=PER){const top=LOCAL?S.scores.every(v=>v>0):S.scores.reduce((a,b)=>a+b,0)==PER*TRIES;
+      if(runAt(PER-1)<PER)snd("endGame"); // a 5-in-a-row already played streak5 as its end-of-game sound
+      if(top)confetti(4,10)} // 100%: ten seconds of confetti
+    show();focusInput()},1500)}
 // Each airport row on the left is a button: click a finished round to review it, or the current round to get back to guessing.
 $("flap").onclick=e=>{const i=[...$("flap").children].indexOf(e.target.closest(".w"));if(i<0||i==V||i>Math.min(S.i,PER-1)||busy)return;snd("forward");$("msg").textContent="";i<S.i?view(i):(show(),focusInput())};
 function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
@@ -287,7 +296,7 @@ $("f").onsubmit=async e=>{e.preventDefault();
   busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
   if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
     if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,t[3],t[4])+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
-  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("correct");confetti()}
+  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.min(runAt(S.i-1),5));confetti()} // the solve sound climbs with the run: streak1 ... streak5
   else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
   else snd("wrong")
   busy=0;hideCH();save();S.i>i0?reveal(c):show()};
@@ -318,7 +327,7 @@ function end(){
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
-  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
+  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER,S.scores);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
     $("xp").innerHTML=`+${r.gain} XP`+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"")}
   else if(!PRACTICE&&DAY!==TODAY)$("xp").textContent="Past days don't earn XP.";
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;

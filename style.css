@@ -251,3 +251,6 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #rankBar i{display:block;height:100%;background:var(--amber);border-radius:3px;transition:width .4s ease}
 #rank small{color:var(--muted)}
 #xp{margin-top:.5em;color:var(--amber);font-weight:700}
+/* the streak line under an airport name changes color with the run */
+#flap .nm b.st3{color:var(--orange)}
+#flap .nm b.st4{color:var(--bad)}

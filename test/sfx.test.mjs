@@ -14,7 +14,10 @@ function rig({ stored = {}, files = {} } = {}) {
     resume() { log.push("ctx.resume"); }
     async close() { log.push("ctx.close"); this.closed = true; }
     createBufferSource() { return { connect() {}, start() { log.push("file.start"); }, stop() { log.push("file.stop"); } }; }
-    createGain() { return { gain: {}, connect() {} }; }
+    createGain() { return { gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; }
+    createBiquadFilter() { return { frequency: {}, connect() {} }; }
+    createOscillator() { return { frequency: {}, connect() {}, start() { log.push("osc.start"); }, stop() {} }; }
+    get currentTime() { return 0; }
     async decodeAudioData() { return {}; }
   }
   const createUISFX = (o) => {

@@ -1,7 +1,7 @@
 // node --test — XP: points x difficulty, perfect and streak bonuses, one award per day+mode, rank-ups.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { award, fresh, rankIndex, liveStreak } from "../xp.mjs";
+import { award, fresh, rankIndex, liveStreak, streakXp, streakTotal } from "../xp.mjs";
 
 test("first game: points x difficulty + perfect bonus + day-1 streak bonus", () => {
   const r = award(fresh(), 100, "medium", 20, 5, 5); // 30 + 10 + 2
@@ -24,10 +24,16 @@ test("the same day + difficulty is only paid once", () => {
   assert.equal(b.gain, a.gain); assert.equal(b.state.xp, a.state.xp);
 });
 test("crossing a threshold reports the new rank", () => {
-  const s = { ...fresh(), xp: 95 }, r = award(s, 1, "easy", 20, 5, 5);
+  const s = { ...fresh(), xp: 130 }, r = award(s, 1, "easy", 20, 5, 5);
   assert.equal(r.rankUp, "Cadet"); assert.equal(rankIndex(r.state.xp), 1);
 });
 test("a streak only shows while alive", () => {
   const s = { xp: 0, streak: 4, last: 10, done: {} };
   assert.equal(liveStreak(s, 11), 4); assert.equal(liveStreak(s, 12), 0);
+});
+test("rounds solved in a row: 2nd = 10 XP, 3rd = 15, a miss resets", () => {
+  assert.deepEqual([1, 2, 3, 5].map(streakXp), [0, 10, 15, 25]);
+  assert.equal(streakTotal([4, 3, 0, 2, 1]), 10 + 10); // run of 2, a miss, run of 2
+  assert.equal(streakTotal([1, 1, 1, 1, 1]), 10 + 15 + 20 + 25);
+  assert.equal(award(fresh(), 9, "easy", 0, 0, 5, [4, 4]).gain, 10 + 2); // streak XP + day-1 daily bonus
 });

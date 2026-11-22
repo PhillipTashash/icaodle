@@ -1,7 +1,7 @@
 // sfx.mjs — all game audio, in one place. ES module; nothing touches window/document at import time, so it is SSR-safe.
 //
 // Pack: "mechanical" (uisfx). The game is styled as an airport departure board (split-flap tiles, signage amber), and this
-// pack's switches, relays and firm detents match that. Your own files in /sounds (correct, wrong, lost, skip, finish, flap)
+// pack's switches, relays and firm detents match that. Your own files in /sounds (correct, wrong, lost, skip, flap, streak1-5, end_game)
 // still win over the pack when they exist; the pack's cues cover everything else and replace the old synthesized beeps.
 export const PACK = "mechanical";
 export const KEY = "icaodle:sound"; // localStorage: { enabled, volume }, saved on every change
@@ -14,12 +14,16 @@ export const EVENTS = {
   open: { cue: "open" },              // custom setup panel, results screen, review board
   back: { cue: "back" },              // custom setup -> menu, review Back, results -> menu
   forward: { cue: "forward" },        // review Next
-  correct: { file: "correct", cue: "success" },   // round solved
+  correct: { file: "correct", cue: "success" },   // (not used by the game now: streak1 is the solve sound)
+  streak1: { file: "streak1", cue: "success" },   // round solved, not on a streak yet
+  streak2: { file: "streak2", cue: "streak" },    // 2 solved in a row
+  streak3: { file: "streak3", cue: "streak" },    // 3 in a row
+  streak4: { file: "streak4", cue: "streak" },    // 4 in a row
+  streak5: { file: "streak5", cue: "achievement" }, // all 5 in a row (the end-of-game sound for a perfect run)
+  endGame: { file: "end_game", cue: "complete" }, // the game is over and the last round wasn't a 5-in-a-row
   wrong: { file: "wrong", cue: "error" },         // wrong guess
   skip: { file: "skip", cue: "skip-next" },       // a guess passed with Skip
   lost: { file: "lost", cue: "blocked" },         // round lost (4th miss, or Skip on the last guess)
-  finish: { file: "finish", cue: "complete" },    // all 5 rounds done
-  perfect: { cue: "achievement" },                // all 5 solved
   flap: { file: "flap", cue: "typing", volume: 0.3 }, // each split-flap flip (typing = a brief key contact, never throttled)
   soundOn: { cue: "toggle-on" },                  // sound switched back on (muting is silent: mute must be immediate)
 };
@@ -79,11 +83,12 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     },
     // Plays an event. Silent (returns null) before the first gesture or while muted, so nothing stale is queued.
     // Returns "file" or "cue" for what actually played.
-    play(event) {
+    play(event, extra) { // extra: uisfx play options, e.g. { playbackRate: 2 } for an octave up
       const e = EVENTS[event];
       if (!e || !ui || !enabled) return null;
       if (e.file && playFile(e.file, e.volume)) return "file";
-      return ui.play(e.cue, e.volume === undefined ? undefined : { volume: e.volume }) ? "cue" : null; // play() can return null
+      const o = { ...(e.volume === undefined ? {} : { volume: e.volume }), ...extra };
+      return ui.play(e.cue, Object.keys(o).length ? o : undefined) ? "cue" : null; // play() can return null
     },
     setEnabled(on) {
       on = !!on;

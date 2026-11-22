@@ -32,7 +32,7 @@ docker run --rm -v icaodle_icaodle-data:/data -v "$PWD":/backup alpine cp /data/
 
 **Updating.** `git pull && docker compose up -d --build`. New daily sets are generated automatically at midnight UTC.
 
-**Sounds.** The game uses the built-in sound pack plus any `correct.wav`, `wrong.wav`, `lost.wav`, `skip.wav`, `finish.wav` or `flap.wav` in `sounds/` (see `sounds/README.md`). To swap files without rebuilding, uncomment the `./sounds` volume line in `docker-compose.yml`.
+**Sounds.** The game uses the built-in sound pack plus any `streak1.wav` to `streak5.wav`, `end_game.wav`, `wrong.wav`, `lost.wav`, `skip.wav` or `flap.wav` in `sounds/` (see `sounds/README.md`). To swap files without rebuilding, uncomment the `./sounds` volume line in `docker-compose.yml`.
 
 ## Run it without Docker
 
