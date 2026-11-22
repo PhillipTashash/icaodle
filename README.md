@@ -30,8 +30,6 @@ docker run --rm -v icaodle_icaodle-data:/data -v "$PWD":/backup alpine cp /data/
 
 **Past days.** The menu has a date picker. The archive starts the day the database is first created (today, on a fresh install) and grows by one day each day: players can step back to any earlier day and play that day's sets, and those games count in that day's stats. A day nobody has opened yet gets a stable set from a seeded shuffle.
 
-**Answering.** The menu has a "Type it / Multiple choice" switch for the daily games. Typing earns full XP; multiple choice (six options per round) earns half and has its own score distribution. A game keeps the mode it was opened with.
-
 **Updating.** `git pull && docker compose up -d --build`. New daily sets are generated automatically at midnight UTC.
 
 **Sounds.** The game uses the built-in sound pack plus any `streak1.wav` to `streak5.wav`, `end_game.wav`, `wrong.wav`, `lost.wav`, `skip.wav` or `flap.wav` in `sounds/` (see `sounds/README.md`). To swap files without rebuilding, uncomment the `./sounds` volume line in `docker-compose.yml`.

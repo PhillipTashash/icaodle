@@ -67,10 +67,10 @@ async function zipPoint(zip) {
   zips.set(zip, p); return p;
 }
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
-const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/xp.js": "xp.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
+const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
 // Cache busting: the page asks for /style.css?v=<hash of the files>, so after an update every visitor (and Cloudflare) sees a new address and fetches the new file.
-const VERSION = require("crypto").createHash("md5").update(["style.css", "sfx.mjs", "xp.mjs", "node_modules/uisfx/dist/index.js"].map(f => fs.readFileSync(f)).join("")).digest("hex").slice(0, 10);
-const page = () => fs.readFileSync("index.html", "utf8").replace(/(\/style\.css|\/sfx\.js|\/xp\.js|\/vendor\/uisfx\.js)(?=["'])/g, "$1?v=" + VERSION);
+const VERSION = require("crypto").createHash("md5").update(["style.css", "sfx.mjs", "node_modules/uisfx/dist/index.js"].map(f => fs.readFileSync(f)).join("")).digest("hex").slice(0, 10);
+const page = () => fs.readFileSync("index.html", "utf8").replace(/(\/style\.css|\/sfx\.js|\/vendor\/uisfx\.js)(?=["'])/g, "$1?v=" + VERSION);
 const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
 // The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
 const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
@@ -94,10 +94,8 @@ http.createServer((req, res) => {
     if (!tier) return json({ error: "bad request" }, 400);
     // Every option starts with the same letter after the K (the "Starts with" clue): own tier first, then any tier, then anything, so there are always four options.
     const skip = new Set(String(u.searchParams.get("skip") || "").toUpperCase().split(",")); // other right answers (same city) are never decoys
-    // ?any=1 drops the same-letter rule (multiple-choice daily games); ?n= asks for more than 3 decoys (up to 5).
-    const n = Math.min(5, Math.max(1, +u.searchParams.get("n") || 3)), any = u.searchParams.get("any") === "1";
-    const same = l => l.filter(a => a[0] !== c && !skip.has(a[0]) && (any || a[0][1] === c[1])).map(a => a[0]), out = [];
-    for (const pool of [same(AIR[tier]), same([...ALL.values()]), [...ALL.keys()].filter(k => k !== c && !skip.has(k))]) while (out.length < n && pool.length) { const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!out.includes(x)) out.push(x); }
+    const same = l => l.filter(a => a[0] !== c && !skip.has(a[0]) && a[0][1] === c[1]).map(a => a[0]), out = [];
+    for (const pool of [same(AIR[tier]), same([...ALL.values()]), [...ALL.keys()].filter(k => k !== c && !skip.has(k))]) while (out.length < 3 && pool.length) { const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!out.includes(x)) out.push(x); }
     return json(out);
   }
   if (req.method === "GET" && u.pathname === "/api/near") { // "Airports near me": up to PER random airports within N miles of a US ZIP code (any difficulty)
@@ -133,7 +131,7 @@ http.createServer((req, res) => {
     let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
     return req.on("end", () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
-      const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && typeof p.id === "string" && p.id.length <= 64 && /^(easy|medium|hard)(-city|-mc)?$/.test(p.mode) && validDay(p.day) && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
+      const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && typeof p.id === "string" && p.id.length <= 64 && /^(easy|medium|hard)(-city)?$/.test(p.mode) && validDay(p.day) && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
       if (!ok) return json({ error: "invalid" }, 400);
       const k = p.day + ":" + p.mode, d = (db.scores[k] ||= {});
       if (!(p.id in d)) { d[p.id] = p.score; if (p.right !== undefined) (db.right[k] ||= {})[p.id] = p.right; save(); } // first submission per player per day+mode wins

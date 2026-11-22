@@ -3,7 +3,7 @@ ENV NODE_ENV=production PORT=3000 DATA_FILE=/data/data.json
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.js index.html style.css sfx.mjs xp.mjs airports.json ./
+COPY server.js index.html style.css sfx.mjs airports.json ./
 COPY sounds ./sounds
 # the saved daily sets and scores live in /data (a volume), so they survive restarts and image updates
 RUN mkdir -p /data && chown node:node /data

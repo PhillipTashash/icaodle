@@ -16,9 +16,7 @@
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
   <small id="round"></small></h2>
 <div id="menu">
-  <div id="rank"><div id="rankTop"><b></b><span></span></div><div id="rankBar"><i></i></div><small></small></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
-  <div id="playmode" role="group" aria-label="How to answer"><button data-p="type" title="Type the code: full XP">Type it</button><button data-p="pick" title="Pick from a list: half XP">Multiple choice</button></div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
   <button data-m="hard">Extra Hard<small>Small local airports</small></button>
@@ -48,8 +46,7 @@
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
-    <div id="result"><div id="statline"></div><div id="quip"></div>
-      <div id="xpbar" hidden><div id="xpTop"><b id="xpRank"></b><span id="xpNum"></span></div><div id="xpTrack"><i></i></div></div><div id="xp"></div></div>
+    <div id="result"><div id="statline"></div><div id="quip"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
     <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
   </div>
@@ -58,7 +55,7 @@
 </div>
 <details id="dev" hidden><summary>Dev</summary><button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
 </main>
-<footer><div id="soundctl"><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div><div id="timer"></div></footer>
+<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙️</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
   $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
@@ -88,28 +85,13 @@ $("dprev").onclick=()=>{PICK--;snd("back");paintMenu()};
 $("dnext").onclick=()=>{PICK++;snd("forward");paintMenu()};
 paintMenu();
 fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
-// How today's games are answered: type the code, or pick from six (half XP). It applies to games you start; a game already started keeps its mode.
-let PLAYMODE="type";try{if(localStorage.icaoPlay==="pick")PLAYMODE="pick"}catch{}
-const paintPlay=()=>document.querySelectorAll("#playmode button").forEach(b=>b.classList.toggle("on",b.dataset.p===PLAYMODE));
-document.querySelectorAll("#playmode button").forEach(b=>b.onclick=()=>{PLAYMODE=b.dataset.p;try{localStorage.icaoPlay=PLAYMODE}catch{}paintPlay()});
-paintPlay();
-// XP and rank (per device, in localStorage): earned by finishing today's daily sets, shown here and on the results panel. Logic is in xp.js.
-let XPM=null;const xpState=()=>{try{return JSON.parse(localStorage.icaoXp)}catch{return XPM.fresh()}};
-function paintRank(){
-  const s=xpState(),i=XPM.rankIndex(s.xp),[min,name]=XPM.RANKS[i],nxt=XPM.RANKS[i+1],streak=XPM.liveStreak(s,TODAY);
-  $("rank").querySelector("b").textContent=name;
-  $("rank").querySelector("span").textContent=nxt?`${s.xp} / ${nxt[0]} XP`:`${s.xp} XP`;
-  const sm=$("rank").querySelector("small");sm.textContent=streak>1?`${streak}-day streak`:"";sm.hidden=streak<=1; // the streak only shows once there is one
-  $("rankBar").firstChild.style.width=(nxt?100*(s.xp-min)/(nxt[0]-min):100)+"%";
-  $("rank").hidden=false}
-import("/xp.js").then(m=>{XPM=m;paintRank()}).catch(()=>{});
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
 let SND=null;
 // On a phone, focusing the text box pops the keyboard over the board, so only desktops get the automatic focus.
 const focusInput=()=>{if(!matchMedia("(pointer:coarse)").matches)$("g").focus()};
 const snd=e=>SND&&SND.play(e);
-const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 Sound on":"🔇 Sound off";$("mute").setAttribute("aria-pressed",String(!on));if(SND)$("vol").value=SND.volume};
+const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 Sound on":"🔇 Sound off";$("mute").setAttribute("aria-pressed",String(!on));if(SND)$("vol").value=SND.enabled?SND.volume:0}; // while muted the slider sits at 0; the real volume is kept and comes back when sound is turned on
 (async()=>{try{
   const [{createSound},{createUISFX}]=await Promise.all([import("/sfx.js"),import("/vendor/uisfx.js")]);
   SND=createSound({createUISFX,storage:localStorage,AudioContextCtor:window.AudioContext||window.webkitAudioContext});
@@ -123,8 +105,22 @@ const tag=()=>LOCAL?`Near ${LOCAL.zip}`:NAME[MODE]+dateTag();
 const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "Normal · Nov 20 1/5" on an earlier day
 const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
 $("menuBack").onclick=()=>{if(PRACTICE&&S&&S.i<PER&&!confirm("Leave this practice game? Practice games aren't saved."))return;location.href=menuUrl()};
+// Settings: the gear fades the sound and particle controls in above it; a click elsewhere or Escape tucks them away again.
+const setOpen=on=>{$("soundctl").classList.toggle("open",on);$("gear").setAttribute("aria-expanded",String(on))};
+$("gear").onclick=()=>setOpen(!$("soundctl").classList.contains("open"));
+document.addEventListener("click",e=>{if(!e.target.closest("#soundctl"))setOpen(false)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")setOpen(false)});
+// Particles (the confetti and the planes drifting across the menu) can be switched off; the choice is remembered.
+const fxOn=()=>{try{return localStorage.icaoFx!=="off"}catch{return true}};
+const paintFx=()=>{$("fx").textContent=fxOn()?"✨ Particles on":"✨ Particles off";$("fx").setAttribute("aria-pressed",String(!fxOn()))};
+$("fx").onclick=()=>{try{localStorage.icaoFx=fxOn()?"off":"on"}catch{}paintFx();if(!fxOn())sky.stop();else if(!$("menu").hidden)sky.start()};
+paintFx();
 $("mute").onclick=()=>{if(!SND)return;SND.unlock();SND.setEnabled(!SND.enabled);paintSound()};
-$("vol").oninput=()=>SND&&SND.setVolume($("vol").value);
+$("vol").oninput=()=>{if(!SND)return;const v=+$("vol").value;if(!SND.enabled){if(!v)return;SND.unlock();SND.setEnabled(true)} // dragging the slider up while muted turns sound back on at that volume
+  SND.setVolume(v);paintSound();preview()};
+let lastPreview=0; // a blip at the new level while you drag (at most every 140 ms, so a fast drag stays a pattern of ticks, not a buzz)
+const preview=()=>{const n=performance.now();if(n-lastPreview>140){lastPreview=n;snd("preview")}};
+$("vol").onchange=()=>{if(SND&&SND.enabled)preview()}; // and a last one where you let go (skipped if one just played)
 paintSound();
 // The menu planes are drawn as a shape, not a font symbol: the symbol points a different way (and can turn into a color emoji) on different phones
 // and computers, so it could never be made to face the way it flies everywhere. This one always has its nose along +x, length 2, centered on 0.
@@ -134,7 +130,7 @@ const PLANE=(()=>{const top=[[1,0],[.6,.08],[.2,.1],[-.15,.95],[-.35,.95],[-.25,
 
 // Correct answer: confetti falls behind the containers (canvas z-index 0, the page content sits above it).
 function confetti(speed=5,secs=0){ // speed in m/s, where 1 m = 100 px, so 5 m/s = 500 px per second; secs > 0 keeps it raining for that long
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return; // a visual effect, so respect the motion preference
+  if(!fxOn()||matchMedia("(prefers-reduced-motion: reduce)").matches)return; // a visual effect, so respect the particles switch and the motion preference
   const c=document.createElement("canvas"),x=c.getContext("2d"),H=innerHeight,W=innerWidth;c.width=W;c.height=H;c.className="fx"+(secs||matchMedia("(max-width:820px)").matches?" front":""); // on a phone the panels cover almost the whole screen, so it falls in front there
   document.body.append(c);
   const cols=["--accent","--text","--ok","--muted"].map(css),rnd=Math.random;
@@ -175,21 +171,19 @@ function flap(word,r,i=0){ // left to right: each letter lands before the next o
 // Round over: flap to the answer, then wait for Next (which flaps back to K--- and loads the next round).
 // rounds solved on the first guess in a row, counting back from round r (a wrong guess, skip or loss in a round breaks the run)
 const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]==TRIES)n++;return n};
-const xpGame=()=>!PRACTICE&&DAY===TODAY; // only today's daily games earn XP
 const ALT=t=>FMT=="city"?t[8]||[]:[]; // other airports in the same city count as right answers only in the City and state format
 let SHOWN=[]; // the code the player typed for each solved round (another airport in the same city counts)
 const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm"),al=ALT(today[r]),shown=al.find(x=>x[0]==SHOWN[r]);n.textContent=shown?shown[3]:today[r][6];
   const others=[today[r][0],...al.map(x=>x[0])].filter(x=>x!=(shown?shown[0]:today[r][0]));if(others.length)n.insertAdjacentHTML("beforeend",`<i>also ${others.join(" ")}</i>`);
   if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>"); // solved with the last guess (score 1 of 4)
   const run=runAt(r);
-  if(run>=2)n.insertAdjacentHTML("beforeend",`<b class="st${Math.min(run,4)}">${xpGame()&&XPM?`+${XPM.streakXp(run)} XP &middot; `:""}${run}x streak</b>`)};
+  if(run>=2)n.insertAdjacentHTML("beforeend",`<b class="st${Math.min(run,4)}">${run}x streak</b>`)};
 const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
 // V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next.
 let V=0;
 const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",i==V);g.classList.toggle("go",i<=Math.min(S.i,PER-1))}); // "go" = a round you can click: finished ones and the current one
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
-let LIVE=false; // true once a round has just been played in this page, so the results animate; reopening a finished game just shows them
-function reveal(c){LIVE=true;nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
+function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
   $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   setTimeout(()=>{$("msg").textContent="";if(S.i>=PER){const top=LOCAL?S.scores.every(v=>v>0):S.scores.reduce((a,b)=>a+b,0)==PER*TRIES;
       if(runAt(PER-1)<PER)snd("endGame"); // a 5-in-a-row already played streak5 as its end-of-game sound
@@ -232,8 +226,7 @@ async function start(m,fmt,st,data){
   DAY=d.day;today=d.airports;PER=today.length;buildFlap();
   if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
-  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[],mc:!PRACTICE&&PLAYMODE==="pick"}; // mc = multiple choice, fixed when the game is first opened so it cannot be swapped for typing later
-  if(SAVE&&!localStorage[SAVE])save();
+  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
   snd(S.i>=PER?"open":"start"); // reopening a finished game just opens its results
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
@@ -254,7 +247,7 @@ function side(){
     name:t[6].replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
-  $("guesses").innerHTML=`<b>Guesses ${f}/${TRIES}</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
+  $("guesses").innerHTML=`<b>Guesses</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
   $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("")}
 function forfeit(text){hideCH();const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
@@ -288,18 +281,11 @@ function show(){
   choose(c,f)}
 // Last guess: four buttons (the answer and three decoys from its tier) instead of typing from scratch. The box still works.
 const CH=$("choices");
-const hideCH=()=>{CH.hidden=true;$("f").hidden=!!(S&&S.mc&&S.i<PER)}; // the answer panel and the choices panel take turns in the same spot (a multiple-choice game only ever shows the choices)
-// Typing games: the last guess is picked from four. Multiple-choice games: every round is picked from six, saved with the game so a reload can't re-roll
-// (and reveal the answer as the one code that never changes); a wrong pick removes its button.
-async function choose(c,f){hideCH();CH.innerHTML="";if(S.i>=PER||(!S.mc&&f<TRIES-1))return;
-  const r=S.i,stillHere=()=>S.i==r&&today[r][0]==c&&(S.mc||S.fails>=TRIES-1);
-  let opts=S.mc?(S.opts||={})[r]:null;
-  if(!opts){
-    const d=await fetch(`/api/decoys?code=${c}&skip=${ALT(today[r]).map(x=>x[0])}${S.mc?"&any=1&n=5":""}`).then(x=>x.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
-    if(!stillHere())return; // the round moved on while loading
-    opts=[c,...d].sort(()=>Math.random()-.5);if(S.mc){S.opts[r]=opts;save()}}
-  const tried=new Set((S.guesses||[]).map(x=>x.slice(0,4)));
-  CH.innerHTML=`<b>${f>=TRIES-1?"Final guess":"Pick the airport"}</b>`+opts.filter(x=>!tried.has(x)).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
+const hideCH=()=>{CH.hidden=true;$("f").hidden=false}; // the answer panel and the Final guess panel take turns in the same spot
+async function choose(c,f){hideCH();CH.innerHTML="";if(f<TRIES-1||S.i>=PER)return;
+  const d=await fetch("/api/decoys?code="+c+"&skip="+ALT(today[S.i]).map(x=>x[0])).then(r=>r.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
+  if(S.fails<TRIES-1||today[S.i][0]!=c)return; // the round moved on while loading
+  CH.innerHTML="<b>Final guess</b>"+[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
 CH.onclick=e=>{if(e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}};
 function view(v){ // review a finished round: its airport, answer and result; no guessing
   V=v;navs();$("cluebox").hidden=CH.hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
@@ -340,7 +326,6 @@ const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practicall
   ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
 function end(){
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
-  $("xp").textContent="";$("xpbar").hidden=true;
   $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
   if(FMT!="city"&&map)setTimeout(()=>{google.maps.event.trigger(map,"resize");map.setCenter({lat:today[V][3],lng:today[V][4]})})
@@ -349,33 +334,14 @@ function end(){
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
   if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
-  if(!PRACTICE&&DAY===TODAY&&XPM){const r=XPM.award(xpState(),DAY,MODE,t,right,PER,S.scores,!!S.mc);try{localStorage.icaoXp=JSON.stringify(r.state)}catch{}
-    $("xp").innerHTML=`+${r.gain} XP`+(S.mc?" (multiple choice: half XP)":"")+(r.rankUp?` &middot; Promoted to <b>${r.rankUp}</b>!`:"");
-    xpBar(r.state.xp-r.gain,r.state.xp,r.rankUp,LIVE&&!matchMedia("(prefers-reduced-motion: reduce)").matches)}
-  else if(!PRACTICE&&DAY!==TODAY)$("xp").textContent="Past days don't earn XP.";
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
-// The XP bar under the quip: starts where you were, then SNAPS forward (the easing overshoots the mark and settles) with a sound. If the gain fills a
-// rank it snaps to full, rolls over into the next rank and plays the rank-up sound. Not live (a reopened game): it just shows where you are now.
-function xpBar(from,to,up,live){
-  const R=XPM.RANKS,bar=$("xpbar"),fill=bar.querySelector("i");
-  const pct=xp=>{const k=XPM.rankIndex(xp),n=R[k+1];return n?100*(xp-R[k][0])/(n[0]-R[k][0]):100};
-  const label=xp=>{const k=XPM.rankIndex(xp),n=R[k+1];$("xpRank").textContent=R[k][1];$("xpNum").textContent=n?`${xp} / ${n[0]} XP`:`${xp} XP`};
-  const snap=w=>{fill.style.transition="width .32s cubic-bezier(.2,1.6,.4,1)";fill.style.width=w+"%"};
-  const set=(xp)=>{fill.style.transition="none";fill.style.width=pct(xp)+"%";label(xp)};
-  bar.hidden=false;bar.classList.remove("pop");set(live?from:to);
-  if(!live)return;
-  setTimeout(()=>{bar.classList.add("pop");
-    if(!up){snd("xpSnap");label(to);snap(pct(to));return}
-    snd("xpSnap");snap(100); // fills the old rank...
-    setTimeout(()=>{snd("rankUp");label(to);fill.style.transition="none";fill.style.width="0%";void fill.offsetWidth;snap(pct(to))},420)}, // ...then rolls into the new one
-  600)}
 // The score goes to the global stats once, when the game is over; the reply feeds the distribution chart.
 let SUB;
 function postScore(){
   const score=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length;let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
-  return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":"")+(S.mc?"-mc":""),score,right})}).then(r=>r.json())}
+  return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score,right})}).then(r=>r.json())}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 function chart(d,me){
   const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1);
@@ -421,7 +387,7 @@ const sky=(()=>{
   function size(){W=cb.width=cf.width=innerWidth;H=cb.height=cf.height=innerHeight}
   return{
     start(){
-      if(running||matchMedia("(prefers-reduced-motion: reduce)").matches)return; // decorative motion, so respect the preference
+      if(running||!fxOn()||matchMedia("(prefers-reduced-motion: reduce)").matches)return; // decorative motion, so respect the preference
       running=true;
       cb=document.createElement("canvas");cb.className="fx";cf=document.createElement("canvas");cf.className="fx front";document.body.append(cb,cf);
       xb=cb.getContext("2d");xf=cf.getContext("2d");size();addEventListener("resize",size);document.addEventListener("click",onClick);

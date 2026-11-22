@@ -25,8 +25,7 @@ export const EVENTS = {
   skip: { file: "skip", cue: "skip-next" },       // a guess passed with Skip
   lost: { file: "lost", cue: "blocked" },         // round lost (4th miss, or Skip on the last guess)
   flap: { file: "flap", cue: "typing", volume: 0.3 }, // each split-flap flip (typing = a brief key contact, never throttled)
-  xpSnap: { file: "xp_snap", cue: "snap" },       // the XP bar snapping forward on the results panel
-  rankUp: { file: "rank_up", cue: "level-up" },   // the XP bar fills a rank and rolls over into the next
+  preview: { cue: "volume-change" },              // a short blip while dragging the volume slider, so you hear the level you are choosing
   soundOn: { cue: "toggle-on" },                  // sound switched back on (muting is silent: mute must be immediate)
 };
 
