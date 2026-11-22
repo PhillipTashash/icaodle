@@ -6,6 +6,10 @@ const AIR = JSON.parse(fs.readFileSync("airports.json"));
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
 // States with at least PER airports can be played as practice games.
 const STATES = Object.entries([...ALL.values()].reduce((c, a) => (c[a[2]] = (c[a[2]] || 0) + 1, c), {})).filter(([, n]) => n >= PER).map(([st]) => st).sort();
+// The City and state game: any airport in the same city and state is a right answer. altsOf(a) = the other airports there, as [code, lat, lon, name].
+const cityKey = a => a[1] + "|" + a[2], ALTS = new Map();
+for (const a of ALL.values()) { if (!ALTS.has(cityKey(a))) ALTS.set(cityKey(a), []); ALTS.get(cityKey(a)).push(a); }
+const altsOf = a => ALTS.get(cityKey(a)).filter(x => x[0] !== a[0]).map(x => [x[0], x[3], x[4], x[6]]);
 const ORDER = { easy: ["easy", "medium", "hard"], medium: ["medium", "hard", "easy"], hard: ["hard", "medium", "easy"] };
 let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...JSON.parse(fs.readFileSync(FILE)) }; } catch {}
 // db.sets["day:mode"] = 5 airports; db.used[mode] = icaos already served (no repeats until the pool runs out); db.scores["day:mode"] = {playerId: total}
@@ -89,8 +93,9 @@ http.createServer((req, res) => {
     const c = (u.searchParams.get("code") || "").toUpperCase(), tier = Object.keys(AIR).find(t => AIR[t].some(a => a[0] === c));
     if (!tier) return json({ error: "bad request" }, 400);
     // Every option starts with the same letter after the K (the "Starts with" clue): own tier first, then any tier, then anything, so there are always four options.
-    const same = l => l.filter(a => a[0] !== c && a[0][1] === c[1]).map(a => a[0]), out = [];
-    for (const pool of [same(AIR[tier]), same([...ALL.values()]), [...ALL.keys()].filter(k => k !== c)]) while (out.length < 3 && pool.length) { const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!out.includes(x)) out.push(x); }
+    const skip = new Set(String(u.searchParams.get("skip") || "").toUpperCase().split(",")); // other right answers (same city) are never decoys
+    const same = l => l.filter(a => a[0] !== c && !skip.has(a[0]) && a[0][1] === c[1]).map(a => a[0]), out = [];
+    for (const pool of [same(AIR[tier]), same([...ALL.values()]), [...ALL.keys()].filter(k => k !== c && !skip.has(k))]) while (out.length < 3 && pool.length) { const x = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!out.includes(x)) out.push(x); }
     return json(out);
   }
   if (req.method === "GET" && u.pathname === "/api/near") { // "Airports near me": up to PER random airports within N miles of a US ZIP code (any difficulty)
@@ -108,9 +113,9 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
     const st = u.searchParams.get("state");
     if (!MODES.includes(mode) || (st !== "ALL" && !STATES.includes(st))) return json({ error: "bad request" }, 400); // "ALL" = any state
-    const pick = [];
-    for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => st === "ALL" || a[2] === st); while (pick.length < PER && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
-    return json({ day: day(), airports: pick });
+    const pick = [], seen = new Set(); // never two airports from the same city in one game
+    for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => st === "ALL" || a[2] === st); while (pick.length < PER && pool.length) { const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!seen.has(cityKey(a))) { seen.add(cityKey(a)); pick.push(a); } } }
+    return json({ day: day(), airports: pick.map(a => [...a, altsOf(a)]) });
   }
   if (req.method === "GET" && u.pathname === "/api/today") {
     if (!MODES.includes(mode)) return json({ error: "bad mode" }, 400);

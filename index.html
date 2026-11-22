@@ -169,7 +169,10 @@ function flap(word,r,i=0){ // left to right: each letter lands before the next o
 // rounds solved on the first guess in a row, counting back from round r (a wrong guess, skip or loss in a round breaks the run)
 const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]==TRIES)n++;return n};
 const xpGame=()=>!PRACTICE&&DAY===TODAY; // only today's daily games earn XP
-const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm");n.textContent=today[r][6];
+const ALT=t=>FMT=="city"?t[8]||[]:[]; // other airports in the same city count as right answers only in the City and state format
+let SHOWN=[]; // the code the player typed for each solved round (another airport in the same city counts)
+const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm"),al=ALT(today[r]),shown=al.find(x=>x[0]==SHOWN[r]);n.textContent=shown?shown[3]:today[r][6];
+  const others=[today[r][0],...al.map(x=>x[0])].filter(x=>x!=(shown?shown[0]:today[r][0]));if(others.length)n.insertAdjacentHTML("beforeend",`<i>also ${others.join(" ")}</i>`);
   if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>"); // solved with the last guess (score 1 of 4)
   const run=runAt(r);
   if(run>=2)n.insertAdjacentHTML("beforeend",`<b class="st${Math.min(run,4)}">${xpGame()&&XPM?`+${XPM.streakXp(run)} XP &middot; `:""}${run}x streak</b>`)};
@@ -239,7 +242,7 @@ function side(){
   const t=today[S.i],f=S.fails,n=Math.min(f,CLUE_KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
   val={region:REGION[t[2]]||t[2],
     loc:FMT=="city"?`Elevation: ${t[7].toLocaleString()} ft`:`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the elevation
-    first:`Starts with ${t[0][1]}`, // the letter after the K
+    first:`Starts with ${[...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[1]))].join(" or ")}`, // the letter after the K (every right answer's, when a city has several airports)
     name:t[6].replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
@@ -279,7 +282,7 @@ function show(){
 const CH=$("choices");
 const hideCH=()=>{CH.hidden=true;$("f").hidden=false}; // the answer panel and the Final guess panel take turns in the same spot
 async function choose(c,f){hideCH();CH.innerHTML="";if(f<TRIES-1||S.i>=PER)return;
-  const d=await fetch("/api/decoys?code="+c).then(r=>r.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
+  const d=await fetch("/api/decoys?code="+c+"&skip="+ALT(today[S.i]).map(x=>x[0])).then(r=>r.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
   if(S.fails<TRIES-1||today[S.i][0]!=c)return; // the round moved on while loading
   CH.innerHTML="<b>Final guess</b>"+[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
 CH.onclick=e=>{if(e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}};
@@ -296,13 +299,14 @@ $("f").onsubmit=async e=>{e.preventDefault();
   if(S.i>=PER||busy)return;
   let g=$("g").value.trim().toUpperCase(); $("g").value="";
   if(g.length==3)g="K"+g; if(!/^K[A-Z]{3}$/.test(g))return;
-  busy=1;const i0=S.i,t=today[S.i],c=t[0];let lbl=g;
-  if(g!=c){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
-    if(a.lat!=null){const d=Math.round(miles(a.lat,a.lon,t[3],t[4]));lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,t[3],t[4])+((S.guesses||[]).length>=2?` ${d} mi`:"")}} // distance shown from the 3rd guess on
-  if(g==c){S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.max(1,Math.min(runAt(S.i-1),5)));confetti()} // the solve sound climbs with the first-guess run: streak1 ... streak5 (streak1 also for a solve after a miss)
-  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${c} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
+  busy=1;const i0=S.i,t=today[S.i],c=t[0],alts=ALT(t),ok=g==c||alts.some(x=>x[0]==g);let lbl=g; // City and state game: another airport in the same city is also right
+  if(!ok){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
+    if(a.lat!=null){const [d,p]=[[t[3],t[4]],...alts.map(x=>[x[1],x[2]])].map(p=>[miles(a.lat,a.lon,p[0],p[1]),p]).sort((x,y)=>x[0]-y[0])[0]; // hot/cold and the arrow point at the nearest right answer
+      lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,p[0],p[1])+((S.guesses||[]).length>=2?` ${Math.round(d)} mi`:"")}} // distance shown from the 3rd guess on
+  if(ok){SHOWN[S.i]=g;S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.max(1,Math.min(runAt(S.i-1),5)));confetti()} // the solve sound climbs with the first-guess run: streak1 ... streak5 (streak1 also for a solve after a miss)
+  else if((S.guesses||=[]).push(lbl),++S.fails>=TRIES){S.scores.push(0);S.i++;S.fails=0;S.guesses=[];$("msg").textContent=`Out of guesses: ${[c,...alts.map(x=>x[0])].join(" or ")} (last guess ${lbl.replace(/↑\d+/,"")})`;snd("lost")}
   else snd("wrong")
-  busy=0;hideCH();save();S.i>i0?reveal(c):show()};
+  busy=0;hideCH();save();S.i>i0?reveal(ok?g:c):show()};
 // Results screen -> "Review rounds": back to the board in read-only mode (Back/Next through the 5 rounds; Next from the last returns here).
 // Letter grade for the results screen: points out of the maximum, as a percentage. The color slides red -> orange -> green as the score
 // approaches the A line (so an A is fully green).
