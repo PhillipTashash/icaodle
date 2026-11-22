@@ -269,7 +269,7 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
 const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
 const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
-let lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+let LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
 $("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
@@ -301,26 +301,33 @@ addEventListener("pagehide",()=>{if(ROOM&&!INGAME&&VSD&&VSD.phase!="playing")nav
 function enterLobby(d){$("menu").hidden=$("custom").hidden=true;$("lobby").hidden=false;sky.stop();snd("open");vsHandle(d);pollLoop()}
 // Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
 // plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
-function pollLoop(){setTimeout(async()=>{if(!document.hidden)await vsPoll();pollLoop()},INGAME?3000:2000)}
-addEventListener("visibilitychange",()=>{if(!document.hidden&&ROOM)vsPoll()}); // catch up the moment you come back to the tab
+// In a background tab it only checks in every 30 s and says it is "away", so the lobby doesn't think you left (and a returning tab catches up at once).
+function pollLoop(){setTimeout(async()=>{await vsPoll();pollLoop()},document.hidden?30000:INGAME?3000:2000)}
+addEventListener("visibilitychange",()=>{if(ROOM)vsPoll()});
 async function vsPoll(){
   if(!ROOM)return;
-  const o={action:"sync"};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,done:S.i>=PER});
+  const o={action:"sync",away:document.hidden};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,done:S.i>=PER});
   try{vsHandle(await vsPost(o))}catch(e){if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
 function vsHandle(d){
   VSD=d;CDEND=d.cd!=null?Date.now()+d.cd:0;
   if(INGAME){ // on the board: the right-hand tab lists everyone
-    $("pcol").innerHTML="<b>Players</b>"+d.players.map(p=>`<div class="${p.me?"me":""}">${esc(p.name)}<span>${p.done?"✓ Finished":p.rounds+"/"+PER+" rounds"} · ${p.total} pts</span></div>`).join("");
+    $("pcol").innerHTML="<b>Players</b>"+d.players.filter(p=>!p.late).map(p=>`<div class="${p.me?"me":""}">${esc(p.name)}<span>${p.done?"✓ Finished":p.rounds+"/"+PER+" rounds"} · ${p.total} pts</span></div>`).join("");
     if(d.left!=null)ENDS=Date.now()+d.left;
     if(d.phase=="over"){if(S.i<PER)vsTimeout();INGAME=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;renderLobby(d);askFeedback()}
     return}
-  renderLobby(d);if(d.phase=="playing")beginGame(d)}
+  const me=d.players.find(p=>p.me);LATEEND=d.phase=="playing"&&d.left!=null?Date.now()+d.left:0;
+  renderLobby(d);if(d.phase=="playing"&&!(me&&me.late))beginGame(d)}
+// The lobby has three faces: waiting (Ready toggles), a game in progress (live scores; players who joined late only watch), and game over (ranked results).
+const lateMsg=ms=>"A game is in progress ("+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0")+" left). You'll join the next one.";
 function renderLobby(d){
-  const over=d.phase=="over",ps=[...d.players],me=ps.find(p=>p.me);if(over)ps.sort((a,b)=>b.total-a.total);
+  const over=d.phase=="over",playing=d.phase=="playing",me=d.players.find(p=>p.me);
+  const ranked=over?d.players.filter(p=>!p.late).sort((a,b)=>b.total-a.total):d.players,latecomers=over?d.players.filter(p=>p.late):[]; // after a game, anyone who joined late is listed below the ranking
+  const status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/5 solved`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts`:`${p.rounds}/5 rounds · ${p.total} pts`):p.away?"Away":(p.ready?"✓ Ready":"Not ready");
+  const row=(p,i)=>`<div class="${p.me?"me":""}"><span>${over&&!p.late?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${status(p)}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`;
   $("lbTitle").innerHTML=`Lobby · <b title="Click to copy the invite link">${d.code}</b>`;
-  if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=ps.map((p,i)=>`<div class="${p.me?"me":""}"><span>${over?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${over?`${p.total} pts · ${p.right}/5 solved`:p.ready?"✓ Ready":"Not ready"}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`).join("");
-  const rdy=!over&&me&&me.ready;$("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
-  $("lbMsg").textContent=over?(ps.length>1&&ps[0].total==ps[1].total?"Game over: it's a tie!":`Game over: ${ps[0].name} wins! 🏆`):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":ps.length<2?"Waiting for friends: share the code or the link.":""}
+  if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=[...ranked.map(row),...latecomers.map(row)].join("");
+  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
+  $("lbMsg").textContent=over?(ranked.length>1&&ranked[0].total==ranked[1].total?"Game over: it's a tie!":ranked.length?`Game over: ${ranked[0].name} wins! 🏆`:"Game over"):playing?lateMsg(d.left||0):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":""}
 function beginGame(d){
   if(PLAYED){location.href="/?join="+ROOM.code+"&auto=1";return} // a second game: a fresh page is the simplest clean slate (it rejoins this game and starts right away)
   INGAME=PLAYED=true;ENDS=Date.now()+d.left;$("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
@@ -331,6 +338,7 @@ setInterval(()=>{
   if(INGAME&&S){const ms=Math.max(0,ENDS-Date.now());$("vsTimer").textContent="⏱ "+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");if(!ms&&S.i<PER)vsTimeout();
     const sec=Math.ceil(ms/1e3); // sounds while you're still playing: a beep at each minute mark, then one a second for the last 5 seconds
     if(sec<lastSec){lastSec=sec;if(S.i<PER){if(sec>=1&&sec<=5)snd("tick");else if(sec%60==0&&sec<300)snd("minute")}}}
+  else if(LATEEND&&!INGAME)$("lbMsg").textContent=lateMsg(Math.max(0,LATEEND-Date.now()));
   else if(CDEND&&!INGAME){const n=Math.max(0,Math.ceil((CDEND-Date.now())/1e3));$("lbMsg").textContent="Starting in "+n+"…";
     if(n!=lastTick){lastTick=n;if(n>=1&&n<=3)snd("tick");if(n==0)vsPoll()}} // a beep for each of the last three seconds
   else lastTick=-1},250);

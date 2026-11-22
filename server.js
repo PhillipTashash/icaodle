@@ -83,13 +83,13 @@ const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000;
 function roomTick(r) {
   const now = Date.now();
   if (r.phase === "lobby") {
-    for (const [k, q] of Object.entries(r.players)) if (now - q.seen > 15000) delete r.players[k]; // players who closed the page
+    for (const [k, q] of Object.entries(r.players)) if (now - q.seen > (q.away ? 600000 : 15000)) delete r.players[k]; // players who closed the page (a player whose tab is just in the background is "away" and gets much longer)
     const ps = Object.values(r.players);
     if (ps.length >= 2 && ps.every(q => q.ready)) r.cd ??= now; else r.cd = null;
     if (r.cd && now - r.cd >= CD_MS) { r.phase = "playing"; r.end = r.cd + CD_MS + GAME_MS; }
   }
-  if (r.phase === "playing" && (now >= r.end || Object.values(r.players).every(q => q.done))) {
-    r.phase = "over"; const ps = Object.values(r.players); for (const q of ps) q.done = true;
+  if (r.phase === "playing" && (now >= r.end || Object.values(r.players).filter(q => !q.late).every(q => q.done))) {
+    r.phase = "over"; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
   }
 }
@@ -183,21 +183,20 @@ http.createServer((req, res) => {
       if (!me) { // new players: create / join only, and only before the game starts
         if (p.action !== "create" && p.action !== "join") return json({ error: "You're no longer in that game." }, 410);
         if (!name) return json({ error: "Enter your name." }, 400);
-        if (r.phase === "playing") return json({ error: "That game has already started." }, 409);
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
-        me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false };
+        me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby" }; // late = joined while a game is on (or just finished)
       }
-      me.seen = now; if (name) me.name = name;
+      me.seen = now; if ("away" in p) me.away = !!p.away; if (name) me.name = name;
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
-      if (p.action === "sync" && r.phase === "playing" && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), done: !!p.done });
+      if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), done: !!p.done });
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
         r.airports = randomSet(r.mode, "ALL"); r.phase = "lobby"; r.cd = null;
-        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, done: false });
+        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, done: false, late: false });
       }
       if (p.action === "ready" && r.phase === "lobby") me.ready = !!p.value;
       roomTick(r);
       json({ code, day: day(), mode: r.mode, phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
-        airports: r.phase === "playing" ? r.airports : undefined, players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, done: q.done, wins: q.wins || 0, me: k === p.id })) });
+        airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, done: q.done, late: !!q.late, away: !!q.away, wins: q.wins || 0, me: k === p.id })) });
     });
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.
