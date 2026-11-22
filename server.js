@@ -111,49 +111,12 @@ const page = () => fs.readFileSync("index.html", "utf8").replace("__VERSION__", 
 const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
 // The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
 const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
-// IP bans: bans.json (override with BANS_FILE). A banned address gets "Access denied" for every page and API; the admin routes below are the only way to change the list.
-const BANS_FILE = process.env.BANS_FILE || "bans.json", bans = new Map();
-try { for (const b of JSON.parse(fs.readFileSync(BANS_FILE, "utf8"))) bans.set(b.ip, b); } catch {}
-const saveBans = () => fs.writeFileSync(BANS_FILE, JSON.stringify([...bans.values()], null, 2));
-// Admin routes: loopback only (this computer), never through a tunnel or proxy, and only with an x-admin header, which a web page on another site cannot add without a permission check the server never grants.
-const adminOk = req => /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"] && req.headers["x-admin"] === "1";
-function admin(req, res, u) {
-  const out = (o, st = 200) => (res.writeHead(st, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
-  if (!adminOk(req)) return out({ error: "forbidden" }, 403);
-  if (req.method === "GET" && u.pathname === "/admin/state") {
-    const now = Date.now();
-    return out({ now, bans: [...bans.values()], rooms: [...rooms].filter(([, r]) => { roomTick(r); return Object.keys(r.players).length; }).map(([code, r]) => { return {
-      code, mode: r.mode, phase: r.phase, age: now - r.at, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
-      players: Object.entries(r.players).map(([id, q]) => ({ id, name: q.name, ip: q.ip || "", ready: q.ready, rounds: q.rounds, total: q.total, done: q.done, wins: q.wins || 0, seen: now - q.seen })) }; }) });
-  }
-  if (req.method !== "POST") return out({ error: "not found" }, 404);
-  let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
-  return req.on("end", () => {
-    let p; try { p = JSON.parse(b); } catch { return out({ error: "bad json" }, 400); }
-    const kick = (r, id) => { (r.kicked ||= new Set()).add(id); delete r.players[id]; };
-    if (u.pathname === "/admin/kick") {
-      const r = rooms.get(String(p.code)); if (!r || !(p.id in r.players)) return out({ error: "no such player" }, 404);
-      kick(r, p.id); if (!Object.keys(r.players).length) rooms.delete(p.code); else roomTick(r);
-      return out({ ok: true });
-    }
-    if (u.pathname === "/admin/ban") {
-      if (!require("net").isIP(p.ip)) return out({ error: "bad ip" }, 400);
-      bans.set(p.ip, { ip: p.ip, name: cleanName(p.name), t: new Date().toISOString() }); saveBans();
-      for (const [code, r] of rooms) { for (const [id, q] of Object.entries(r.players)) if (q.ip === p.ip) kick(r, id); if (!Object.keys(r.players).length) rooms.delete(code); } // everyone on that address leaves their lobby
-      return out({ ok: true });
-    }
-    if (u.pathname === "/admin/unban") { bans.delete(p.ip); saveBans(); return out({ ok: true }); }
-    out({ error: "not found" }, 404);
-  });
-}
 // Every 30 seconds: let lobbies tidy themselves (players who left are dropped) and delete lobbies nobody is in.
 setInterval(() => { for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length) rooms.delete(k); } }, 30000).unref();
 http.createServer((req, res) => {
   res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "same-origin");
   res.setHeader("content-security-policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"); // no framing, no <base> tricks, no plugins
-  if (bans.has(clientIp(req)) && !req.url.startsWith("/admin/")) { res.writeHead(403, { "content-type": "text/plain" }); return res.end("Access denied."); }
   const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
-  if (u.pathname.startsWith("/admin/")) return admin(req, res, u);
   if (req.method === "GET" && u.pathname === "/") return (res.writeHead(200, { "content-type": "text/html", "cache-control": "no-cache" }), res.end(page()));
   if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
   if (req.method === "GET" && u.pathname === "/chart.jpg") { // today's faint background chart
@@ -216,7 +179,6 @@ http.createServer((req, res) => {
         delete r.players[p.id]; if (!Object.keys(r.players).length) rooms.delete(code); else roomTick(r);
         return json({ left: true });
       }
-      if (r.kicked && r.kicked.has(p.id)) return json({ error: "You were removed from this game." }, 403);
       let me = r.players[p.id];
       if (!me) { // new players: create / join only, and only before the game starts
         if (p.action !== "create" && p.action !== "join") return json({ error: "You're no longer in that game." }, 410);
@@ -225,7 +187,7 @@ http.createServer((req, res) => {
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
         me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false };
       }
-      me.seen = now; me.ip = clientIp(req); if (name) me.name = name;
+      me.seen = now; if (name) me.name = name;
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
       if (p.action === "sync" && r.phase === "playing" && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), done: !!p.done });
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)

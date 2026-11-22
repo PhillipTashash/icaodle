@@ -8,15 +8,6 @@
         "start"
       ],
       "port": 3000
-    },
-    {
-      "name": "feedback-dashboard",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dashboard"
-      ],
-      "port": 4000
     }
   ]
 }

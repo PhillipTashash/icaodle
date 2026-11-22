@@ -1,11 +1,11 @@
 FROM node:22-alpine
-ENV NODE_ENV=production PORT=3000 DATA_FILE=/data/data.json
+ENV NODE_ENV=production PORT=3000 DATA_FILE=/data/data.json FEEDBACK_FILE=/data/feedback.jsonl
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server.js index.html style.css sfx.mjs airports.json ./
 COPY sounds ./sounds
-# the saved daily sets and scores live in /data (a volume), so they survive restarts and image updates
+# the saved daily sets and scores and player feedback live in /data (a volume), so they survive restarts and image updates
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data

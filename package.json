@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node --test",
-    "dashboard": "node dashboard.js"
+    "test": "node --test"
   },
   "dependencies": {
     "uisfx": "^0.4.0"
