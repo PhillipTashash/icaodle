@@ -101,6 +101,17 @@ function randomSet(mode, st) {
 }
 // "Play a friend": a 4-letter code shares one random set between two players. In memory only (a restart ends open games); rooms expire after a day.
 const rooms = new Map(), MAX_ROOMS = 300;
+// A lobby's game settings (cfg), set by the lobby owner: kind easy | medium | hard (Normal / Hard / Extra Hard), custom (format, state, difficulty) or zip (airports near a ZIP).
+// genSet makes the five airports for the current settings (a zip lobby keeps the ZIP's coordinates in r.zp).
+function genSet(r) {
+  const c = r.cfg;
+  if (c.kind === "zip") {
+    const near = [...ALL.values()].filter(a => dist(r.zp.lat, r.zp.lon, a[3], a[4]) <= c.miles && !(c.off || []).includes(a[0])), pick = []; // c.off = airports the host switched off
+    while (pick.length < PER && near.length) pick.push(near.splice(Math.floor(Math.random() * near.length), 1)[0]);
+    return pick.map(a => [...a, altsOf(a), nearMajor(a)]);
+  }
+  return randomSet(c.mode, c.st || "ALL");
+}
 // Everything a player types or sends is untrusted. Names: no control, invisible or direction-changing characters, no angle brackets, one space between words, 12 characters.
 const NAME_BAD = new RegExp("[" + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x2069], [0xfeff, 0xfeff]].map(([x, y]) => String.fromCharCode(x) + "-" + String.fromCharCode(y)).join("") + "<>]", "g"); // control, zero-width, line/paragraph separators, direction overrides, BOM, angle brackets
 const cleanName = t => [...String(t ?? "").replace(NAME_BAD, "").replace(/\s+/g, " ").trim()].slice(0, 12).join("");
@@ -136,6 +147,8 @@ function roomTick(r) {
   if (r.phase === "playing" && (now >= r.end || Object.values(r.players).filter(q => !q.late).every(q => q.done))) {
     r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
+    // The lobby remembers its finished games (newest last, the last 15): what was played and everyone's result. Sent to a page only when it has changed.
+    r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: r.cfg, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift();
   }
 }
 const zips = new Map();
@@ -197,6 +210,12 @@ http.createServer((req, res) => {
       json(pick.length ? { day: day(), airports: pick } : { error: `No airports within ${miles} miles of ${zip}. Try a bigger distance.` });
     }).catch(() => json({ error: "Couldn't look that ZIP up right now. Try again." }, 502));
   }
+  if (req.method === "GET" && u.pathname === "/api/within") { // the airports inside a radius, for the zip lobby's map: [[code, lat, lon], ...]
+    const lat = +u.searchParams.get("lat"), lon = +u.searchParams.get("lon"), miles = +u.searchParams.get("miles");
+    if (limited(req, "within", 60)) return json({ error: "Slow down a little." }, 429);
+    if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || ![25, 50, 100, 250, 500].includes(miles)) return json({ error: "bad request" }, 400);
+    return json([...ALL.values()].filter(a => dist(lat, lon, a[3], a[4]) <= miles).map(a => [a[0], a[3], a[4], a[1], a[2]]));
+  }
   if (req.method === "GET" && u.pathname === "/api/dots") return (res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=86400" }), res.end(JSON.stringify(DOT))); // the locator-map dots (never changes)
   if (req.method === "GET" && u.pathname === "/api/learn") { // ?codes=KATL,KJFK -> { KATL: [tips], ... } for the ones we have notes on (asked for after a game, so no spoilers)
     const out = {}; for (const c of String(u.searchParams.get("codes") || "").toUpperCase().split(",").slice(0, 10)) if (/^[A-Z0-9]{3,4}$/.test(c) && LEARN[c]) out[c] = LEARN[c];
@@ -215,23 +234,32 @@ http.createServer((req, res) => {
     if (!validDay(d)) return json({ error: "day out of range" }, 400);
     ensure(day()); return json({ day: d, airports: setFor(d, mode) });
   }
-  if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name, mode} | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | reset {code}
+  if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name} | config {kind, ...} (owner only) | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | reset {code}
     if (limited(req, "room", 600)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
-    return req.on("end", () => {
+    return req.on("end", async () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
       if (!p || typeof p !== "object" || !validId(p.id)) return json({ error: "bad request" }, 400);
-      const now = Date.now(), name = cleanName(p.name); let r, code = String(p.code || "").toUpperCase();
+      const now = Date.now(), name = cleanName(p.name); let r, code = String(p.code || "").toUpperCase(), zp = null;
+      if (p.action === "config" && p.kind === "zip") { // a ZIP is looked up before anything changes (and only for the owner, at most 20 a minute)
+        const z = String(p.zip || ""), mi = +p.miles;
+        if (!/^[0-9]{5}$/.test(z) || ![25, 50, 100, 250, 500].includes(mi)) return json({ error: "Enter a 5-digit ZIP code." }, 400);
+        if (limited(req, "roomzip", 20)) return json({ error: "Slow down a little." }, 429);
+        if (rooms.get(code)?.owner !== p.id) return json({ error: "Only the lobby owner can change that." }, 403);
+        try { zp = await zipPoint(z); } catch { return json({ error: "Couldn't look that ZIP up right now. Try again." }, 502); }
+        if (!zp) return json({ error: "Couldn't find that ZIP code." }, 404);
+        if (![...ALL.values()].some(a => dist(zp.lat, zp.lon, a[3], a[4]) <= mi)) return json({ error: `No airports within ${mi} miles of ${z}. Try a bigger distance.` }, 404);
+      }
       if (p.action === "create") {
-        if (!MODES.includes(p.mode) || !name) return json({ error: "Enter your name." }, 400);
+        if (!name) return json({ error: "Enter your name." }, 400);
         for (const [k, v] of rooms) if (now - v.at > 864e5) rooms.delete(k);
         if (rooms.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
-        code = roomCode(); rooms.set(code, r = { mode: p.mode, airports: randomSet(p.mode, "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now, trivia: newTrivia() });
+        code = roomCode(); rooms.set(code, r = { mode: "easy", cfg: { kind: "easy", mode: "easy", fmt: "map", st: "" }, owner: p.id, airports: randomSet("easy", "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now, trivia: newTrivia() });
       } else if (!(r = rooms.get(code))) return json({ error: "No game with that code." }, 404);
       roomTick(r); // also notices a lobby that has timed out
       if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
       if (p.action === "leave") { // leaving takes you off the list at once (an empty game is deleted)
-        delete r.players[p.id]; r.act = now; if (!Object.keys(r.players).length) rooms.delete(code); else roomTick(r);
+        delete r.players[p.id]; r.act = now; if (!Object.keys(r.players).length) rooms.delete(code); else { if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; roomTick(r); }
         return json({ left: true });
       }
       let me = r.players[p.id];
@@ -246,15 +274,35 @@ http.createServer((req, res) => {
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
       if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), streak: num(p.streak, PER), done: !!p.done });
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
-        r.airports = randomSet(r.mode, "ALL"); r.phase = "lobby"; r.cd = null; r.trivia = newTrivia(); // a new game: new questions
+        r.airports = genSet(r); r.phase = "lobby"; r.cd = null; r.trivia = newTrivia(); // a new game: new questions
         for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, late: false });
+      }
+      if (p.action === "config" && r.owner === p.id && r.phase !== "playing") { // the owner changes what will be played; a lobby's players are un-readied and get a fresh set
+        const k = p.kind;
+        if (["easy", "medium", "hard"].includes(k)) r.cfg = { kind: k, mode: k, fmt: "map", st: "" };
+        else if (k === "custom" && ["map", "city"].includes(p.fmt) && MODES.includes(p.mode) && (p.st === "" || STATES.includes(p.st))) r.cfg = { kind: k, mode: p.mode, fmt: p.fmt, st: p.st };
+        else if (k === "zip" && zp) { r.cfg = { kind: k, mode: "easy", fmt: "map", st: "", zip: String(p.zip), miles: +p.miles, lat: zp.lat, lon: zp.lon, off: [] }; r.zp = zp; }
+        else return json({ error: "That setting isn't available." }, 400);
+        r.mode = r.cfg.mode; r.act = now;
+        if (r.phase === "lobby") { r.airports = genSet(r); r.cd = null; for (const q of Object.values(r.players)) q.ready = false; }
+      } else if (p.action === "config") return json({ error: "Only the lobby owner can change that." }, 403);
+      if (p.action === "airport") { // the host switches one airport of a zip lobby on or off (an off airport is never picked); at least one stays on
+        const c = r.cfg, code = String(p.ap || "").toUpperCase(), a = ALL.get(code);
+        if (r.owner !== p.id || r.phase === "playing" || c.kind !== "zip") return json({ error: "Only the lobby owner can change that." }, 403);
+        if (!a || dist(r.zp.lat, r.zp.lon, a[3], a[4]) > c.miles) return json({ error: "That airport isn't in the radius." }, 400);
+        const off = new Set(c.off || []); if (p.on) off.delete(code); else off.add(code);
+        const left = [...ALL.values()].filter(x => dist(r.zp.lat, r.zp.lon, x[3], x[4]) <= c.miles && !off.has(x[0])).length;
+        if (!left) return json({ error: "Keep at least one airport on." }, 400);
+        c.off = [...off]; r.act = now;
+        if (r.phase === "lobby") { r.airports = genSet(r); r.cd = null; for (const q of Object.values(r.players)) q.ready = false; }
       }
       if (p.action === "ready" && r.phase === "lobby") me.ready = !!p.value;
       if (p.action === "trivia" && r.phase === "lobby" && r.trivia && !me.late && Number.isInteger(p.q) && p.q >= 0 && p.q < TQ && Number.isInteger(p.choice) && p.choice >= 0 && p.choice < 4) {
         const mine = (r.trivia.ans[p.id] ||= Array(TQ).fill(null)); if (mine[p.q] == null) { mine[p.q] = p.choice; r.act = now; } // one answer per question, no changing it
       }
       roomTick(r);
-      json({ code, day: day(), mode: r.mode, phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
+      if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; // the owner left: the longest-waiting player takes over
+      json({ code, day: day(), mode: r.mode, cfg: r.cfg, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
         trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
     });

@@ -448,3 +448,45 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #askDlg::backdrop{background:rgba(0,0,0,.6)}#askDlg p{margin:0 0 1em;text-align:left}
 #askBtns{display:flex;gap:.6em}#askBtns button{flex:1}
 #askDlg p:first-child{margin-bottom:.25em;font-size:1.2rem}
+/* lobby settings (owner) / summary (everyone else) */
+#lbSum{margin:.8rem 0 0;color:var(--muted);font-size:.9em}#lbSum[hidden]{display:none}
+#lbCfg{margin:.8rem 0 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface)}#lbCfg[hidden]{display:none}
+#lbKind{display:flex;flex-wrap:wrap;gap:.4em}
+#lbKind button{flex:1 1 auto;padding:.4em .7em;font-size:.85em;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
+#lbKind button.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+.lbOpts{display:flex;flex-wrap:wrap;gap:.6em .8em;align-items:flex-end;margin-top:.6em}.lbOpts[hidden]{display:none}
+.lbOpts label{display:flex;flex-direction:column;gap:.25em;font-size:.8em;color:var(--muted)}
+.lbOpts select,.lbOpts input{font:inherit;font-size:1.1em;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.35em .5em;text-transform:none;letter-spacing:normal;width:auto;max-width:100%}
+.lbOpts input{width:6em}.lbOpts button{padding:.45em 1em}
+#lbCfgErr{min-height:0;margin-top:.4em;font-size:.85em;color:var(--bad)}#lbCfgErr:empty{display:none}
+/* previous games in the lobby */
+#lbHist{margin:.8rem 0 0}#lbHist[hidden]{display:none}
+#lbHist>b{display:block;margin-bottom:.4em;color:var(--muted);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#lbHist details{margin:.4em 0;padding:.5em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:.9em}
+#lbHist summary{cursor:pointer}
+#lbHist .hcodes{margin:.4em 0;color:var(--muted);font-size:.85em;letter-spacing:.05em}
+#lbHist .hrow{display:flex;justify-content:space-between;gap:1em;padding:.2em 0}
+/* zip lobby map */
+#lbMap{margin:.8rem 0 0}#lbMap[hidden]{display:none}
+#lbMapCanvas{height:16em;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+#lbMapNote{margin-top:.4em;font-size:.85em;color:var(--muted)}
+/* the host's lobby settings as seen by everyone else: same panel, not clickable */
+#lbCfg.ro button,#lbCfg.ro select,#lbCfg.ro input{cursor:default}
+#lbCfg.ro #lbKind button:disabled{background:var(--surface-2);color:var(--muted)}
+#lbCfg.ro #lbKind button.on:disabled{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#lbCfg.ro select:disabled,#lbCfg.ro input:disabled{color:var(--text);opacity:.8}
+#lbCfgNote{margin-top:.4em;font-size:.8em;color:var(--muted)}#lbCfgNote[hidden]{display:none}
+/* zip lobby: airports in the game, as toggles */
+#lbAir{margin:.8rem 0 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface)}#lbAir[hidden]{display:none}
+#lbAirHead{display:block;margin-bottom:.5em;font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+#lbAirList{display:flex;flex-wrap:wrap;gap:.4em}
+#lbAir button.air{display:flex;flex-direction:column;align-items:center;gap:.1em;padding:.35em .6em;min-width:5.2em;font-size:.8em;line-height:1.15;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);text-decoration:line-through}
+#lbAir button.air small{font-size:.8em;font-weight:500;max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lbAir button.air.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent);text-decoration:none}
+#lbAir button.air:disabled{cursor:default;opacity:1}#lbAir button.air:disabled:not(.on){color:var(--dim)}
+#lbAirNote{margin-top:.5em;font-size:.8em;color:var(--muted)}
+/* airport list: paging arrows, and a darker city name on the amber buttons */
+#lbAirTop{display:flex;justify-content:space-between;align-items:center;gap:.6em;margin-bottom:.5em}#lbAirTop #lbAirHead{margin:0}
+#lbAirNav{display:flex;align-items:center;gap:.5em;font-size:.85em;color:var(--muted)}#lbAirNav[hidden]{display:none}
+#lbAirNav button{padding:.2em .6em;font-size:.9em;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}#lbAirNav button:disabled{opacity:.4}
+#lbAir button.air.on small{color:#1a1300;font-weight:700;opacity:1}

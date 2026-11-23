@@ -43,8 +43,7 @@
 <dialog id="vs">
   <button id="vsCancel" class="ghost" aria-label="Close" title="Close">✕</button>
   <p><b>Start a lobby</b></p>
-  <div id="vsRow"><label>Your name <input id="vsName" maxlength="12" autocomplete="nickname" placeholder="Name"></label>
-  <label>Difficulty <select id="vsDiff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label></div>
+  <div id="vsRow"><label>Your name <input id="vsName" maxlength="12" autocomplete="nickname" placeholder="Name"></label></div>
   <button id="vsCreate">Create</button>
   <div id="vsErr" role="alert"></div>
 </dialog>
@@ -84,7 +83,24 @@
 <div id="lobby" hidden>
   <div id="lbHead"><h3 id="lbTitle"></h3><span id="lbTip">Copied!</span></div>
   <div id="lbMsg"></div>
+  <div id="lbCfg" hidden>
+    <div id="lbKind" role="group" aria-label="Game type"><button type="button" data-k="easy">Normal</button><button type="button" data-k="medium">Hard</button><button type="button" data-k="hard">Extra Hard</button><button type="button" data-k="custom">Custom</button><button type="button" data-k="zip">Zip code</button></div>
+    <div id="lbCustom" class="lbOpts" hidden>
+      <label>Format <select id="lbFmt"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label>
+      <label>State <select id="lbSt"><option value="">All states</option></select></label>
+      <label>Difficulty <select id="lbDiff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
+    </div>
+    <div id="lbZip" class="lbOpts" hidden>
+      <label>ZIP code <input id="lbZipIn" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="12345"></label>
+      <label>Within <span><select id="lbMiles"><option>25</option><option>50</option><option>100</option><option>250</option><option>500</option></select> miles</span></label>
+    </div>
+    <div id="lbCfgErr" role="alert"></div>
+    <div id="lbCfgNote">Only the host can change these.</div>
+  </div>
+  <div id="lbMap" hidden><div id="lbMapCanvas"></div><div id="lbMapNote"></div></div>
+  <div id="lbAir" hidden><div id="lbAirTop"><b id="lbAirHead"></b><span id="lbAirNav" hidden><button type="button" id="lbAirPrev" aria-label="Previous airports">◀</button><span id="lbAirPg"></span><button type="button" id="lbAirNext" aria-label="More airports">▶</button></span></div><div id="lbAirList"></div><div id="lbAirNote"></div></div>
   <div id="lbPlayers"></div>
+  <div id="lbHist" hidden></div>
   <div id="lbStreak" hidden></div>
   <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
   <div id="trivia" hidden></div>
@@ -261,7 +277,8 @@ function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
 $("flap").onclick=e=>{const i=[...$("flap").children].indexOf(e.target.closest(".w"));if(i<0||i==V||i>Math.min(S.i,PER-1)||busy)return;snd("forward");$("msg").textContent="";i<S.i?view(i):(show(),focusInput())};
 function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
 // The key lives in .env on the server (never in this file or git); the browser still has to receive it, so restrict it by referrer in Google Cloud.
-function loadMaps(){return fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
+let MAPSP=null; // the Maps script is loaded once, however many maps the page makes
+function loadMaps(){return MAPSP||=fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
   window.gm_authFailure=()=>{$("map").textContent="Google Maps rejected the API key (check key, enabled APIs, billing, referrer)."};
   const s=document.createElement("script");s.src=`https://maps.googleapis.com/maps/api/js?key=${key}`;s.onload=ok;s.onerror=bad;document.head.append(s)}))}
 let FMT="map",ST="",PRACTICE=false,REDO=false; // REDO: the daily airports again, in a new random order, saved nowhere and counted nowhere
@@ -296,8 +313,8 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 // The server owns the phases (lobby -> playing -> over); this page polls it once a second.
 const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
 const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
-const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
-let CLOSEEND=0,TV=null,TVD=null,tvRev=-1,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,hn:HN,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
+let HIST=[],HN=-1,HISTKEY="",CLOSEEND=0,TV=null,TVD=null,tvRev=-1,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
 $("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
@@ -305,7 +322,7 @@ $("vsCancel").onclick=()=>{snd("back");VS.close()};
 async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");
   try{localStorage.vsName=name}catch{}
   vsErr("Working…");try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){vsErr(e.error||"Couldn't reach the server. Try again.")}}
-$("vsCreate").onclick=()=>vsGo({action:"create",mode:$("vsDiff").value,code:null});
+$("vsCreate").onclick=()=>vsGo({action:"create",code:null});
 $("vsJoin").onclick=()=>{if(getCode().length!=4)return $("joinErr").textContent="Enter the 4-letter code.";openAsk()};
 function openAsk(){let n="";try{n=localStorage.vsName||""}catch{}$("askName").value=n||fakeName();$("askCode").textContent=getCode();vsErr("");$("ask").showModal();$("askName").select()}
 // The lobby code field on the menu: letters only, uppercase. Join asks for a name in the small popup, then joins.
@@ -343,7 +360,8 @@ async function vsPoll(){
   const o={action:"sync"};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,streak:bestRun(),done:S.i>=PER});
   try{vsHandle(await vsPost(o))}catch(e){if(e&&e.timeout)return lobbyTimedOut(e.timeout);if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
 function vsHandle(d){
-  VSD=d;CDEND=d.cd!=null?Date.now()+d.cd:0;
+  VSD=d;if(d.history)HIST=d.history;if(d.hn!=null)HN=d.hn;
+  CDEND=d.cd!=null?Date.now()+d.cd:0;
   if(INGAME){ // on the board: the right-hand tab lists everyone
     $("pcol").innerHTML="<b>Players</b>"+d.players.filter(p=>!p.late).map(p=>`<div class="${p.me?"me":""}">${esc(p.name)}<span>${p.done?"✓ Finished":p.rounds+"/"+PER+" rounds"} · ${p.total} pts</span></div>`).join("");
     if(d.left!=null)ENDS=Date.now()+d.left;
@@ -368,7 +386,80 @@ function renderLobby(d){
   const best=over?Math.max(0,...ranked.map(p=>p.streak||0)):0,who=ranked.filter(p=>(p.streak||0)==best).map(p=>p.name);
   $("lbStreak").hidden=!(over&&best>0);
   if(over&&best>0)$("lbStreak").textContent="🔥 Best streak: "+(who.length>2?who.slice(0,-1).join(", ")+" and "+who[who.length-1]:who.join(" and "))+", "+best+" in a row";
+  renderCfg(d,playing);renderHist(over);
   $("lbMsg").textContent=over?"":playing?lateMsg(d.left||0):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
+// Previous games in this lobby (newest first): what was played and everyone's score. While a game's results are showing above, that game is left out of this list.
+function renderHist(over){
+  const list=(over?HIST.slice(0,-1):HIST).slice().reverse(),key=HN+":"+list.length,box=$("lbHist");
+  box.hidden=!list.length;if(key==HISTKEY)return;HISTKEY=key;
+  box.replaceChildren(mk("b",{textContent:"Previous games"}),...list.map(g=>mk("details",{},mk("summary",{textContent:"Game "+g.n+" · "+cfgText(g.cfg)+" · "+(g.players[0]?g.players[0].name+" won ("+g.players[0].total+" pts)":"")}),
+    mk("div",{className:"hcodes",textContent:g.codes.join(" ")}),...g.players.map((p,i)=>mk("div",{className:"hrow"},mk("span",{textContent:(i+1)+". "+p.name}),mk("span",{textContent:p.total+" pts · "+p.right+"/5 solved"}))))))}
+// ---- Lobby settings: the lobby owner picks what is played (Normal / Hard / Extra Hard, a custom game, or airports near a ZIP); everyone else just sees it.
+const KIND={easy:"Normal",medium:"Hard",hard:"Extra Hard",custom:"Custom",zip:"Zip code"};let ZIPOPEN=false;
+const cfgText=c=>!c?"":c.kind=="custom"?"Custom · "+(c.fmt=="city"?"City & state only":"Map")+" · "+(c.st||"All states")+" · "+KIND[c.mode]:c.kind=="zip"?"Zip code · airports within "+c.miles+" miles of "+c.zip:KIND[c.kind];
+const cfgSend=o=>vsPost({action:"config",...o}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d);return true}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that. Try again.";return false});
+const customSend=()=>cfgSend({kind:"custom",fmt:$("lbFmt").value,st:$("lbSt").value,mode:$("lbDiff").value});
+function renderCfg(d,playing){ // the host gets working controls; everyone else sees the same panel, greyed out, following what the host picks
+  const c=d.cfg,ro=!d.owner;paintZipMap(playing?null:c);paintAir(playing?null:c);
+  $("lbCfg").hidden=playing||!c;if(playing||!c)return;
+  $("lbCfg").classList.toggle("ro",ro);$("lbCfgNote").hidden=!ro;
+  document.querySelectorAll("#lbCfg button,#lbCfg select,#lbCfg input").forEach(e=>e.disabled=ro);
+  if($("lbSt").options.length<2)$("lbSt").innerHTML=$("st").innerHTML; // the state list, filled once
+  const shown=!ro&&ZIPOPEN?"zip":c.kind;
+  document.querySelectorAll("#lbKind button").forEach(b=>b.classList.toggle("on",b.dataset.k==shown));
+  $("lbCustom").hidden=shown!="custom";$("lbZip").hidden=shown!="zip";
+  const ae=ro?null:document.activeElement;
+  if(c.kind=="custom"){if(ae!==$("lbFmt"))$("lbFmt").value=c.fmt;if(ae!==$("lbSt"))$("lbSt").value=c.st;if(ae!==$("lbDiff"))$("lbDiff").value=c.mode}
+  if(c.kind=="zip"&&!ZIPOPEN){if(ae!==$("lbZipIn"))$("lbZipIn").value=c.zip;$("lbMiles").value=c.miles}}
+document.querySelectorAll("#lbKind button").forEach(b=>b.onclick=()=>{const k=b.dataset.k;$("lbCfgErr").textContent="";
+  if(k=="zip"){ZIPOPEN=true;renderCfg(VSD,false);$("lbZipIn").focus();return}
+  ZIPOPEN=false;if(k=="custom")customSend();else cfgSend({kind:k})});
+["lbFmt","lbSt","lbDiff"].forEach(i=>$(i).onchange=customSend);
+// No Set button: the ZIP is sent as soon as it has 5 digits (and again when the miles change).
+let zipT=0;
+function zipSend(){clearTimeout(zipT);const zip=$("lbZipIn").value.trim();if(!/^[0-9]{5}$/.test(zip))return;
+  $("lbCfgErr").textContent="Looking…";cfgSend({kind:"zip",zip,miles:+$("lbMiles").value}).then(ok=>{if(ok){ZIPOPEN=false;renderCfg(VSD,false)}})}
+$("lbZipIn").oninput=()=>{const v=$("lbZipIn").value=$("lbZipIn").value.replace(/[^0-9]/g,"");clearTimeout(zipT);if(v.length==5)zipT=setTimeout(zipSend,400)};
+$("lbMiles").onchange=zipSend;
+$("lbZipIn").onkeydown=e=>{if(e.key=="Enter")zipSend()};
+// The zip lobby's map (everyone sees it): a circle for the radius with its mileage, and every airport inside it highlighted.
+let LBMAP=null,LBKEY="",LBOBJ=[],LBLIST=[],LBLISTKEY="",LBMARK={},AIRKEY="",AIRPAGE=0,AIRPER=25; // at most 25 airport buttons at a time, with arrows for the rest
+// A plain dark map for the radius picture: flat land and water, state borders and big-city names; no roads, terrain, parks or businesses.
+// Every airport in the radius as a toggle button, all on to start: the host can switch airports off so they are never picked. Everyone sees it; only the host can click.
+function paintAir(c){
+  const box=$("lbAir"),ok=c&&c.kind=="zip"&&LBLISTKEY==c.zip+":"+c.miles&&LBLIST.length;box.hidden=!ok;if(!ok)return;
+  const off=new Set(c.off||[]),own=!!VSD.owner,pages=Math.ceil(LBLIST.length/AIRPER);AIRPAGE=Math.min(AIRPAGE,pages-1);const key=c.zip+":"+c.miles+":"+[...off].sort().join()+":"+own+":"+AIRPAGE;
+  if(window.google&&google.maps)for(const [code,m] of Object.entries(LBMARK)){const ic=m.getIcon();if(ic){ic.fillColor=off.has(code)?"#6b7280":"#ffb81c";m.setIcon(ic)}} // the map follows the toggles
+  $("lbMapNote").textContent=c.miles+"-mile radius around "+c.zip+" · "+(LBLIST.length-off.size)+" of "+LBLIST.length+" airport"+(LBLIST.length==1?"":"s")+" in the game";
+  if(key==AIRKEY)return;AIRKEY=key;
+  $("lbAirHead").textContent="Airports in the game ("+(LBLIST.length-off.size)+" of "+LBLIST.length+")";
+  $("lbAirNote").textContent=own?"Tap an airport to switch it off or on.":"Only the host can change these.";
+  $("lbAirNav").hidden=pages<2;$("lbAirPg").textContent=(AIRPAGE+1)+" / "+pages;$("lbAirPrev").disabled=AIRPAGE<=0;$("lbAirNext").disabled=AIRPAGE>=pages-1;
+  $("lbAirList").replaceChildren(...LBLIST.slice().sort((a,b)=>a[0]<b[0]?-1:1).slice(AIRPAGE*AIRPER,(AIRPAGE+1)*AIRPER).map(([code,,,city,st])=>{const isOn=!off.has(code);
+    return mk("button",{type:"button",className:"air"+(isOn?" on":""),disabled:!own,title:city+", "+st,onclick:()=>vsPost({action:"airport",ap:code,on:!isOn}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d)}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."})},mk("b",{textContent:code}),mk("small",{textContent:city}))}))}
+$("lbAirPrev").onclick=()=>{AIRPAGE=Math.max(0,AIRPAGE-1);paintAir(VSD.cfg)};$("lbAirNext").onclick=()=>{AIRPAGE++;paintAir(VSD.cfg)};
+const LBSTYLE=[{elementType:"geometry",stylers:[{color:"#1a1f28"}]},{elementType:"labels.text.fill",stylers:[{color:"#9aa3b2"}]},{elementType:"labels.text.stroke",stylers:[{color:"#0d1014"}]},
+  {featureType:"water",elementType:"geometry",stylers:[{color:"#0f2233"}]},{featureType:"water",elementType:"labels",stylers:[{visibility:"off"}]},
+  {featureType:"administrative.province",elementType:"geometry.stroke",stylers:[{color:"#4a5568"},{weight:1}]},{featureType:"administrative.country",elementType:"geometry.stroke",stylers:[{color:"#4a5568"}]},
+  {featureType:"administrative.land_parcel",stylers:[{visibility:"off"}]},{featureType:"administrative.neighborhood",stylers:[{visibility:"off"}]},{featureType:"administrative.locality",elementType:"labels",stylers:[{visibility:"simplified"}]},
+  {featureType:"poi",stylers:[{visibility:"off"}]},{featureType:"road",stylers:[{visibility:"off"}]},{featureType:"transit",stylers:[{visibility:"off"}]},{featureType:"landscape.natural",elementType:"geometry",stylers:[{color:"#1a1f28"}]}];
+async function paintZipMap(c){
+  const box=$("lbMap");box.hidden=!(c&&c.kind=="zip"&&c.lat!=null);if(box.hidden)return;
+  const key=c.zip+":"+c.miles;if(key==LBKEY)return;LBKEY=key;
+  let list=[];try{list=await fetch("/api/within?lat="+c.lat+"&lon="+c.lon+"&miles="+c.miles).then(r=>r.json())}catch{}
+  try{await loadMaps()}catch{$("lbMapNote").textContent="The map couldn't load.";return}
+  if(key!=LBKEY)return;
+  const G=google.maps,ctr={lat:c.lat,lng:c.lon};
+  LBMAP||=new G.Map($("lbMapCanvas"),{mapTypeId:"roadmap",styles:LBSTYLE,disableDefaultUI:true,zoomControl:true,gestureHandling:"cooperative",center:ctr,zoom:7});
+  LBOBJ.forEach(o=>o.setMap(null));LBOBJ=[];LBMARK={};LBLIST=list;LBLISTKEY=key;
+  const circle=new G.Circle({map:LBMAP,center:ctr,radius:c.miles*1609.34,strokeColor:"#ffb81c",strokeWeight:2,fillColor:"#ffb81c",fillOpacity:.08});
+  LBOBJ.push(circle);
+  const dot=(p,fill,sc,extra)=>new G.Marker({map:LBMAP,position:p,icon:{path:G.SymbolPath.CIRCLE,scale:sc,fillColor:fill,fillOpacity:1,strokeColor:"#fff",strokeWeight:1.5,labelOrigin:new G.Point(0,-2.5)},...extra}) /* labelOrigin: the code sits above the dot, not on it */;
+  LBOBJ.push(dot(ctr,"#58a6ff",4,{title:"ZIP "+c.zip,zIndex:1}));
+  for(const [code,la,lo] of list){const m=dot({lat:la,lng:lo},"#ffb81c",5,{title:code,zIndex:2,label:list.length<=12?{text:code,color:"#fff",fontSize:"10px",className:"lbcode"}:undefined});LBMARK[code]=m;LBOBJ.push(m)}
+  LBOBJ.push(new G.Marker({map:LBMAP,position:{lat:c.lat+c.miles/69*1.12,lng:c.lon},icon:{path:G.SymbolPath.CIRCLE,scale:0},label:{text:c.miles+" miles",color:"#ffb81c",fontSize:"13px",fontWeight:"700"}}));
+  AIRKEY="";AIRPAGE=0;paintAir(c);
+  G.event.trigger(LBMAP,"resize");LBMAP.fitBounds(circle.getBounds().toJSON(),20)}
 // ---- Lobby trivia (desktop browsers only): 5 questions while you wait. After the last one you see everyone's right and wrong.
 // It floats in the empty space under the Ready/Leave buttons, centered between them and the bottom of the screen (or sits right under them if the screen is short).
 const PCQ=matchMedia("(hover:hover) and (pointer:fine) and (min-width:821px)");
@@ -419,7 +510,7 @@ setInterval(()=>{const el=$("lobbyClock"),ms=ROOM&&!INGAME&&CLOSEEND?Math.max(0,
 function beginGame(d){
   if(PLAYED){location.href="/?join="+ROOM.code+"&auto=1";return} // a second game: a fresh page is the simplest clean slate (it rejoins this game and starts right away)
   INGAME=PLAYED=true;ENDS=Date.now()+d.left;$("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
-  start(d.mode||"easy","map","ROOM",{day:d.day,airports:d.airports})}
+  start(d.mode||"easy",d.cfg?d.cfg.fmt:"map","ROOM",{day:d.day,airports:d.airports})}
 // Time is up: every round you haven't finished counts as missed, and you land on the results.
 function vsTimeout(){while(S.scores.length<PER)S.scores.push(0);S.i=PER;S.fails=0;S.guesses=[];hideCH();show()}
 setInterval(()=>{
