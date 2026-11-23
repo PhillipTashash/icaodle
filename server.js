@@ -80,10 +80,22 @@ function chartOfTheDay() {
 // ZIP code -> coordinates, from the free zippopotam.us lookup (no key); answers are kept in memory since a ZIP never moves.
 const dist = (a, b, c, d) => { const r = Math.PI / 180, h = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 3959 * 2 * Math.asin(Math.sqrt(h)); };
 // A random game: 5 airports in a state ("ALL" = anywhere) from the chosen difficulty first, topped up from the others; never two from one city. Each carries its same-city alternates.
+// Clues for the City and state game. nearMajor(a): the closest major (Normal-tier) airport and which way this one lies from it, e.g. ["KSYR","Syracuse",46,"SW"].
+// DOT: every airport projected onto a small grid, as one SVG path of dots, so the page can draw the country from the airports themselves (no map tiles) and mark the answer.
+const RAD = Math.PI / 180, COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const bearing = (a, b, c, d) => { const y = Math.sin((d - b) * RAD) * Math.cos(c * RAD), x = Math.cos(a * RAD) * Math.sin(c * RAD) - Math.sin(a * RAD) * Math.cos(c * RAD) * Math.cos((d - b) * RAD); return (Math.atan2(y, x) / RAD + 360) % 360; };
+function nearMajor(a) {
+  let best = null;
+  for (const m of AIR.easy) { if (m[0] === a[0]) continue; const d = dist(a[3], a[4], m[3], m[4]); if (!best || d < best[0]) best = [d, m]; }
+  const [d, m] = best; return [m[0], m[1], Math.round(d), COMPASS[Math.round(bearing(m[3], m[4], a[3], a[4]) / 45) % 8]];
+}
+const DOT = { w: 240, h: 144, lon0: -125, lon1: -66.5, lat0: 24.5, lat1: 49.5 };
+DOT.d = [...new Set([...ALL.values()].filter(a => a[3] >= DOT.lat0 && a[3] <= DOT.lat1 && a[4] >= DOT.lon0 && a[4] <= DOT.lon1)
+  .map(a => Math.round((a[4] - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w) + " " + Math.round((DOT.lat1 - a[3]) / (DOT.lat1 - DOT.lat0) * DOT.h)))].map(p => "M" + p + "h0").join("");
 function randomSet(mode, st) {
   const pick = [], seen = new Set();
   for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => st === "ALL" || a[2] === st); while (pick.length < PER && pool.length) { const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!seen.has(cityKey(a))) { seen.add(cityKey(a)); pick.push(a); } } }
-  return pick.map(a => [...a, altsOf(a)]);
+  return pick.map(a => [...a, altsOf(a), nearMajor(a)]);
 }
 // "Play a friend": a 4-letter code shares one random set between two players. In memory only (a restart ends open games); rooms expire after a day.
 const rooms = new Map(), MAX_ROOMS = 300;
@@ -134,14 +146,17 @@ async function zipPoint(zip) {
   zips.set(zip, p); return p;
 }
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
-const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js" };
+const STATIC = { "/style.css": "style.css", "/sfx.js": "sfx.mjs", "/vendor/uisfx.js": "node_modules/uisfx/dist/index.js",
+  // the game's icon: browser tab (SVG, plus a 32 px PNG for Safari), iPhone/iPad home screen, and the install manifest
+  "/icon.svg": "icons/icon.svg", "/icon-32.png": "icons/icon-32.png", "/apple-touch-icon.png": "icons/apple-touch-icon.png", "/icon-192.png": "icons/icon-192.png", "/icon-512.png": "icons/icon-512.png", "/site.webmanifest": "icons/site.webmanifest" };
 // Cache busting: the page asks for /style.css?v=<hash of the files>, so after an update every visitor (and Cloudflare) sees a new address and fetches the new file.
 const VERSION = require("crypto").createHash("md5").update(["style.css", "sfx.mjs", "node_modules/uisfx/dist/index.js"].map(f => fs.readFileSync(f)).join("")).digest("hex").slice(0, 10);
 const APP_VERSION = JSON.parse(fs.readFileSync("package.json", "utf8")).version; // shown in the page footer: bump "version" in package.json when you release
 const page = () => fs.readFileSync("index.html", "utf8").replace("__VERSION__", APP_VERSION).replace(/(\/style\.css|\/sfx\.js|\/vendor\/uisfx\.js)(?=["'])/g, "$1?v=" + VERSION);
-const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg" };
+const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: "text/javascript", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", jpg: "image/jpeg", svg: "image/svg+xml", png: "image/png", webmanifest: "application/manifest+json" };
 // The page, stylesheet and scripts are sent with no-cache so browsers and Cloudflare re-check them, so an update shows up right away instead of after a stale copy expires.
-const serve = (res, f, cache = "no-cache") => (res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }), res.end(fs.readFileSync(f)));
+// A file that is missing on disk answers 404 instead of crashing the server.
+const serve = (res, f, cache = "no-cache") => { let body; try { body = fs.readFileSync(f); } catch { res.writeHead(404, { "content-type": "text/plain" }); return res.end("Not found"); } res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }); res.end(body); };
 // Every 30 seconds: let lobbies tidy themselves (players who left are dropped) and delete lobbies nobody is in.
 setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length || (r.closed && now - r.closed.at > 300000)) rooms.delete(k); } }, 30000).unref();
 http.createServer((req, res) => {
@@ -180,6 +195,7 @@ http.createServer((req, res) => {
       json(pick.length ? { day: day(), airports: pick } : { error: `No airports within ${miles} miles of ${zip}. Try a bigger distance.` });
     }).catch(() => json({ error: "Couldn't look that ZIP up right now. Try again." }, 502));
   }
+  if (req.method === "GET" && u.pathname === "/api/dots") return (res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=86400" }), res.end(JSON.stringify(DOT))); // the locator-map dots (never changes)
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
   if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others

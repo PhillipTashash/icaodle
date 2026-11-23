@@ -1,6 +1,8 @@
 <!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ICAOdle</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#0d1014">
 <link rel="stylesheet" href="/style.css">
 <main>
 <h2 class="top">
@@ -406,24 +408,30 @@ SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice 
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
   today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
-  if(FMT=="city")$("map").classList.add("txt"); // no map in this format: the city and state are the whole prompt
+  if(FMT=="city"){$("map").classList.add("txt");if(!DOTS)fetch("/api/dots").then(r=>r.json()).then(d=>{DOTS=d;if(S&&S.i<PER)side()}).catch(()=>{})} // no map in this format: the city and state are the whole prompt
   else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
   show();focusInput()}
 // Right column: Guesses (used/4), and under it Clues. Each miss unlocks the next clue and it pops in: region, then city/state, then the first letter.
 const REGION={};
 for(const [r,list] of Object.entries({"Pacific Northwest":"WA OR","West Coast":"CA","Mountain West":"ID MT WY CO UT NV","Southwest":"AZ NM TX OK","Great Plains":"ND SD NE KS","Midwest":"MN IA MO WI IL IN MI OH","South":"AR LA MS AL TN KY","Southeast":"FL GA SC NC VA WV","Mid-Atlantic":"NY NJ PA DE MD DC","New England":"ME NH VT MA RI CT",Alaska:"AK",Hawaii:"HI"}))for(const st of list.split(" "))REGION[st]=r;
+let DOTS=null; // the locator map's dots, fetched once for City and state games
+const CITY_KEYS=[["region"],["loc"],["name","first","last"]]; // City and state: 2nd clue = nearest big airport + locator map; 3rd adds the last letter
+function dotMap(t){if(!DOTS)return"";const D=DOTS,x=Math.round((t[4]-D.lon0)/(D.lon1-D.lon0)*D.w),y=Math.round((D.lat1-t[3])/(D.lat1-D.lat0)*D.h);
+  return `<svg class="dotmap" viewBox="0 0 ${D.w} ${D.h}" role="img" aria-label="Map of the airports with the answer highlighted"><path d="${D.d}"/><circle class="tg" cx="${x}" cy="${y}" r="3"/><circle class="ring" cx="${x}" cy="${y}" r="8"/></svg>`}
+const nearClue=t=>{const n=t[9];return (n?`${n[2]} mi ${n[3]} of ${n[0]}<br>(${esc(n[1])})`:"")+dotMap(t)};
 const CLUE_KEYS=[["region"],["loc"],["name","first"]]; // 1st miss: region (and the map gains place names); 2nd: city/state; 3rd: the airport name with its city blanked out, plus the first letter
 let seenClues={i:-1,n:0}; // how many clues of this round were already showing, so only a newly unlocked one pops up
 function side(){
-  const t=today[S.i],f=S.fails,n=Math.min(f,CLUE_KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
+  const t=today[S.i],f=S.fails,KEYS=FMT=="city"?CITY_KEYS:CLUE_KEYS,n=Math.min(f,KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
   val={region:REGION[t[2]]||t[2],
-    loc:FMT=="city"?`Elevation: ${t[7].toLocaleString()} ft`:`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the elevation
+    loc:FMT=="city"?nearClue(t):`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the nearest big airport and a locator map
+    last:`Ends with ${[...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[3]))].join(" or ")}`,
     first:`Starts with ${[...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[1]))].join(" or ")}`, // the letter after the K (every right answer's, when a city has several airports)
     name:t[6].replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
   $("guesses").innerHTML=`<b>Guesses</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
-  $("cluebox").innerHTML="<b>Clues</b>"+CLUE_KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("")}
+  $("cluebox").innerHTML="<b>Clues</b>"+KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("")}
 function forfeit(text){hideCH();const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
 $("skip").onclick=()=>{if(S.i>=PER||busy)return;
