@@ -241,8 +241,8 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #stats.nochart #result{text-align:left}#stats.nochart #statline{font-size:2.2rem}
 @media (max-width:820px){#stats:not([hidden]){display:block;text-align:center}#grade .letter{font-size:7rem}#endbtns{display:block}}
 /* game over: the guesses/clues column goes and the map takes its place */
-#board.over #col{display:none}
-#board.over #map{grid-column:2/4}
+#board.over:not(.study) #col{display:none}
+#board.over:not(.study) #map{grid-column:2/4}
 /* the rows on the left are buttons */
 #flap .w.go{cursor:pointer}
 #flap .w.go:hover{background:color-mix(in srgb,var(--amber) 10%,transparent)}
@@ -398,3 +398,43 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 .dotmap{display:block;width:100%;height:auto;margin-top:.4em}.dotmap path{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round}
 .dotmap .tg{fill:var(--accent)}.dotmap .ring{fill:none;stroke:var(--accent);stroke-width:1.5}
 @media (max-width:820px){#cluebox .dotmap{max-height:6em}}
+/* trivia review */
+.tvcap{font-size:.75em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:.6em 0 .3em}
+.tvwho{display:grid;grid-template-columns:1fr 1fr;gap:.35em}
+.tvwhorow{display:flex;justify-content:space-between;gap:.6em;padding:.3em .6em;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-size:.9em}.tvwhorow.me{border-color:var(--accent)}
+.tvwhorow .ok{color:var(--ok)}.tvwhorow .bad{color:var(--bad)}
+.tvchips{display:flex;align-items:center;gap:.4em;margin:.2em 0 .6em;flex-wrap:wrap}.tvchips .tvcap{margin:0 .4em 0 0}
+.tvchips button{padding:.3em .8em;min-height:0}.tvchips button.ok{border-color:var(--ok);color:var(--ok)}.tvchips button.bad{border-color:var(--bad);color:var(--bad)}
+.tvnav{display:flex;gap:.4em}.tvnav button{padding:.3em .9em;min-height:0}
+#lobby.hasTrivia{padding-bottom:300px}
+/* after a game: the right column shows study notes for the airport you are looking at */
+#board.over #guesses,#board.over #cluebox{display:none}
+#studybox{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:.6em;background:var(--surface);text-align:left;scrollbar-width:none}
+#studybox::-webkit-scrollbar{display:none}#studybox[hidden]{display:none}
+#studybox>b{color:var(--accent);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#studybox .stcode{margin-top:.4em;font-weight:700}#studybox .stname{color:var(--muted);font-size:.85em;margin-bottom:.3em}
+#studybox .stres{font-weight:600;font-size:.85em}#studybox .stres.ok{color:var(--ok)}#studybox .stres.bad{color:var(--bad)}
+#studybox ul{margin:.5em 0 0;padding-left:1.1em;font-size:.88em;line-height:1.4}#studybox li{margin:.45em 0}
+@media (max-width:820px){#studybox{order:3;flex:none;max-height:none}}
+/* share popup */
+#shareDlg{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(26em,92vw);text-align:left}
+#shareDlg::backdrop{background:rgba(0,0,0,.6)}#shareDlg p{margin:0 0 .6em;text-align:left}
+#shImg{display:block;width:min(15em,100%);aspect-ratio:1;margin:.3em auto .8em;border-radius:10px;border:1px solid var(--border)}
+#shBtns{display:grid;grid-template-columns:1fr 1fr;gap:.5em}
+#shMsg{min-height:1.3em;margin:.6em 0;font-size:.85em;color:var(--muted)}
+#shClose{width:100%}
+/* study: mnemonic and the report button */
+#studybox{display:flex;flex-direction:column}#studybox[hidden]{display:none}
+#studybox .stmn{margin:.5em 0;padding:.45em .6em;border:1px dashed var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+#studybox .stlab{display:block;font-size:.7em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+#studybox .stphrase{font-weight:600;line-height:1.35}#studybox .stphrase b{color:var(--accent);font-size:1.1em}
+#studybox .streport{margin-top:auto;padding:.4em .6em;font-size:.8em;min-height:0}
+#studybox ul{margin-bottom:.8em}
+/* report popup */
+#reportDlg{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(26em,92vw);text-align:left}
+#reportDlg::backdrop{background:rgba(0,0,0,.6)}#reportDlg p{margin:0 0 .6em;text-align:left}#rpAbout{color:var(--muted);font-size:.9em}
+#rpText{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:7em;font:inherit;padding:.6em .8em;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;text-transform:none;letter-spacing:normal;text-align:left}
+#rpMsg{min-height:1.3em;margin:.5em 0;font-size:.85em;color:var(--bad)}
+#rpBtns{display:flex;gap:.6em}#rpBtns button{flex:1}#rpDone{width:100%}
+#studybox .stwhy{margin-top:.3em;font-size:.75em;line-height:1.35;color:var(--muted)}#studybox .stmn{margin:.2em 0 .8em}#studybox ul{margin-bottom:.5em}
+

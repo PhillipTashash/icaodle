@@ -2,3 +2,5 @@
 data.json
 node_modules/
 feedback.jsonl
+reports.jsonl
+shares/

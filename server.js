@@ -1,10 +1,12 @@
 // node server.js — zero dependencies. Serves the page, daily airport sets, and score stats.
 const http = require("http"), fs = require("fs");
-const FEEDBACK = process.env.FEEDBACK_FILE || "feedback.jsonl", FILE = process.env.DATA_FILE || "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
+const SHARES = process.env.SHARES_DIR || "shares", REPORTS = process.env.REPORTS_FILE || "reports.jsonl", FEEDBACK = process.env.FEEDBACK_FILE || "feedback.jsonl", FILE = process.env.DATA_FILE || "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
 try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
 const AIR = JSON.parse(fs.readFileSync("airports.json"));
 // Lobby trivia: trivia.json is a list of [question, correct answer, three wrong answers, Wikipedia article about the answer]. Each lobby run gets 5 random ones,
 // with the answer positions shuffled; the answer key stays on the server and is only revealed to a player question by question, as they answer.
+// Study tips: learn.json maps an airport code to a few "how to recognise it" notes (runway layout, nearby water or mountains, roads, terminal shape). Only the Normal airports have them.
+let LEARN = {}; try { LEARN = JSON.parse(fs.readFileSync("learn.json", "utf8")); } catch {}
 let TRIVIA = []; try { TRIVIA = JSON.parse(fs.readFileSync("trivia.json", "utf8")); } catch {}
 const TQ = 5;
 function newTrivia() {
@@ -22,7 +24,7 @@ function triviaFor(r, id, tv) {
   const t = r.trivia; if (!t) return undefined;
   const mine = t.ans[id] || [], out = { id: t.id, mine: t.qs.map((x, i) => mine[i] == null ? null : { c: mine[i], a: x.a }) };
   if (tv !== t.id) out.qs = t.qs.map(x => ({ q: x.q, o: x.o, w: x.w }));
-  if (t.qs.every((_, i) => mine[i] != null)) out.others = Object.entries(r.players).filter(([k, q]) => k !== id && !q.late).map(([k, q]) => ({ name: q.name, res: t.qs.map((x, i) => { const v = (t.ans[k] || [])[i]; return v == null ? null : v === x.a ? 1 : 0; }) }));
+  if (t.qs.every((_, i) => mine[i] != null)) out.others = Object.entries(r.players).filter(([k, q]) => k !== id && !q.late).map(([k, q]) => ({ name: q.name, res: t.qs.map((x, i) => { const v = (t.ans[k] || [])[i]; return v == null ? null : v === x.a ? 1 : 0; }), pick: t.qs.map((x, i) => (t.ans[k] || [])[i] ?? null) })); // pick = the option each one chose
   return out;
 }
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
@@ -196,6 +198,10 @@ http.createServer((req, res) => {
     }).catch(() => json({ error: "Couldn't look that ZIP up right now. Try again." }, 502));
   }
   if (req.method === "GET" && u.pathname === "/api/dots") return (res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=86400" }), res.end(JSON.stringify(DOT))); // the locator-map dots (never changes)
+  if (req.method === "GET" && u.pathname === "/api/learn") { // ?codes=KATL,KJFK -> { KATL: [tips], ... } for the ones we have notes on (asked for after a game, so no spoilers)
+    const out = {}; for (const c of String(u.searchParams.get("codes") || "").toUpperCase().split(",").slice(0, 10)) if (/^[A-Z0-9]{3,4}$/.test(c) && LEARN[c]) out[c] = LEARN[c];
+    return json(out);
+  }
   if (req.method === "GET" && u.pathname === "/api/states") return json(STATES);
   if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
@@ -274,6 +280,64 @@ http.createServer((req, res) => {
     if (!local) return json({ error: "forbidden" }, 403);
     let rows = []; try { rows = fs.readFileSync(FEEDBACK, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)); } catch {}
     res.setHeader("access-control-allow-origin", "*"); // so a dashboard page served from another local port can read it
+    return json(rows);
+  }
+  // Share links: the page uploads its result picture (a PNG, 400 KB at most) and gets a short link, /s/<id>. That page carries Open Graph tags, which is what
+  // makes Discord, X and others show a card (title, text and the score picture) when the link is pasted. People who open the link are sent to the game.
+  // Files live in SHARES_DIR; only the newest 2000 are kept. The title is cleaned, the picture must really be a PNG, and each address gets 10 shares a minute.
+  if (req.method === "POST" && u.pathname === "/api/share") {
+    if (limited(req, "share", 10)) return json({ error: "Slow down a little." }, 429);
+    let b = ""; req.on("data", c => (b += c, b.length > 6e5 && req.destroy()));
+    return req.on("end", () => {
+      let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      const png = Buffer.from(String(p?.png || ""), "base64"), score = Math.floor(+p.score), of = Math.floor(+p.of);
+      if (png.length < 100 || png.length > 4e5 || png.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || !(score >= 0 && of > 0 && score <= of && of <= 99)) return json({ error: "invalid" }, 400);
+      const title = [...String(p.title ?? "").replace(NAME_BAD, " ").replace(/\s+/g, " ").trim()].slice(0, 40).join("") || "Game", id = require("crypto").randomBytes(5).toString("hex");
+      try {
+        fs.mkdirSync(SHARES, { recursive: true });
+        fs.writeFileSync(SHARES + "/" + id + ".png", png); fs.writeFileSync(SHARES + "/" + id + ".json", JSON.stringify({ title, score, of }));
+        const old = fs.readdirSync(SHARES).filter(f => f.endsWith(".png")).map(f => [f, fs.statSync(SHARES + "/" + f).mtimeMs]).sort((x, y) => y[1] - x[1]).slice(2000);
+        for (const [f] of old) { fs.rmSync(SHARES + "/" + f, { force: true }); fs.rmSync(SHARES + "/" + f.replace(".png", ".json"), { force: true }); }
+      } catch { return json({ error: "Couldn't save that." }, 500); }
+      json({ id });
+    });
+  }
+  const sh = req.method === "GET" && /^\/s\/([0-9a-f]{10})(\.png)?$/.exec(u.pathname);
+  if (sh) {
+    if (sh[2]) return serve(res, SHARES + "/" + sh[1] + ".png", "public, max-age=86400");
+    let m; try { m = JSON.parse(fs.readFileSync(SHARES + "/" + sh[1] + ".json", "utf8")); } catch { res.writeHead(302, { location: "/" }); return res.end(); }
+    const host = /^[\w.-]+(:\d+)?$/.test(req.headers.host || "") ? req.headers.host : "localhost", proto = req.headers["x-forwarded-proto"] === "https" || !/^(localhost|127\.)/.test(host) ? "https" : "http", base = proto + "://" + host,
+      esc = t => String(t).replace(/[&<>"]/g, c => "&#" + c.charCodeAt(0) + ";"), ttl = "ICAOdle · " + m.title, desc = "I scored a " + m.score + "/" + m.of + ". Think you can beat it? Try your attempt!";
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600" });
+    return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ttl)}</title><meta http-equiv="refresh" content="0;url=/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="ICAOdle"><meta property="og:title" content="${esc(ttl)}"><meta property="og:description" content="${esc(desc)}">
+<meta property="og:url" content="${base}/s/${sh[1]}"><meta property="og:image" content="${base}/s/${sh[1]}.png"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1080">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(ttl)}"><meta name="twitter:description" content="${esc(desc)}"><meta name="twitter:image" content="${base}/s/${sh[1]}.png">
+<meta name="theme-color" content="#ffb81c"></head><body><a href="/">Play ICAOdle</a></body></html>`);
+  }
+  // "Report incorrect info": players can flag a wrong study note. One JSON object per line in reports.jsonl (REPORTS_FILE), e.g.
+  // {"t":"2026-11-23T10:00:00.000Z","kind":"study","code":"KCHS","text":"The ramp is on the west side"}
+  // The text is cleaned (no control, invisible or direction-changing characters, no angle brackets, one line, 500 characters), the airport must be a real one,
+  // the file stops growing at 5 MB, and each address gets 10 reports a minute. Read it from the file or from GET /api/reports (this computer only).
+  if (req.method === "POST" && u.pathname === "/api/report") {
+    if (limited(req, "report", 10)) return json({ error: "Slow down a little." }, 429);
+    let b = ""; req.on("data", c => (b += c, b.length > 4e3 && req.destroy()));
+    return req.on("end", () => {
+      let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      if (!p || typeof p !== "object") return json({ error: "invalid" }, 400);
+      const text = [...String(p.text ?? "").replace(NAME_BAD, " ").replace(/\s+/g, " ").trim()].slice(0, 500).join(""), code = String(p.code || "").toUpperCase();
+      if (text.length < 5) return json({ error: "Please write a little more." }, 400);
+      if (code && !ALL.has(code)) return json({ error: "invalid" }, 400);
+      try { if (fs.statSync(REPORTS).size > 5e6) return json({ error: "Reports are full for now. Thank you!" }, 503); } catch {}
+      fs.appendFile(REPORTS, JSON.stringify({ t: new Date().toISOString(), kind: "study", code, text }) + "\n", () => {});
+      json({ ok: true });
+    });
+  }
+  if (req.method === "GET" && u.pathname === "/api/reports") {
+    const local = /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
+    if (!local) return json({ error: "forbidden" }, 403);
+    let rows = []; try { rows = fs.readFileSync(REPORTS, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)); } catch {}
+    res.setHeader("access-control-allow-origin", "*");
     return json(rows);
   }
   if (req.method === "POST" && u.pathname === "/api/reset") { // dev only: loopback clients can wipe all score stats

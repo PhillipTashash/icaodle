@@ -48,6 +48,23 @@
   <button id="vsCreate">Create</button>
   <div id="vsErr" role="alert"></div>
 </dialog>
+<dialog id="reportDlg">
+  <div id="rpForm">
+    <p><b>Report incorrect info</b></p>
+    <p id="rpAbout"></p>
+    <textarea id="rpText" maxlength="500" rows="5" placeholder="What is wrong, and what should it say?" aria-label="What is wrong"></textarea>
+    <div id="rpMsg" role="status"></div>
+    <div id="rpBtns"><button id="rpSend">Submit</button><button id="rpCancel" class="ghost">Cancel</button></div>
+  </div>
+  <div id="rpThanks" hidden><p><b>Thank you for your contribution!</b></p><p>We read every report and use them to fix the notes.</p><button id="rpDone">Close</button></div>
+</dialog>
+<dialog id="shareDlg">
+  <p><b>Share your result</b></p>
+  <img id="shImg" alt="Your result card: your score and a row of colored squares">
+  <div id="shBtns"><button id="shLink">Copy link</button><button id="shX">Share on X</button><button id="shInsta">Instagram</button><button id="shSave" class="ghost">Save image</button><button id="shMore" class="ghost" hidden>More…</button></div>
+  <div id="shMsg" role="status"></div>
+  <button id="shClose" class="ghost">Close</button>
+</dialog>
 <dialog id="tmo">
   <h3>Server Timeout</h3>
   <p id="tmoText"></p>
@@ -80,13 +97,13 @@
 <div id="game" hidden>
   <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
-</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div></div></div>
+</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div><div id="studybox" hidden></div></div></div>
   <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="result"><div id="statline"></div><div id="bestline" title="Most rounds solved on the first guess in a row"></div><div id="quip"></div></div>
     <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="share" hidden>Share</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button></div>
+    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button><button id="share" hidden>Share</button></div>
   </div>
   <div id="choices" hidden></div>
   <div id="pcol"></div>
@@ -273,7 +290,7 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
 const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
 const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
-let CLOSEEND=0,TV=null,TVD=null,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+let CLOSEEND=0,TV=null,TVD=null,tvRev=-1,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
 $("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
@@ -357,27 +374,36 @@ function placeTrivia(){
   box.style.top=Math.round(top)+"px";box.style.maxHeight=Math.max(150,limit-top-6)+"px"} // never runs under the footer: on a short window the card scrolls inside itself // on a very short window the card scrolls inside itself instead of running off the screen
 function renderTrivia(){
   const box=$("trivia");
-  if(!(PCQ.matches&&TVD&&TV&&TV.id==TVD.id)){box.hidden=true;return}
-  box.hidden=false;const mine=TVD.mine,n=TV.qs.length;
-  if(tvId!=TV.id){tvId=TV.id;tvIdx=mine.findIndex(m=>!m);if(tvIdx<0)tvIdx=n} // a new set starts at its first unanswered question
-  const sig=JSON.stringify([TV.id,tvIdx,mine,TVD.others]);if(sig==tvSig){placeTrivia();return;}tvSig=sig; // only rebuild when something changed (the lobby refreshes every 2 s)
-  const head=mk("div",{className:"tvhead"},mk("b",{textContent:"Trivia while you wait"}),mk("span",{textContent:tvIdx<n?(tvIdx+1)+"/"+n:"Results"}));
-  const body=mk("div",{});
-  if(tvIdx<n){
-    const q=TV.qs[tvIdx],a=mine[tvIdx],opts=mk("div",{className:"tvopts"});body.append(mk("p",{className:"tvq",textContent:q.q}));
+  if(!(PCQ.matches&&TVD&&TV&&TV.id==TVD.id)){box.hidden=true;$("lobby").classList.remove("hasTrivia");return}
+  box.hidden=false;$("lobby").classList.add("hasTrivia"); /* the lobby keeps room underneath for the card, so it sits a bit higher */const mine=TVD.mine,n=TV.qs.length;
+  if(tvId!=TV.id){tvId=TV.id;tvRev=-1;tvIdx=mine.findIndex(m=>!m);if(tvIdx<0)tvIdx=n} // a new set starts at its first unanswered question
+  const sig=JSON.stringify([TV.id,tvIdx,tvRev,mine,TVD.others]);if(sig==tvSig){placeTrivia();return}tvSig=sig; // only rebuild when something changed (the lobby refreshes every 2 s)
+  const hit=m=>!!m&&m.c==m.a,go=(i,r)=>()=>{tvIdx=i;tvRev=r;tvSig="";renderTrivia()};
+  const head=(label,right)=>mk("div",{className:"tvhead"},mk("b",{textContent:label}),mk("span",{textContent:right}));
+  let kids;
+  if(tvIdx<n){ // answering
+    const q=TV.qs[tvIdx],a=mine[tvIdx],opts=mk("div",{className:"tvopts"});
     q.o.forEach((o,i)=>{const bt=mk("button",{type:"button",className:"ghost tvopt"+(a?(i==a.a?" ok":i==a.c?" bad":" dim"):""),textContent:o,disabled:!!a});
       if(!a)bt.onclick=()=>vsPost({action:"trivia",q:tvIdx,choice:i}).then(vsHandle).catch(()=>{});opts.append(bt)});
-    body.append(opts);
-    if(!a)body.append(mk("div",{className:"tvbar"})); // reserves the row the result and Next button appear in, so the card never changes height when you answer
-    if(a)body.append(mk("div",{className:"tvbar"},mk("span",{className:"tvres "+(a.c==a.a?"ok":"bad"),textContent:a.c==a.a?"Correct!":"Answer: "+q.o[a.a]}),
-      mk("button",{type:"button",textContent:tvIdx<n-1?"Next":"Results",onclick:()=>{tvIdx++;tvSig="";renderTrivia()}})))
-  }else{
-    const me=VSD&&VSD.players.find(p=>p.me),score=mine.filter(m=>m&&m.c==m.a).length;
-    body.append(mk("p",{className:"tvq",textContent:"You got "+score+" of "+n+" right"}),
-      mk("div",{className:"tvrow me"},mk("span",{textContent:me?me.name:"You"}),pips(mine.map(m=>m?(m.c==m.a?1:0):null))));
-    for(const o of TVD.others||[])body.append(mk("div",{className:"tvrow"},mk("span",{textContent:o.name}),pips(o.res)));
-    if(!(TVD.others||[]).length)body.append(mk("p",{className:"tvres",textContent:"Nobody else is here yet."}))}
-  box.replaceChildren(head,body);placeTrivia()}
+    kids=[head("Trivia while you wait",(tvIdx+1)+"/"+n),mk("p",{className:"tvq",textContent:q.q}),opts,
+      mk("div",{className:"tvbar"},...(a?[mk("span",{className:"tvres "+(a.c==a.a?"ok":"bad"),textContent:a.c==a.a?"Correct!":"Answer: "+q.o[a.a]}),
+        mk("button",{type:"button",textContent:tvIdx<n-1?"Next":"Results",onclick:()=>{tvIdx++;tvSig="";renderTrivia()}})]:[]))]; // an empty bar reserves the row, so the card never changes height when you answer
+  }else if(tvRev>=0){ // reviewing one finished question: the options, then who guessed what
+    const q=TV.qs[tvRev],a=mine[tvRev],opts=mk("div",{className:"tvopts"}),who=mk("div",{className:"tvwho"}),me=VSD&&VSD.players.find(p=>p.me);
+    q.o.forEach((o,i)=>opts.append(mk("button",{type:"button",disabled:true,className:"ghost tvopt"+(i==a.a?" ok":i==a.c?" bad":" dim"),textContent:o})));
+    const line=(name,c,isMe)=>mk("div",{className:"tvwhorow"+(isMe?" me":"")},mk("span",{textContent:name}),mk("span",{className:c==null?"":c==q.a?"ok":"bad",textContent:c==null?"–":q.o[c]+(c==q.a?" ✓":" ✗")}));
+    who.append(line(me?me.name:"You",a.c,true),...(TVD.others||[]).map(o=>line(o.name,o.pick?o.pick[tvRev]:null,false)));
+    kids=[head("Review",(tvRev+1)+"/"+n),mk("p",{className:"tvq",textContent:q.q}),opts,mk("div",{className:"tvcap",textContent:"Who guessed what"}),who,
+      mk("div",{className:"tvbar"},mk("button",{type:"button",textContent:"Results",onclick:go(n,-1)}),
+        mk("span",{className:"tvnav"},mk("button",{type:"button",textContent:"‹",disabled:tvRev==0,onclick:go(n,tvRev-1)}),mk("button",{type:"button",textContent:"›",disabled:tvRev==n-1,onclick:go(n,tvRev+1)})))];
+  }else{ // results: your score, a chip per question to review, and everyone's right and wrong
+    const me=VSD&&VSD.players.find(p=>p.me),score=mine.filter(hit).length;
+    kids=[head("Trivia while you wait","Results"),mk("p",{className:"tvq",textContent:"You got "+score+" of "+n+" right"}),
+      mk("div",{className:"tvchips"},mk("span",{className:"tvcap",textContent:"Review"}),...TV.qs.map((_,i)=>mk("button",{type:"button",className:"ghost "+(hit(mine[i])?"ok":"bad"),textContent:(i+1)+(hit(mine[i])?" ✓":" ✗"),title:"Review question "+(i+1),onclick:go(n,i)}))),
+      mk("div",{className:"tvrow me"},mk("span",{textContent:me?me.name:"You"}),pips(mine.map(m=>m?(hit(m)?1:0):null))),
+      ...(TVD.others||[]).map(o=>mk("div",{className:"tvrow"},mk("span",{textContent:o.name}),pips(o.res)))];
+    if(!(TVD.others||[]).length)kids.push(mk("p",{className:"tvres",textContent:"Nobody else is here yet."}))}
+  box.replaceChildren(...kids);placeTrivia()}
 PCQ.addEventListener("change",()=>{tvSig="";if(VSD)renderLobby(VSD)});
 addEventListener("resize",()=>placeTrivia());
 // Footer, next to the version: how long until the lobby closes for inactivity (resets whenever someone joins, leaves, readies up or answers trivia).
@@ -474,7 +500,7 @@ function view(v){ // review a finished round: its airport, answer and result; no
   V=v;navs();$("cluebox").hidden=CH.hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   $("round").textContent=`${tag()} ${v+1}/${PER}`;
   $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
-  setMap(t,t[5],t[5]-1)}
+  setMap(t,t[5],t[5]-1);paintStudy()}
 const HOT=500; // miles: within this = hot, otherwise cold
 const bearing=(a,b,c,d)=>{const r=Math.PI/180;return Math.round((Math.atan2(Math.sin((d-b)*r)*Math.cos(c*r),Math.cos(a*r)*Math.sin(c*r)-Math.sin(a*r)*Math.cos(c*r)*Math.cos((d-b)*r))/r+360)%360)}; // compass degrees from the guess to the answer
 const miles=(a,b,c,d)=>{const r=Math.PI/180,h=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 3959*2*Math.asin(Math.sqrt(h))};
@@ -509,7 +535,39 @@ const QUIPS=[["Meh. I've seen better.","An A? Cute. The airports were practicall
   ["An F. The airports are filing a complaint.","That wasn't flying. That was falling with extra steps.","Even the autopilot took you off the crew list."]];
 // Longest run of rounds solved on the very first guess (the same streak the answer board counts), for the results panel.
 const bestRun=()=>{let m=0,c=0;for(const v of S.scores){c=v==TRIES?c+1:0;m=Math.max(m,c)}return m};
+// Study notes: when a game is over, the column to the right of the map shows how to recognise the airport you are looking at (Normal airports only; the
+// notes are fetched after the game ends, so there are no spoilers). Click an airport in the left list to switch.
+let TIPS={},TIPSKEY="";
+async function loadStudy(){
+  const key=today.map(t=>t[0]).join();
+  if(key==TIPSKEY){paintStudy();return}
+  TIPSKEY=key;TIPS={};
+  try{TIPS=await fetch("/api/learn?codes="+key).then(r=>r.json())}catch{}
+  paintStudy()}
+function paintStudy(){
+  const board=$("board");if(!board.classList.contains("over"))return;
+  const t=today[V],e=TIPS[t[0]],box=$("studybox");
+  board.classList.toggle("study",!!e);box.hidden=!e;if(!e)return;
+  const got=(S.scores[V]||0)>0;
+  // the mnemonic: each word's first letter (the code's letters) is picked out in amber
+  const mn=mk("div",{className:"stmn"},mk("span",{className:"stlab",textContent:"Remember the code"}),mk("div",{className:"stphrase"},...e.m.split(" ").map(w=>mk("span",{},mk("b",{textContent:w[0]}),w.slice(1)+" "))),mk("div",{className:"stwhy",textContent:e.w||""}));
+  box.replaceChildren(mk("b",{textContent:"Study this airport"}),mk("div",{className:"stcode",textContent:t[0]+" · "+t[1]+", "+t[2]}),mk("div",{className:"stname",textContent:t[6]}),
+    mk("div",{className:"stres "+(got?"ok":"bad"),textContent:got?"You got this one":"You missed this one"}),mk("ul",{},...e.t.map(x=>mk("li",{textContent:x}))),mn,
+    mk("button",{type:"button",className:"ghost streport",textContent:"Report incorrect info",onclick:()=>openReport(t[0])}))}
+// Report incorrect info: a small popup with a text box. The text is cleaned here (and again on the server) before it is sent.
+let RPCODE="";
+const cleanReport=t=>[...String(t).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff<>]/g," ").replace(/\s+/g," ").trim()].slice(0,500).join("");
+function openReport(code){RPCODE=code;$("rpAbout").textContent="About "+code;$("rpText").value="";$("rpMsg").textContent="";$("rpForm").hidden=false;$("rpThanks").hidden=true;$("rpSend").disabled=false;$("reportDlg").showModal();$("rpText").focus()}
+$("rpCancel").onclick=()=>$("reportDlg").close();$("rpDone").onclick=()=>$("reportDlg").close();
+$("rpSend").onclick=async()=>{const text=cleanReport($("rpText").value);
+  if(text.length<5)return void($("rpMsg").textContent="Please write a little more.");
+  $("rpSend").disabled=true;$("rpMsg").textContent="Sending…";
+  try{const r=await fetch("/api/report",{method:"POST",body:JSON.stringify({code:RPCODE,text})}),d=await r.json();
+    if(!r.ok){$("rpMsg").textContent=d.error||"Couldn't send that. Try again.";$("rpSend").disabled=false;return}
+    $("rpForm").hidden=true;$("rpThanks").hidden=false}
+  catch{$("rpMsg").textContent="Couldn't send that. Try again.";$("rpSend").disabled=false}};
 function end(){
+  loadStudy();
   $("bestline").textContent="🔥 Best streak: "+bestRun()+" in a row";
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
   $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
@@ -523,26 +581,45 @@ function end(){
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(ROOM){vsPoll();return} // friend games: tell the server you're done right now; your own results show while the others finish, then everyone returns to the lobby, where the feedback question is asked
   if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
-  $("share").hidden=false;$("share").onclick=share;askFeedback();
+  $("share").hidden=false;askFeedback();
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
 // Share: a spoiler-free emoji row per round (green = first guess, yellow = later guess, orange = last guess, red = missed), via the phone share sheet or the clipboard.
-async function share(){
-  const SQ=["#f85149","#e8833a","#d29922","#d29922","#3fb950"],t=S.scores.reduce((a,b)=>a+b,0),name=tag().replace(" · "," "),
-  text="I got "+t+"/"+PER*TRIES+" on ICAOdle "+name+". Challenge me! "+location.origin;
+// Share: a popup with the picture that will be shared and one-tap options. The picture shows only your score and a row of colored squares (no spoilers).
+let SHARE=null;
+async function shareCard(){
+  const SQ=["#f85149","#e8833a","#d29922","#d29922","#3fb950"],t=S.scores.reduce((a,b)=>a+b,0),name=tag().replace(" · "," "),parts=tag().split(" · "),title=parts[0]+" Game"+(parts[1]?" · "+parts[1]:""),
+  text="I scored a "+t+"/"+PER*TRIES+" on ICAOdle "+name+"! Try your attempt at "+location.origin;
   const c=document.createElement("canvas");c.width=c.height=1080;const x=c.getContext("2d"),mid=540;x.textAlign="center";
   x.fillStyle="#0d1014";x.fillRect(0,0,1080,1080);
   for(let k=0;k<4;k++){const px=mid-4*70+k*150-5; // four split-flap tiles spelling ICAO
     x.fillStyle="#1a1f28";x.beginPath();x.roundRect(px,110,130,160,16);x.fill();x.fillStyle="#0d1014";x.fillRect(px,189,130,3);
     x.fillStyle="#ffb81c";x.font="bold 110px monospace";x.fillText("ICAO"[k],px+65,230)}
-  x.fillStyle="#e8eaee";x.font="bold 70px system-ui,sans-serif";x.fillText("ICAOdle "+name,mid,370);
+  x.fillStyle="#e8eaee";x.font="bold 70px system-ui,sans-serif";x.fillText(title,mid,370); // e.g. "Normal Game" (and the date for an earlier day)
   S.scores.forEach((v,k)=>{x.fillStyle=SQ[v];x.beginPath();x.roundRect(mid-PER*60+k*120+6,430,108,108,18);x.fill()});
   x.fillStyle="#ffb81c";x.font="bold 190px system-ui,sans-serif";x.fillText(t+"/"+PER*TRIES,mid,760);
   x.fillStyle="#e8eaee";x.font="bold 64px system-ui,sans-serif";x.fillText("I played this. Challenge me!",mid,890);
   x.fillStyle="#9aa3b2";x.font="48px system-ui,sans-serif";x.fillText(location.host,mid,970);
-  try{const f=new File([await new Promise(r=>c.toBlob(r))],"icaodle.png",{type:"image/png"});
-    if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],text});
-    else{const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(f),download:"icaodle.png"});a.click();URL.revokeObjectURL(a.href); // no share sheet (desktop): save the picture
-      try{await navigator.clipboard.writeText(text)}catch{}$("share").textContent="Saved!";setTimeout(()=>$("share").textContent="Share",1500)}}catch{}}
+  const blob=await new Promise(r=>c.toBlob(r));return{text,title,score:t,of:PER*TRIES,blob,file:new File([blob],"icaodle.png",{type:"image/png"}),url:URL.createObjectURL(blob)}}
+// The picture is uploaded when the popup opens and comes back as a short link; pasted into Discord, X and others, that link shows a card with the score picture.
+async function uploadShare(s){
+  try{const b=new Uint8Array(await s.blob.arrayBuffer());let bin="";for(let i=0;i<b.length;i+=8192)bin+=String.fromCharCode(...b.subarray(i,i+8192));
+    const r=await fetch("/api/share",{method:"POST",body:JSON.stringify({png:btoa(bin),score:s.score,of:s.of,title:s.title})}),d=await r.json();
+    if(d.id){s.link=location.origin+"/s/"+d.id;s.text=s.text.replace(location.origin,s.link)}}catch{}}
+const shMsg=m=>$("shMsg").textContent=m;
+async function openShare(){
+  if(SHARE)URL.revokeObjectURL(SHARE.url);
+  SHARE=await shareCard();$("shImg").src=SHARE.url;shMsg("");SHARE.ready=uploadShare(SHARE);$("shMore").hidden=!navigator.share;$("shareDlg").showModal()}
+const copyText=async t=>{try{await navigator.clipboard.writeText(t);return true}catch{return false}};
+const saveImage=()=>{const a=Object.assign(document.createElement("a"),{href:SHARE.url,download:"icaodle.png"});a.click()};
+$("share").onclick=openShare;
+$("shClose").onclick=()=>$("shareDlg").close();
+$("shLink").onclick=async()=>{await SHARE.ready;shMsg(await copyText(SHARE.text)?"Link copied.":"Couldn't copy. Select and copy: "+SHARE.text)};
+$("shX").onclick=async()=>{await SHARE.ready;window.open("https://x.com/intent/post?text="+encodeURIComponent(SHARE.text),"_blank","noopener");shMsg("Opened X in a new tab.")};
+$("shInsta").onclick=async()=>{ // a phone's share sheet offers Instagram; on a computer, save the picture and open Instagram to upload it
+  if(navigator.canShare&&navigator.canShare({files:[SHARE.file]})){try{await navigator.share({files:[SHARE.file],text:SHARE.text});return}catch{return}}
+  window.open("https://www.instagram.com/","_blank","noopener");saveImage();shMsg("Picture saved to your downloads and Instagram opened in a new tab. Click + and upload it.")};
+$("shSave").onclick=()=>{saveImage();shMsg("Picture saved.")};
+$("shMore").onclick=async()=>{try{await navigator.share(navigator.canShare&&navigator.canShare({files:[SHARE.file]})?{files:[SHARE.file],text:SHARE.text}:{text:SHARE.text})}catch{}};
 // Feedback popup after a daily or friend game: Fun / Meh / Too hard; for the last two, which airports bothered you. Asked once per game; the
 // answers are saved on the server (feedback.jsonl) for the dashboard. Practice, custom and ZIP games never ask.
 let FBASKED=false,FBR="";
