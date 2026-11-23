@@ -1,24 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ICAOdle">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ICAOdle: a target, like Class B airspace seen from above">
   <title>ICAOdle</title>
-  <defs>
-    <linearGradient id="flap" x1="0" y1="0" x2="0" y2="1">
-      <stop offset=".49" stop-color="#2d3442"/>
-      <stop offset=".5" stop-color="#0d1014"/>
-      <stop offset=".51" stop-color="#1b212b"/>
-    </linearGradient>
-    <rect id="tile" width="200" height="200" rx="26" fill="url(#flap)"/>
-  </defs>
   <rect width="512" height="512" rx="104" fill="#0d1014"/>
-  <!-- four split-flap tiles -->
-  <use href="#tile" x="44" y="44"/>
-  <use href="#tile" x="268" y="44"/>
-  <use href="#tile" x="44" y="268"/>
-  <use href="#tile" x="268" y="268"/>
-  <!-- the letters I C A O, drawn as strokes so they look the same everywhere -->
-  <g fill="none" stroke="#ffb81c" stroke-width="22">
-    <path transform="translate(44 44)" d="M68 56H132M100 56V144M68 144H132"/>
-    <path transform="translate(268 44)" d="M138 72A46 46 0 1 0 138 128"/>
-    <path transform="translate(44 268)" d="M62 150L100 52L138 150M76 118H124"/>
-    <ellipse transform="translate(268 268)" cx="100" cy="100" rx="40" ry="50"/>
-  </g>
+  <!-- a bullseye of alternating rings: yellow, background, yellow, background, yellow -->
+  <circle cx="256" cy="256" r="214" fill="#ffb81c"/>
+  <circle cx="256" cy="256" r="178" fill="#0d1014"/>
+  <circle cx="256" cy="256" r="114" fill="#ffb81c"/>
+  <circle cx="256" cy="256" r="78" fill="#0d1014"/>
+  <circle cx="256" cy="256" r="28" fill="#ffb81c"/>
 </svg>
