@@ -94,23 +94,29 @@ function nearMajor(a) {
 const DOT = { w: 240, h: 144, lon0: -125, lon1: -66.5, lat0: 24.5, lat1: 49.5 };
 DOT.d = [...new Set([...ALL.values()].filter(a => a[3] >= DOT.lat0 && a[3] <= DOT.lat1 && a[4] >= DOT.lon0 && a[4] <= DOT.lon1)
   .map(a => Math.round((a[4] - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w) + " " + Math.round((DOT.lat1 - a[3]) / (DOT.lat1 - DOT.lat0) * DOT.h)))].map(p => "M" + p + "h0").join("");
-function randomSet(mode, st) {
+// The airports a custom game can pick from in a state: the chosen difficulty's own airports there, plus the next difficulty's only if there are fewer than five.
+const tiersOf = mode => mode === "all" ? [["easy", "medium", "hard"].flatMap(t => AIR[t])] : ORDER[mode].map(t => AIR[t]); // "all" (lobby custom games): every difficulty together, no preference
+const candidates = (mode, st) => { const out = []; for (const list of tiersOf(mode)) { out.push(...list.filter(a => a[2] === st)); if (out.length >= PER) break; } return out; };
+function randomSet(mode, st, skip = []) { // skip = airport codes the lobby host switched off
   const pick = [], seen = new Set();
-  for (const t of ORDER[mode]) { const pool = AIR[t].filter(a => st === "ALL" || a[2] === st); while (pick.length < PER && pool.length) { const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!seen.has(cityKey(a))) { seen.add(cityKey(a)); pick.push(a); } } }
+  for (const list of tiersOf(mode)) { const pool = list.filter(a => (st === "ALL" || a[2] === st) && !skip.includes(a[0])); while (pick.length < PER && pool.length) { const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (!seen.has(cityKey(a))) { seen.add(cityKey(a)); pick.push(a); } } }
   return pick.map(a => [...a, altsOf(a), nearMajor(a)]);
 }
 // "Play a friend": a 4-letter code shares one random set between two players. In memory only (a restart ends open games); rooms expire after a day.
 const rooms = new Map(), MAX_ROOMS = 300;
+let FIND = null; // search table for /api/find, built on first use
 // A lobby's game settings (cfg), set by the lobby owner: kind easy | medium | hard (Normal / Hard / Extra Hard), custom (format, state, difficulty) or zip (airports near a ZIP).
 // genSet makes the five airports for the current settings (a zip lobby keeps the ZIP's coordinates in r.zp).
 function genSet(r) {
-  const c = r.cfg;
-  if (c.kind === "zip") {
-    const near = [...ALL.values()].filter(a => dist(r.zp.lat, r.zp.lon, a[3], a[4]) <= c.miles && !(c.off || []).includes(a[0])), pick = []; // c.off = airports the host switched off
-    while (pick.length < PER && near.length) pick.push(near.splice(Math.floor(Math.random() * near.length), 1)[0]);
-    return pick.map(a => [...a, altsOf(a), nearMajor(a)]);
-  }
-  return randomSet(c.mode, c.st || "ALL");
+  const c = r.cfg, off = new Set(c.off || []), row = a => [...a, altsOf(a), nearMajor(a)];
+  let pool, dedupe = false;
+  if (c.kind === "zip") pool = [...ALL.values()].filter(a => dist(r.zp.lat, r.zp.lon, a[3], a[4]) <= c.miles && !off.has(a[0])); // off = airports the host switched off
+  else if (c.kind === "list") pool = c.list.map(x => ALL.get(x)).filter(Boolean); // the host's own typed list: exactly these airports
+  else if (c.kind === "custom" && c.st) { pool = candidates(c.mode, c.st).filter(a => !off.has(a[0])); dedupe = true; }
+  else return randomSet(c.mode, c.st || "ALL", []);
+  const pick = [], seen = new Set(); // five at random from the pool (fewer if the pool is smaller; none if every airport is switched off)
+  while (pick.length < PER && pool.length) { const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; if (dedupe && seen.has(cityKey(a))) continue; seen.add(cityKey(a)); pick.push(a); }
+  return pick.map(row);
 }
 // Everything a player types or sends is untrusted. Names: no control, invisible or direction-changing characters, no angle brackets, one space between words, 12 characters.
 const NAME_BAD = new RegExp("[" + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x2069], [0xfeff, 0xfeff]].map(([x, y]) => String.fromCharCode(x) + "-" + String.fromCharCode(y)).join("") + "<>]", "g"); // control, zero-width, line/paragraph separators, direction overrides, BOM, angle brackets
@@ -125,6 +131,8 @@ function limited(req, route, max) {
   return ++h.n > max;
 }
 const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c)) return c; } };
+// A host-typed airport list: an array of at most 100 airport codes, every one of which must be a real airport we know (anything else is dropped, never stored). Returns undefined for no list.
+const cleanList = l => { if (!Array.isArray(l)) return undefined; const out = []; for (const x of l.slice(0, 100)) { const c = typeof x === "string" ? x.trim().toUpperCase() : ""; if (/^[A-Z0-9]{3,4}$/.test(c) && ALL.has(c) && !out.includes(c)) out.push(c); } return out.length ? out : undefined; };
 const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000;
 // Lobby time-outs (never while a game is being played): 5 minutes with nothing happening (nobody joining, leaving, renaming, pressing Ready or starting over;
 // the page checking in does not count), and 10 minutes since the lobby opened or the last game ended without a new game starting, which keeps a lobby that
@@ -148,7 +156,7 @@ function roomTick(r) {
     r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
     // The lobby remembers its finished games (newest last, the last 15): what was played and everyone's result. Sent to a page only when it has changed.
-    r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: r.cfg, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift();
+    r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: r.cfg, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, fin: q.fin ?? null })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift();
   }
 }
 const zips = new Map();
@@ -216,6 +224,29 @@ http.createServer((req, res) => {
     if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180) || ![25, 50, 100, 250, 500].includes(miles)) return json({ error: "bad request" }, 400);
     return json([...ALL.values()].filter(a => dist(lat, lon, a[3], a[4]) <= miles).map(a => [a[0], a[3], a[4], a[1], a[2]]));
   }
+  if (req.method === "GET" && u.pathname === "/api/airports") { // the airports a custom game can pick in a state at a difficulty (?state=TX&mode=easy), for the custom lobby's list: [[code, lat, lon, city, state], ...]
+    const st = u.searchParams.get("state"), m = u.searchParams.get("mode") || "easy";
+    if (!STATES.includes(st) || !(MODES.includes(m) || m === "all")) return json({ error: "bad request" }, 400);
+    return json(candidates(m, st).map(a => [a[0], a[3], a[4], a[1], a[2]]));
+  }
+  if (req.method === "GET" && u.pathname === "/api/list") { // single-player "Custom List": ?codes=KORD,KMDW,... -> five of those at random (or fewer): { day, airports }
+    if (limited(req, "list", 60)) return json({ error: "Slow down a little." }, 429);
+    const list = cleanList(String(u.searchParams.get("codes") || "").slice(0, 800).split(","));
+    if (!list) return json({ error: "Add at least one airport." }, 400);
+    const pool = list.map(c => ALL.get(c)), pick = [];
+    while (pick.length < PER && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    return json({ day: day(), airports: pick.map(a => [...a, altsOf(a), nearMajor(a)]) });
+  }
+  if (req.method === "GET" && u.pathname === "/api/find") { // airport search for the lobby's typed list: ?q=chicago (top 5 matches) or ?codes=KORD,KMDW (look those up): [[code, city, state, name], ...]
+    if (limited(req, "find", 150)) return json({ error: "Slow down a little." }, 429);
+    const row = a => [a[0], a[1], a[2], a[6]];
+    if (u.searchParams.has("codes")) return json(String(u.searchParams.get("codes")).slice(0, 800).toUpperCase().split(",").slice(0, 100).filter(c => /^[A-Z0-9]{3,4}$/.test(c) && ALL.has(c)).map(c => row(ALL.get(c))));
+    const q = String(u.searchParams.get("q") || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/ +/g, " ").trim().slice(0, 30);
+    if (!q) return json([]);
+    FIND ||= [...ALL.values()].map(a => ({ a, code: a[0].toLowerCase(), bare: a[0].slice(1).toLowerCase(), city: a[1].toLowerCase(), name: String(a[6]).toLowerCase(), st: a[2].toLowerCase() }));
+    const score = f => f.code === q || f.bare === q ? 0 : f.code.startsWith(q) || f.bare.startsWith(q) ? 1 : f.city.startsWith(q) ? 2 : f.city.includes(q) || f.name.includes(q) ? 3 : (q.length === 2 && f.st === q) ? 4 : 9;
+    return json(FIND.map(f => [score(f), f]).filter(x => x[0] < 9).sort((x, y) => x[0] - y[0] || (x[1].code < y[1].code ? -1 : 1)).slice(0, 5).map(x => row(x[1].a)));
+  }
   if (req.method === "GET" && u.pathname === "/api/dots") return (res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=86400" }), res.end(JSON.stringify(DOT))); // the locator-map dots (never changes)
   if (req.method === "GET" && u.pathname === "/api/learn") { // ?codes=KATL,KJFK -> { KATL: [tips], ... } for the ones we have notes on (asked for after a game, so no spoilers)
     const out = {}; for (const c of String(u.searchParams.get("codes") || "").toUpperCase().split(",").slice(0, 10)) if (/^[A-Z0-9]{3,4}$/.test(c) && LEARN[c]) out[c] = LEARN[c];
@@ -236,7 +267,7 @@ http.createServer((req, res) => {
   }
   if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name} | config {kind, ...} (owner only) | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | reset {code}
     if (limited(req, "room", 600)) return json({ error: "Slow down a little." }, 429);
-    let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
+    let b = ""; req.on("data", c => (b += c, b.length > 3e3 && req.destroy())); // 3 KB at most (a typed airport list is up to 100 codes)
     return req.on("end", async () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
       if (!p || typeof p !== "object" || !validId(p.id)) return json({ error: "bad request" }, 400);
@@ -273,38 +304,42 @@ http.createServer((req, res) => {
       if (p.action === "join" || p.action === "ready" || p.action === "reset") r.act = now; // things people do count as activity; plain check-ins do not
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
       if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), streak: num(p.streak, PER), done: !!p.done });
+      if (p.action === "sync" && r.phase === "playing" && !me.late && me.done && me.fin == null) me.fin = Math.max(0, now - (r.end - GAME_MS)); // when this player finished, in ms from the start of the game (stays empty if the time ran out)
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
         r.airports = genSet(r); r.phase = "lobby"; r.cd = null; r.trivia = newTrivia(); // a new game: new questions
-        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, late: false });
+        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, late: false, fin: null });
       }
       if (p.action === "config" && r.owner === p.id && r.phase !== "playing") { // the owner changes what will be played; a lobby's players are un-readied and get a fresh set
         const k = p.kind;
         if (["easy", "medium", "hard"].includes(k)) r.cfg = { kind: k, mode: k, fmt: "map", st: "" };
-        else if (k === "custom" && ["map", "city"].includes(p.fmt) && MODES.includes(p.mode) && (p.st === "" || STATES.includes(p.st))) r.cfg = { kind: k, mode: p.mode, fmt: p.fmt, st: p.st };
+        else if (k === "custom" && ["map", "city"].includes(p.fmt) && (MODES.includes(p.mode) || p.mode === "all") && (p.st === "" || STATES.includes(p.st))) r.cfg = { kind: k, mode: p.mode, fmt: p.fmt, st: p.st, off: r.cfg.kind === "custom" && r.cfg.st === p.st ? r.cfg.off || [] : [] }; // switched-off airports are kept while the state stays the same
+        else if (k === "list" && ["map", "city"].includes(p.fmt) && cleanList(p.list)) r.cfg = { kind: k, mode: "easy", fmt: p.fmt, st: "", list: cleanList(p.list) };
         else if (k === "zip" && zp) { r.cfg = { kind: k, mode: "easy", fmt: "map", st: "", zip: String(p.zip), miles: +p.miles, lat: zp.lat, lon: zp.lon, off: [] }; r.zp = zp; }
         else return json({ error: "That setting isn't available." }, 400);
-        r.mode = r.cfg.mode; r.act = now;
+        r.mode = r.cfg.mode === "all" ? "easy" : r.cfg.mode; r.act = now; // r.mode is the label the page and feedback use, so "all" counts as Normal there
         if (r.phase === "lobby") { r.airports = genSet(r); r.cd = null; for (const q of Object.values(r.players)) q.ready = false; }
       } else if (p.action === "config") return json({ error: "Only the lobby owner can change that." }, 403);
-      if (p.action === "airport") { // the host switches one airport of a zip lobby on or off (an off airport is never picked); at least one stays on
-        const c = r.cfg, code = String(p.ap || "").toUpperCase(), a = ALL.get(code);
-        if (r.owner !== p.id || r.phase === "playing" || c.kind !== "zip") return json({ error: "Only the lobby owner can change that." }, 403);
-        if (!a || dist(r.zp.lat, r.zp.lon, a[3], a[4]) > c.miles) return json({ error: "That airport isn't in the radius." }, 400);
-        const off = new Set(c.off || []); if (p.on) off.delete(code); else off.add(code);
-        const left = [...ALL.values()].filter(x => dist(r.zp.lat, r.zp.lon, x[3], x[4]) <= c.miles && !off.has(x[0])).length;
-        if (!left) return json({ error: "Keep at least one airport on." }, 400);
+      if (p.action === "airport" || p.action === "airportAll") { // the host switches airports on or off (zip lobby: inside the radius; custom lobby with a state: the ones that difficulty can pick). An off airport is never picked.
+        const c = r.cfg;
+        if (r.owner !== p.id || r.phase === "playing") return json({ error: "Only the lobby owner can change that." }, 403);
+        if (!(c.kind === "zip" || (c.kind === "custom" && c.st))) return json({ error: "There's no airport list to change right now." }, 400);
+        const cand = c.kind === "custom" ? new Set(candidates(c.mode, c.st).map(x => x[0])) : null, inside = x => c.kind === "zip" ? dist(r.zp.lat, r.zp.lon, x[3], x[4]) <= c.miles : cand.has(x[0]);
+        const off = new Set(c.off || []);
+        if (p.action === "airportAll") { if (p.on) off.clear(); else for (const x of ALL.values()) if (inside(x)) off.add(x[0]); }
+        else { const code = String(p.ap || "").toUpperCase(), a = ALL.get(code); if (!a || !inside(a)) return json({ error: "That airport isn't in the list." }, 400); if (p.on) off.delete(code); else off.add(code); }
         c.off = [...off]; r.act = now;
         if (r.phase === "lobby") { r.airports = genSet(r); r.cd = null; for (const q of Object.values(r.players)) q.ready = false; }
       }
+      if (p.action === "ready" && p.value && !r.airports.length) return json({ error: "Switch at least one airport on." }, 400); // nothing to play
       if (p.action === "ready" && r.phase === "lobby") me.ready = !!p.value;
       if (p.action === "trivia" && r.phase === "lobby" && r.trivia && !me.late && Number.isInteger(p.q) && p.q >= 0 && p.q < TQ && Number.isInteger(p.choice) && p.choice >= 0 && p.choice < 4) {
         const mine = (r.trivia.ans[p.id] ||= Array(TQ).fill(null)); if (mine[p.q] == null) { mine[p.q] = p.choice; r.act = now; } // one answer per question, no changing it
       }
       roomTick(r);
       if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; // the owner left: the longest-waiting player takes over
-      json({ code, day: day(), mode: r.mode, cfg: r.cfg, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
+      json({ code, day: day(), mode: r.mode, cfg: r.cfg, empty: !r.airports.length, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
-        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ players: Object.entries(r.players).map(([k, q]) => ({ name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
+        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
     });
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.

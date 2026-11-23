@@ -31,7 +31,16 @@
   <div class="lbl">Practice</div>
   <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
   <button id="customBtn" title="Pick a state and format, just for fun">Custom Game</button>
+  <button id="listBtn" title="Build a list of airports you choose, just for fun">Custom List</button>
 </div>
+<dialog id="listDlg">
+  <button id="listX" class="ghost" aria-label="Close" title="Close">✕</button>
+  <p><b>Custom List</b></p>
+  <div id="listSlot"></div>
+  <small class="note">Just for fun: five of your airports at random, not part of the daily set or the global scores.</small>
+  <div id="listErr" role="alert"></div>
+  <div id="listBtns"><button id="listGo">Start</button> <button id="listCancel" class="ghost">Cancel</button></div>
+</dialog>
 <dialog id="near">
   <p><b>Zip Code</b></p>
   <label>ZIP code <input id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="12345"></label>
@@ -84,11 +93,18 @@
   <div id="lbHead"><h3 id="lbTitle"></h3><span id="lbTip">Copied!</span></div>
   <div id="lbMsg"></div>
   <div id="lbCfg" hidden>
-    <div id="lbKind" role="group" aria-label="Game type"><button type="button" data-k="easy">Normal</button><button type="button" data-k="medium">Hard</button><button type="button" data-k="hard">Extra Hard</button><button type="button" data-k="custom">Custom</button><button type="button" data-k="zip">Zip code</button></div>
+    <div id="lbKind" role="group" aria-label="Game type"><button type="button" data-k="easy" data-tip="Major airports: the big hubs most people have flown through.">Normal</button><button type="button" data-k="medium" data-tip="Regional airline airports, a step down from the big hubs.">Hard</button><button type="button" data-k="hard" data-tip="Small local airports. Tough, even for frequent flyers.">Extra Hard</button><button type="button" data-k="list" data-tip="Pick the airports yourself. Five at random from your list.">List</button><button type="button" data-k="custom" data-tip="Choose a format, a state and a difficulty.">Custom</button><button type="button" data-k="zip" data-tip="Airports near a ZIP code, within the radius you pick.">Zip code</button></div>
     <div id="lbCustom" class="lbOpts" hidden>
       <label>Format <select id="lbFmt"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label>
       <label>State <select id="lbSt"><option value="">All states</option></select></label>
-      <label>Difficulty <select id="lbDiff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
+      <label>Difficulty <select id="lbDiff"><option value="all">All</option><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
+    </div>
+    <div id="lbList" hidden>
+      <div class="lbOpts" id="lbListFmtRow"><label><select id="lbListFmt" aria-label="Format"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label></div>
+      <div id="lbFindBox"><input id="lbFind" maxlength="30" autocomplete="off" spellcheck="false" placeholder="Type a code or name (KORD, Chicago…)" role="combobox" aria-expanded="false" aria-controls="lbFindRes" aria-label="Find an airport"><div id="lbFindRes" role="listbox" hidden></div></div>
+      <div id="lbChips"></div>
+      <div id="lbListBtns"><button type="button" id="lbListUse">Use this list</button><button type="button" id="lbListClear" class="ghost">Clear</button><button type="button" id="lbListDl" class="ghost">Download</button><button type="button" id="lbListUpBtn" class="ghost">Upload</button><input type="file" id="lbListUp" accept=".json,application/json" hidden></div>
+      <div id="lbListMsg" role="status"></div>
     </div>
     <div id="lbZip" class="lbOpts" hidden>
       <label>ZIP code <input id="lbZipIn" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="12345"></label>
@@ -98,7 +114,7 @@
     <div id="lbCfgNote">Only the host can change these.</div>
   </div>
   <div id="lbMap" hidden><div id="lbMapCanvas"></div><div id="lbMapNote"></div></div>
-  <div id="lbAir" hidden><div id="lbAirTop"><b id="lbAirHead"></b><span id="lbAirNav" hidden><button type="button" id="lbAirPrev" aria-label="Previous airports">◀</button><span id="lbAirPg"></span><button type="button" id="lbAirNext" aria-label="More airports">▶</button></span></div><div id="lbAirList"></div><div id="lbAirNote"></div></div>
+  <div id="lbAir" hidden><div id="lbAirTop"><b id="lbAirHead"></b><span id="lbAirAll"><button type="button" id="lbAirSel">Select all</button><button type="button" id="lbAirNone">Deselect all</button></span><span id="lbAirNav" hidden><button type="button" id="lbAirPrev" aria-label="Previous airports">◀</button><span id="lbAirPg"></span><button type="button" id="lbAirNext" aria-label="More airports">▶</button></span></div><div id="lbAirList"></div><div id="lbAirNote"></div></div>
   <div id="lbPlayers"></div>
   <div id="lbHist" hidden></div>
   <div id="lbStreak" hidden></div>
@@ -290,6 +306,7 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
   $("diff").value=o.diff||"easy";
   if(p.get("go")){if(p.get("re"))PICK=+p.get("re");start(p.get("go"),p.get("fmt")||"map",p.get("st")||"",undefined,!!p.get("re"))}
   if(p.get("near"))$("nearGo").click();
+  if(p.get("list")&&Array.isArray(LISTSAVED.codes)&&LISTSAVED.codes.length)playList(LISTSAVED.codes.filter(CODE_OK),LISTSAVED.fmt=="city"?"city":"map",()=>{}); // Play again from a Custom List game
   if(p.get("join")){setCode(p.get("join"));try{$("vsName").value=localStorage.vsName||""}catch{}
     if(p.get("auto")&&$("vsName").value)vsGo({action:"join",code:getCode()}); // auto=1 is the page reload that starts a rematch: straight back in
     else openAsk()}}); // an invite link asks for a name first // an invite link opens the popup with the code filled in, so you can pick your name first
@@ -373,48 +390,51 @@ function vsHandle(d){
   renderLobby(d);if(d.phase=="playing"&&!(me&&me.late))beginGame(d)}
 // The lobby has three faces: waiting (Ready toggles), a game in progress (live scores; players who joined late only watch), and game over (ranked results).
 const lateMsg=ms=>"A game is in progress ("+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0")+" left). You'll join the next one.";
+const fmtT=ms=>Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0"); // 2:41
 function renderLobby(d){
   const over=d.phase=="over",playing=d.phase=="playing",me=d.players.find(p=>p.me);
   const ranked=over?d.players.filter(p=>!p.late).sort((a,b)=>b.total-a.total):d.players,latecomers=over?d.players.filter(p=>p.late):[]; // after a game, anyone who joined late is listed below the ranking
-  const status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/5 solved`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts`:`${p.rounds}/5 rounds · ${p.total} pts`):(p.ready?"✓ Ready":"Not ready");
+  const N=d.n||5,status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/${N} solved${p.fin!=null?" · "+fmtT(p.fin):""}`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts${p.fin!=null?" · "+fmtT(p.fin):""}`:`${p.rounds}/${N} rounds · ${p.total} pts`):(p.ready?"✓ Ready":"Not ready");
   const row=(p,i)=>`<div class="${p.me?"me":""}"><span>${over&&!p.late?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${status(p)}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`;
   $("lbTitle").innerHTML=`Lobby · <b title="Click to copy the invite link">${d.code}</b>`;
   if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=[...ranked.map(row),...latecomers.map(row)].join("");
-  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=d.players.length<2;$("lbReady").title=d.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
+  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=d.players.length<2||!!d.empty;$("lbReady").title=d.empty?"Switch at least one airport on":d.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
   $("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
   // After a game: one callout with the longest first-guess streak in the lobby (everyone who shares it is named).
   const best=over?Math.max(0,...ranked.map(p=>p.streak||0)):0,who=ranked.filter(p=>(p.streak||0)==best).map(p=>p.name);
   $("lbStreak").hidden=!(over&&best>0);
   if(over&&best>0)$("lbStreak").textContent="🔥 Best streak: "+(who.length>2?who.slice(0,-1).join(", ")+" and "+who[who.length-1]:who.join(" and "))+", "+best+" in a row";
   renderCfg(d,playing);renderHist(over);
-  $("lbMsg").textContent=over?"":playing?lateMsg(d.left||0):d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
+  $("lbMsg").textContent=over?"":playing?lateMsg(d.left||0):d.empty?"Switch at least one airport on to play.":d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
 // Previous games in this lobby (newest first): what was played and everyone's score. While a game's results are showing above, that game is left out of this list.
 function renderHist(over){
   const list=(over?HIST.slice(0,-1):HIST).slice().reverse(),key=HN+":"+list.length,box=$("lbHist");
   box.hidden=!list.length;if(key==HISTKEY)return;HISTKEY=key;
   box.replaceChildren(mk("b",{textContent:"Previous games"}),...list.map(g=>mk("details",{},mk("summary",{textContent:"Game "+g.n+" · "+cfgText(g.cfg)+" · "+(g.players[0]?g.players[0].name+" won ("+g.players[0].total+" pts)":"")}),
-    mk("div",{className:"hcodes",textContent:g.codes.join(" ")}),...g.players.map((p,i)=>mk("div",{className:"hrow"},mk("span",{textContent:(i+1)+". "+p.name}),mk("span",{textContent:p.total+" pts · "+p.right+"/5 solved"}))))))}
+    mk("div",{className:"hcodes",textContent:g.codes.join(" ")}),...g.players.map((p,i)=>mk("div",{className:"hrow"},mk("span",{textContent:(i+1)+". "+p.name}),mk("span",{textContent:p.total+" pts · "+p.right+"/"+g.codes.length+" solved"+(p.fin!=null?" · "+fmtT(p.fin):"")}))))))}
 // ---- Lobby settings: the lobby owner picks what is played (Normal / Hard / Extra Hard, a custom game, or airports near a ZIP); everyone else just sees it.
-const KIND={easy:"Normal",medium:"Hard",hard:"Extra Hard",custom:"Custom",zip:"Zip code"};let ZIPOPEN=false;
-const cfgText=c=>!c?"":c.kind=="custom"?"Custom · "+(c.fmt=="city"?"City & state only":"Map")+" · "+(c.st||"All states")+" · "+KIND[c.mode]:c.kind=="zip"?"Zip code · airports within "+c.miles+" miles of "+c.zip:KIND[c.kind];
+const KIND={list:"List",all:"All",easy:"Normal",medium:"Hard",hard:"Extra Hard",custom:"Custom",zip:"Zip code"};let ZIPOPEN=false,LISTOPEN=false;
+const cfgText=c=>!c?"":c.kind=="list"?"List · "+c.list.length+" airport"+(c.list.length==1?"":"s")+" · "+(c.fmt=="city"?"City & state only":"Map"):c.kind=="custom"?"Custom · "+(c.fmt=="city"?"City & state only":"Map")+" · "+(c.st||"All states")+" · "+KIND[c.mode]:c.kind=="zip"?"Zip code · airports within "+c.miles+" miles of "+c.zip:KIND[c.kind];
 const cfgSend=o=>vsPost({action:"config",...o}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d);return true}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that. Try again.";return false});
 const customSend=()=>cfgSend({kind:"custom",fmt:$("lbFmt").value,st:$("lbSt").value,mode:$("lbDiff").value});
 function renderCfg(d,playing){ // the host gets working controls; everyone else sees the same panel, greyed out, following what the host picks
-  const c=d.cfg,ro=!d.owner;paintZipMap(playing?null:c);paintAir(playing?null:c);
+  const c=d.cfg,ro=!d.owner;paintZipMap(playing?null:c);if(!playing&&c)loadStateList(c);paintAir(playing?null:c);
   $("lbCfg").hidden=playing||!c;if(playing||!c)return;
   $("lbCfg").classList.toggle("ro",ro);$("lbCfgNote").hidden=!ro;
   document.querySelectorAll("#lbCfg button,#lbCfg select,#lbCfg input").forEach(e=>e.disabled=ro);
   if($("lbSt").options.length<2)$("lbSt").innerHTML=$("st").innerHTML; // the state list, filled once
-  const shown=!ro&&ZIPOPEN?"zip":c.kind;
+  const shown=!ro&&ZIPOPEN?"zip":!ro&&LISTOPEN?"list":c.kind;
   document.querySelectorAll("#lbKind button").forEach(b=>b.classList.toggle("on",b.dataset.k==shown));
-  $("lbCustom").hidden=shown!="custom";$("lbZip").hidden=shown!="zip";
+  $("lbCustom").hidden=shown!="custom";$("lbList").hidden=shown!="list"&&!LISTMENU;$("lbZip").hidden=shown!="zip";if(shown=="list"&&!LISTMENU)paintList(c.kind=="list"?c:{},ro);
   const ae=ro?null:document.activeElement;
   if(c.kind=="custom"){if(ae!==$("lbFmt"))$("lbFmt").value=c.fmt;if(ae!==$("lbSt"))$("lbSt").value=c.st;if(ae!==$("lbDiff"))$("lbDiff").value=c.mode}
   if(c.kind=="zip"&&!ZIPOPEN){if(ae!==$("lbZipIn"))$("lbZipIn").value=c.zip;$("lbMiles").value=c.miles}}
 document.querySelectorAll("#lbKind button").forEach(b=>b.onclick=()=>{const k=b.dataset.k;$("lbCfgErr").textContent="";
-  if(k=="zip"){ZIPOPEN=true;renderCfg(VSD,false);$("lbZipIn").focus();return}
-  ZIPOPEN=false;if(k=="custom")customSend();else cfgSend({kind:k})});
-["lbFmt","lbSt","lbDiff"].forEach(i=>$(i).onchange=customSend);
+  if(k=="list"){LISTOPEN=true;ZIPOPEN=false;renderCfg(VSD,false);$("lbFind").focus();return}
+  if(k=="zip"){ZIPOPEN=true;LISTOPEN=false;renderCfg(VSD,false);$("lbZipIn").focus();return}
+  ZIPOPEN=LISTOPEN=false;if(k=="custom"){if(VSD.cfg.kind!="custom")customSend()}else cfgSend({kind:k})});
+["lbSt","lbDiff"].forEach(i=>$(i).onchange=customSend);
+$("lbFmt").onchange=customSend;
 // No Set button: the ZIP is sent as soon as it has 5 digits (and again when the miles change).
 let zipT=0;
 function zipSend(){clearTimeout(zipT);const zip=$("lbZipIn").value.trim();if(!/^[0-9]{5}$/.test(zip))return;
@@ -426,17 +446,24 @@ $("lbZipIn").onkeydown=e=>{if(e.key=="Enter")zipSend()};
 let LBMAP=null,LBKEY="",LBOBJ=[],LBLIST=[],LBLISTKEY="",LBMARK={},AIRKEY="",AIRPAGE=0,AIRPER=25; // at most 25 airport buttons at a time, with arrows for the rest
 // A plain dark map for the radius picture: flat land and water, state borders and big-city names; no roads, terrain, parks or businesses.
 // Every airport in the radius as a toggle button, all on to start: the host can switch airports off so they are never picked. Everyone sees it; only the host can click.
+const listKey=c=>!c||(c.list&&c.list.length)?"":c.kind=="zip"?c.zip+":"+c.miles:c.kind=="custom"&&c.st?"st:"+c.st+":"+c.mode:"";
+let AIRFETCH="";
+async function loadStateList(c){ // a custom lobby with a state chosen: every airport in that state
+  const k=listKey(c);if(!k||c.kind!="custom"||LBLISTKEY==k||AIRFETCH==k)return;AIRFETCH=k;
+  try{const l=await fetch("/api/airports?state="+encodeURIComponent(c.st)+"&mode="+c.mode).then(r=>r.json());if(Array.isArray(l)&&listKey(VSD.cfg)==k){LBLIST=l;LBLISTKEY=k;AIRPAGE=0;AIRKEY="";paintAir(VSD.cfg)}}catch{}AIRFETCH=""}
 function paintAir(c){
-  const box=$("lbAir"),ok=c&&c.kind=="zip"&&LBLISTKEY==c.zip+":"+c.miles&&LBLIST.length;box.hidden=!ok;if(!ok)return;
-  const off=new Set(c.off||[]),own=!!VSD.owner,pages=Math.ceil(LBLIST.length/AIRPER);AIRPAGE=Math.min(AIRPAGE,pages-1);const key=c.zip+":"+c.miles+":"+[...off].sort().join()+":"+own+":"+AIRPAGE;
-  if(window.google&&google.maps)for(const [code,m] of Object.entries(LBMARK)){const ic=m.getIcon();if(ic){ic.fillColor=off.has(code)?"#6b7280":"#ffb81c";m.setIcon(ic)}} // the map follows the toggles
-  $("lbMapNote").textContent=c.miles+"-mile radius around "+c.zip+" · "+(LBLIST.length-off.size)+" of "+LBLIST.length+" airport"+(LBLIST.length==1?"":"s")+" in the game";
+  const box=$("lbAir"),lk=listKey(c),ok=lk&&LBLISTKEY==lk&&LBLIST.length;box.hidden=!ok;if(!ok)return;
+  const off=new Set(c.off||[]),own=!!VSD.owner,pages=Math.ceil(LBLIST.length/AIRPER),zip=c.kind=="zip";AIRPAGE=Math.min(AIRPAGE,pages-1);const key=lk+":"+[...off].sort().join()+":"+own+":"+AIRPAGE;
+  if(zip&&window.google&&google.maps)for(const [code,m] of Object.entries(LBMARK)){const ic=m.getIcon();if(ic){ic.fillColor=off.has(code)?"#6b7280":"#ffb81c";m.setIcon(ic)}} // the map follows the toggles
+  if(zip)$("lbMapNote").textContent=c.miles+"-mile radius around "+c.zip+" · "+(LBLIST.length-off.size)+" of "+LBLIST.length+" airport"+(LBLIST.length==1?"":"s")+" in the game";
   if(key==AIRKEY)return;AIRKEY=key;
-  $("lbAirHead").textContent="Airports in the game ("+(LBLIST.length-off.size)+" of "+LBLIST.length+")";
+  $("lbAirHead").textContent=(zip?"Airports in the game":c.st+" · "+KIND[c.mode]+" airports")+" ("+(LBLIST.length-off.size)+" of "+LBLIST.length+")";
   $("lbAirNote").textContent=own?"Tap an airport to switch it off or on.":"Only the host can change these.";
-  $("lbAirNav").hidden=pages<2;$("lbAirPg").textContent=(AIRPAGE+1)+" / "+pages;$("lbAirPrev").disabled=AIRPAGE<=0;$("lbAirNext").disabled=AIRPAGE>=pages-1;
+  $("lbAirAll").hidden=!own;$("lbAirNav").hidden=pages<2;$("lbAirPg").textContent=(AIRPAGE+1)+" / "+pages;$("lbAirPrev").disabled=AIRPAGE<=0;$("lbAirNext").disabled=AIRPAGE>=pages-1;
   $("lbAirList").replaceChildren(...LBLIST.slice().sort((a,b)=>a[0]<b[0]?-1:1).slice(AIRPAGE*AIRPER,(AIRPAGE+1)*AIRPER).map(([code,,,city,st])=>{const isOn=!off.has(code);
     return mk("button",{type:"button",className:"air"+(isOn?" on":""),disabled:!own,title:city+", "+st,onclick:()=>vsPost({action:"airport",ap:code,on:!isOn}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d)}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."})},mk("b",{textContent:code}),mk("small",{textContent:city}))}))}
+$("lbAirSel").onclick=()=>vsPost({action:"airportAll",on:true}).then(vsHandle).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."});
+$("lbAirNone").onclick=()=>vsPost({action:"airportAll",on:false}).then(vsHandle).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."});
 $("lbAirPrev").onclick=()=>{AIRPAGE=Math.max(0,AIRPAGE-1);paintAir(VSD.cfg)};$("lbAirNext").onclick=()=>{AIRPAGE++;paintAir(VSD.cfg)};
 const LBSTYLE=[{elementType:"geometry",stylers:[{color:"#1a1f28"}]},{elementType:"labels.text.fill",stylers:[{color:"#9aa3b2"}]},{elementType:"labels.text.stroke",stylers:[{color:"#0d1014"}]},
   {featureType:"water",elementType:"geometry",stylers:[{color:"#0f2233"}]},{featureType:"water",elementType:"labels",stylers:[{visibility:"off"}]},
@@ -460,16 +487,92 @@ async function paintZipMap(c){
   LBOBJ.push(new G.Marker({map:LBMAP,position:{lat:c.lat+c.miles/69*1.12,lng:c.lon},icon:{path:G.SymbolPath.CIRCLE,scale:0},label:{text:c.miles+" miles",color:"#ffb81c",fontSize:"13px",fontWeight:"700"}}));
   AIRKEY="";AIRPAGE=0;paintAir(c);
   G.event.trigger(LBMAP,"resize");LBMAP.fitBounds(circle.getBounds().toJSON(),20)}
+// ---- The host's own airport list (custom games). Everything typed or uploaded is untrusted: only airport codes survive (3-4 letters/digits, and the server checks each one
+// against its own airport list again), at most 100, and nothing from a file or from the search results is ever put into the page as HTML (text only).
+let LISTMENU=false,LISTRO=false; // LISTMENU: the builder is showing in the main menu popup instead of the lobby
+const META={},CODE_OK=c=>typeof c=="string"&&/^[A-Z0-9]{3,4}$/.test(c);let DRAFT=[],DIRTY=false,LISTSRC="~",FINDN=0,FINDSEL=0,FINDROWS=[],CHIPKEY="";
+const rememberRows=rows=>{for(const x of rows)if(Array.isArray(x)&&CODE_OK(x[0]))META[x[0]]={city:String(x[1]||""),st:String(x[2]||""),name:String(x[3]||"")}};
+const lbListMsg=m=>$("lbListMsg").textContent=m;
+function paintChips(ro){
+  const key=ro+":"+DRAFT.join()+":"+DRAFT.map(c=>META[c]?1:0).join("");if(key==CHIPKEY)return;CHIPKEY=key;
+  $("lbChips").replaceChildren(...DRAFT.map(c=>{const m=META[c];return mk("button",{type:"button",className:"chip",disabled:ro,title:m?m.name:c,"aria-label":ro?c:"Remove "+c,onclick:()=>{DRAFT=DRAFT.filter(x=>x!=c);DIRTY=true;paintChips(false)}},mk("b",{textContent:c}),mk("small",{textContent:m?m.city:""}),ro?"":mk("i",{textContent:"✕"}))}))}
+async function fillMeta(codes){const need=codes.filter(c=>!META[c]);if(!need.length)return;
+  try{rememberRows(await fetch("/api/find?codes="+encodeURIComponent(need.join(","))).then(r=>r.json()));CHIPKEY="";paintChips(LISTRO)}catch{}}
+function paintList(c,ro){ // lobby: called with the settings on every refresh
+  LISTRO=ro;const ck=(c.list||[]).join(),active=c.kind=="list";
+  if(ro||(!DIRTY&&ck!=LISTSRC)){DRAFT=(c.list||[]).slice();LISTSRC=ck;if(ro)DIRTY=false;fillMeta(DRAFT)}
+  if(c.fmt&&document.activeElement!==$("lbListFmt"))$("lbListFmt").value=c.fmt;
+  $("lbFindBox").hidden=$("lbListBtns").hidden=ro;
+  if(!ro){$("lbListUse").textContent=active&&!DIRTY?"List in use":"Use this list";$("lbListUse").disabled=!DRAFT.length||(active&&!DIRTY)}
+  paintChips(ro)}
+async function findAirports(){
+  const q=$("lbFind").value.trim(),n=++FINDN;
+  if(!q){FINDROWS=[];paintFind();return}
+  try{const rows=await fetch("/api/find?q="+encodeURIComponent(q)).then(r=>r.json());if(n!=FINDN||!Array.isArray(rows))return;rememberRows(rows);FINDROWS=rows.filter(x=>CODE_OK(x[0]));FINDSEL=0;paintFind()}catch{}}
+let MX=-1,MY=-1;addEventListener("mousemove",e=>{MX=e.clientX;MY=e.clientY},{passive:true});
+function selectHit(i){FINDSEL=i;[...$("lbFindRes").children].forEach((d,j)=>{d.classList.toggle("sel",j==i);d.setAttribute("aria-selected",String(j==i))})}
+function paintFind(){
+  const box=$("lbFindRes");box.hidden=!FINDROWS.length;$("lbFind").setAttribute("aria-expanded",String(!!FINDROWS.length));
+  box.replaceChildren(...FINDROWS.map((x,i)=>mk("div",{className:"hit"+(i==FINDSEL?" sel":""),role:"option","aria-selected":String(i==FINDSEL),onmouseenter:()=>selectHit(i),onmousemove:()=>{if(FINDSEL!=i)selectHit(i)},onmousedown:e=>{e.preventDefault();addAirport(x[0])}},mk("b",{textContent:x[0]}),mk("span",{textContent:" "+x[1]+", "+x[2]+" · "+x[3]}))))
+  if(MX>=0){const el=document.elementsFromPoint(MX,MY).find(e=>e.parentElement===box&&e.classList.contains("hit"));if(el)selectHit([...box.children].indexOf(el))} /* new predictions can appear under a resting mouse: highlight the one it is over */
+}
+function addAirport(code){
+  if(!CODE_OK(code))return;
+  if(DRAFT.includes(code))lbListMsg(code+" is already in your list.");
+  else if(DRAFT.length>=100)lbListMsg("A list can have up to 100 airports.");
+  else{DRAFT.push(code);DIRTY=true;lbListMsg("");$("listErr").textContent="";paintChips(false);$("lbListUse").disabled=false;$("lbListUse").textContent="Use this list"}
+  $("lbFind").value="";FINDROWS=[];paintFind();$("lbFind").focus()}
+let findT=0;
+$("lbFind").oninput=()=>{clearTimeout(findT);findT=setTimeout(findAirports,150)};
+$("lbFind").onkeydown=e=>{
+  if(e.key=="ArrowDown"&&FINDROWS.length){e.preventDefault();FINDSEL=(FINDSEL+1)%FINDROWS.length;paintFind()}
+  else if(e.key=="ArrowUp"&&FINDROWS.length){e.preventDefault();FINDSEL=(FINDSEL+FINDROWS.length-1)%FINDROWS.length;paintFind()}
+  else if(e.key=="Enter"){e.preventDefault();if(FINDROWS.length)addAirport(FINDROWS[FINDSEL][0]);else lbListMsg("No airport matches that. Try a code or a city.")}
+  else if(e.key=="Escape"){FINDROWS=[];paintFind()}};
+$("lbFind").onblur=()=>{FINDROWS=[];paintFind()};
+$("lbListUse").onclick=()=>{if(!DRAFT.length)return;lbListMsg("Saving…");
+  cfgSend({kind:"list",fmt:$("lbListFmt").value,list:DRAFT}).then(ok=>{if(ok){DIRTY=false;LISTOPEN=false;LISTSRC=DRAFT.join();lbListMsg("Your list is set: "+DRAFT.length+" airport"+(DRAFT.length==1?"":"s")+".")}else lbListMsg("")})};
+$("lbListClear").onclick=()=>{DRAFT=[];DIRTY=true;lbListMsg("");CHIPKEY="";paintChips(false);$("lbListUse").disabled=true;if(!LISTMENU&&VSD.cfg.kind=="list"){LISTOPEN=true;DIRTY=false;cfgSend({kind:"easy"})}}; // clearing a list in use goes back to Normal
+$("lbListDl").onclick=()=>{if(!DRAFT.length)return lbListMsg("Add some airports first.");
+  const url=URL.createObjectURL(new Blob([JSON.stringify({app:"icaodle",type:"airport-list",version:1,airports:DRAFT.filter(CODE_OK)},null,1)],{type:"application/json"}));
+  const a=Object.assign(document.createElement("a"),{href:url,download:"icaodle-airports.json"});a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);lbListMsg("Saved icaodle-airports.json.")};
+$("lbListFmt").onchange=()=>{if(!LISTMENU&&VSD.cfg.kind=="list"&&!DIRTY)cfgSend({kind:"list",fmt:$("lbListFmt").value,list:VSD.cfg.list})};
+$("lbListUpBtn").onclick=()=>$("lbListUp").click();
+$("lbListUp").onchange=async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;
+  if(f.size>20000)return lbListMsg("That file is too big to be an airport list.");
+  if(!/[.]json$/i.test(f.name))return lbListMsg("Please choose the .json file you downloaded.");
+  let j;try{j=JSON.parse(await f.text())}catch{return lbListMsg("That file isn't a valid list.")}
+  if(!j||typeof j!="object"||j.app!="icaodle"||j.type!="airport-list"||!Array.isArray(j.airports))return lbListMsg("That file isn't an ICAOdle airport list.");
+  const codes=[...new Set(j.airports.slice(0,300).map(x=>typeof x=="string"?x.trim().toUpperCase():"").filter(CODE_OK))].slice(0,100);
+  if(!codes.length)return lbListMsg("There were no airports in that file.");
+  let rows=[];try{rows=await fetch("/api/find?codes="+encodeURIComponent(codes.join(","))).then(r=>r.json())}catch{return lbListMsg("Couldn't check that list. Try again.")}
+  if(!Array.isArray(rows))return lbListMsg("Couldn't check that list. Try again.");
+  rememberRows(rows);const known=new Set(rows.map(x=>x[0]));DRAFT=codes.filter(c=>known.has(c));DIRTY=true;CHIPKEY="";paintChips(false);$("lbListUse").disabled=!DRAFT.length;$("lbListUse").textContent="Use this list";
+  lbListMsg(DRAFT.length+" airport"+(DRAFT.length==1?"":"s")+" loaded"+(codes.length>DRAFT.length?"; "+(codes.length-DRAFT.length)+(codes.length-DRAFT.length==1?" wasn't recognized and was":" weren't recognized and were")+" skipped":"")+(LISTMENU?". Press Start to play them.":". Press Use this list to play them."))};
+// The main menu's Custom List button: the same builder (search, chips, download, upload) is moved into a popup, then back to the lobby panel afterwards.
+let LISTSAVED={};try{LISTSAVED=JSON.parse(localStorage.icaoListGame)}catch{}
+const listBack=()=>{if(!LISTMENU)return;LISTMENU=false;$("lbList").classList.remove("menu");$("lbList").hidden=true;$("lbCfg").insertBefore($("lbList"),$("lbZip"))};
+$("listBtn").onclick=()=>{snd("open");LISTMENU=true;LISTRO=false;
+  DRAFT=(Array.isArray(LISTSAVED.codes)?LISTSAVED.codes:[]).filter(CODE_OK).slice(0,100);DIRTY=true;CHIPKEY="";
+  $("listSlot").append($("lbList"));$("lbList").classList.add("menu");$("lbList").hidden=false;
+  document.querySelectorAll("#lbList button,#lbList select,#lbList input").forEach(e=>e.disabled=false);
+  $("lbFindBox").hidden=$("lbListBtns").hidden=false;
+  $("lbListFmt").value=LISTSAVED.fmt=="city"?"city":"map";lbListMsg("");$("listErr").textContent="";fillMeta(DRAFT);paintChips(false);$("listDlg").showModal();$("lbFind").focus()};
+const listClose=()=>{$("listDlg").close();listBack()};
+$("listCancel").onclick=()=>{snd("back");listClose()};$("listX").onclick=()=>{snd("back");listClose()};$("listDlg").onclose=listBack;
+async function playList(codes,fmt,err){ // five of the airports at random; shared by the Start button and "Play again"
+  err("Starting…");const d=await fetch("/api/list?codes="+encodeURIComponent(codes.join(","))).then(r=>r.json()).catch(()=>({error:"Couldn't start that. Try again."}));
+  if(d.error)return err(d.error);
+  try{localStorage.icaoListGame=JSON.stringify({codes,fmt})}catch{}
+  if($("listDlg").open)listClose();start("easy",fmt,"LIST",d)}
+$("listGo").onclick=()=>{if(!DRAFT.length)return void($("listErr").textContent="Add at least one airport.");playList(DRAFT,$("lbListFmt").value,m=>$("listErr").textContent=m)};
 // ---- Lobby trivia (desktop browsers only): 5 questions while you wait. After the last one you see everyone's right and wrong.
 // It floats in the empty space under the Ready/Leave buttons, centered between them and the bottom of the screen (or sits right under them if the screen is short).
 const PCQ=matchMedia("(hover:hover) and (pointer:fine) and (min-width:821px)");
 const mk=(t,p,...k)=>{const e=document.createElement(t);Object.assign(e,p||{});e.append(...k);return e};
 const pips=res=>mk("span",{className:"tvpips"},...res.map(v=>mk("i",{className:v==null?"":v?"ok":"bad",textContent:v==null?"•":v?"✓":"✗"})));
-function placeTrivia(){
-  const box=$("trivia");if(box.hidden)return;
-  const btns=$("lbBtns").getBoundingClientRect(),foot=document.querySelector("footer").getBoundingClientRect(),limit=Math.min(foot.top,innerHeight),hgt=box.scrollHeight;
-  const top=Math.max(btns.bottom+12,btns.bottom+(limit-btns.bottom-hgt)/2); // midway; never closer than 12px to the buttons
-  box.style.top=Math.round(top)+"px";box.style.maxHeight=Math.max(150,limit-top-6)+"px"} // never runs under the footer: on a short window the card scrolls inside itself // on a very short window the card scrolls inside itself instead of running off the screen
+function placeTrivia(){} /* the card now sits in the page right under the lobby (see style.css), so it scrolls with everything else and never covers it */
 function renderTrivia(){
   const box=$("trivia");
   if(!(PCQ.matches&&TVD&&TV&&TV.id==TVD.id)){box.hidden=true;$("lobby").classList.remove("hasTrivia");return}
@@ -679,7 +782,7 @@ function end(){
   showGrade(t);
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(ROOM){vsPoll();return} // friend games: tell the server you're done right now; your own results show while the others finish, then everyone returns to the lobby, where the feedback question is asked
-  if(PRACTICE){$("replay").hidden=false;if(REDO)$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=REDO?`/?go=${MODE}&fmt=${FMT}&re=${DAY}`:`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
+  if(PRACTICE){$("replay").hidden=false;if(REDO)$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=REDO?`/?go=${MODE}&fmt=${FMT}&re=${DAY}`:ST=="LIST"?"/?list=1":`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   $("share").hidden=false;askFeedback();$("replay").hidden=false;$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&re=${DAY}`; // play the daily again for fun: new order, no change to your score
  
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
