@@ -48,6 +48,11 @@
   <button id="vsCreate">Create</button>
   <div id="vsErr" role="alert"></div>
 </dialog>
+<dialog id="askDlg">
+  <p><b id="askTitle"></b></p>
+  <p id="askMsg"></p>
+  <div id="askBtns"><button id="askOk">Okay</button><button id="askNo" class="ghost">Cancel</button></div>
+</dialog>
 <dialog id="reportDlg">
   <div id="rpForm">
     <p><b>Report incorrect info</b></p>
@@ -98,7 +103,7 @@
   <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
 </div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div><div id="studybox" hidden></div></div></div>
-  <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
+  <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><span id="gwrap"><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"><span id="notScored" hidden>Daily repeat, just for fun. No score.</span></span> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="result"><div id="statline"></div><div id="bestline" title="Most rounds solved on the first guess in a row"></div><div id="quip"></div></div>
@@ -114,7 +119,7 @@
 <footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙️</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button data-r="fun">😄 Fun</button><button data-r="meh">😐 Meh</button><button data-r="hard">😣 Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
-  $reset.onclick=async()=>{if(!confirm("Wipe all stats and local progress?"))return;
+  $reset.onclick=async()=>{if(!await ask("Wipe all stats and local progress?"))return;
     await fetch("/api/reset",{method:"POST"});try{localStorage.clear()}catch{}location.reload()}
   // dev only: today's answers, on the menu for all three difficulties (and, once a game starts, for that game)
   Promise.all(["easy","medium","hard"].map(m=>fetch(`/api/today?mode=${m}`).then(r=>r.json()))).then(ds=>{
@@ -165,7 +170,9 @@ let LOCAL=null; // {zip,miles} for an "Airports near me" game
 const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:NAME[MODE]+dateTag();
 const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "Normal · Nov 20 1/5" on an earlier day
 const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
-$("menuBack").onclick=async()=>{if(PRACTICE&&S&&S.i<PER&&!confirm(ROOM?"Leave this game? You'll drop out for everyone.":"Leave this practice game? Practice games aren't saved."))return;await vsLeave();location.href=menuUrl()};
+// Our own Okay / Cancel popup (instead of the browser's): ask("text") resolves true for Okay, false for Cancel.
+function ask(msg,ok="Okay",title="Are you sure?"){return new Promise(res=>{const d=$("askDlg"),done=v=>{d.close();res(v)};$("askMsg").textContent=msg;$("askOk").textContent=ok;$("askTitle").textContent=title;$("askOk").onclick=()=>done(true);$("askNo").onclick=()=>done(false);d.oncancel=e=>{e.preventDefault();done(false)};d.showModal()})}
+$("menuBack").onclick=async()=>{if(PRACTICE&&S&&S.i<PER&&!await ask(ROOM?"Leave this game? You'll drop out for everyone.":REDO?"Leave this round? A repeat of the daily isn't saved.":"Leave this practice game? Practice games aren't saved.","Main Menu","Possible Pilot Deviation"))return;await vsLeave();location.href=menuUrl()};
 // Settings: the gear fades the sound and particle controls in above it; a click elsewhere or Escape tucks them away again.
 const setOpen=on=>{$("soundctl").classList.toggle("open",on);$("gear").setAttribute("aria-expanded",String(on))};
 $("gear").onclick=()=>setOpen(!$("soundctl").classList.contains("open"));
@@ -257,14 +264,14 @@ function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}
 function loadMaps(){return fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
   window.gm_authFailure=()=>{$("map").textContent="Google Maps rejected the API key (check key, enabled APIs, billing, referrer)."};
   const s=document.createElement("script");s.src=`https://maps.googleapis.com/maps/api/js?key=${key}`;s.onload=ok;s.onerror=bad;document.head.append(s)}))}
-let FMT="map",ST="",PRACTICE=false;
+let FMT="map",ST="",PRACTICE=false,REDO=false; // REDO: the daily airports again, in a new random order, saved nowhere and counted nowhere
 // Menu options persist (localStorage) so "Change state" returns to the same selection; ?go=&fmt=&st= auto-starts (used by Play again).
 fetch("/api/states").then(r=>r.json()).then(list=>{
   $("st").innerHTML+=list.map(x=>`<option>${x}</option>`).join("");
   const p=new URLSearchParams(location.search);let o={};try{o=JSON.parse(localStorage.icaoOpts)}catch{}
   $("fmt").value=p.get("fmt")||o.fmt||"map";$("st").value=p.get("st")??o.st??"";
   $("diff").value=o.diff||"easy";
-  if(p.get("go"))start(p.get("go"),p.get("fmt")||"map",p.get("st")||"");
+  if(p.get("go")){if(p.get("re"))PICK=+p.get("re");start(p.get("go"),p.get("fmt")||"map",p.get("st")||"",undefined,!!p.get("re"))}
   if(p.get("near"))$("nearGo").click();
   if(p.get("join")){setCode(p.get("join"));try{$("vsName").value=localStorage.vsName||""}catch{}
     if(p.get("auto")&&$("vsName").value)vsGo({action:"join",code:getCode()}); // auto=1 is the page reload that starts a rematch: straight back in
@@ -423,10 +430,11 @@ setInterval(()=>{
   else if(CDEND&&!INGAME){const n=Math.max(0,Math.ceil((CDEND-Date.now())/1e3));$("lbMsg").textContent="Starting in "+n+"…";
     if(n!=lastTick){lastTick=n;if(n>=1&&n<=3)snd("tick");if(n==0)vsPoll()}} // a beep for each of the last three seconds
   else lastTick=-1},250);
-async function start(m,fmt,st,data){
-  MODE=m;FMT=fmt;ST=st;PRACTICE=!!ST;
-  const d=data||await fetch(PRACTICE?`/api/state?mode=${encodeURIComponent(m)}&state=${encodeURIComponent(ST)}`:`/api/today?mode=${encodeURIComponent(m)}&day=${+PICK}`).then(r=>r.json());
-  DAY=d.day;today=d.airports;PER=today.length;buildFlap();
+async function start(m,fmt,st,data,redo){
+  MODE=m;FMT=fmt;ST=st;REDO=!!redo;PRACTICE=!!ST||REDO;$("notScored").hidden=!REDO; // a replay of the daily says so under the answer box
+ 
+  const d=data||await fetch(ST?`/api/state?mode=${encodeURIComponent(m)}&state=${encodeURIComponent(ST)}`:`/api/today?mode=${encodeURIComponent(m)}&day=${+PICK}`).then(r=>r.json());
+  DAY=d.day;today=d.airports;if(REDO)today=[...today].sort(()=>Math.random()-.5);PER=today.length;buildFlap();
   if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
   S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
@@ -570,7 +578,7 @@ function end(){
   loadStudy();
   $("bestline").textContent="🔥 Best streak: "+bestRun()+" in a row";
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
-  $("f").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
+  $("f").hidden=$("notScored").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
   if(FMT!="city"&&map)setTimeout(()=>{google.maps.event.trigger(map,"resize");map.setCenter({lat:today[V][3],lng:today[V][4]})})
   const q=QUIPS[GRADES.findIndex(([m])=>Math.round(pct)>=m)]; // same tiers as the letter grade
@@ -580,8 +588,9 @@ function end(){
   showGrade(t);
   $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
   if(ROOM){vsPoll();return} // friend games: tell the server you're done right now; your own results show while the others finish, then everyone returns to the lobby, where the feedback question is asked
-  if(PRACTICE){$("replay").hidden=false;$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
-  $("share").hidden=false;askFeedback();
+  if(PRACTICE){$("replay").hidden=false;if(REDO)$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=REDO?`/?go=${MODE}&fmt=${FMT}&re=${DAY}`:`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
+  $("share").hidden=false;askFeedback();$("replay").hidden=false;$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&re=${DAY}`; // play the daily again for fun: new order, no change to your score
+ 
   (SUB||=postScore()).then(d=>chart(d,t)).catch(()=>{$("stats").classList.add("nochart")})}
 // Share: a spoiler-free emoji row per round (green = first guess, yellow = later guess, orange = last guess, red = missed), via the phone share sheet or the clipboard.
 // Share: a popup with the picture that will be shared and one-tap options. The picture shows only your score and a row of colored squares (no spoilers).
