@@ -37,20 +37,29 @@ const altsOf = a => ALTS.get(cityKey(a)).filter(x => x[0] !== a[0]).map(x => [x[
 const ORDER = { easy: ["easy", "medium", "hard"], medium: ["medium", "hard", "easy"], hard: ["hard", "medium", "easy"] };
 let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...JSON.parse(fs.readFileSync(FILE)) }; } catch {}
 // db.sets["day:mode"] = 5 airports; db.used[mode] = icaos already served (no repeats until the pool runs out); db.scores["day:mode"] = {playerId: total}
-const day = () => Math.floor(Date.now() / 864e5), save = () => fs.writeFileSync(FILE, JSON.stringify(db));
+// A bug or a failed disk write must never take the server down: log it and keep serving (a request that hit it just times out).
+process.on("uncaughtException", e => console.error("uncaught:", e)); process.on("unhandledRejection", e => console.error("unhandled:", e));
+const day = () => Math.floor(Date.now() / 864e5), save = () => { try { fs.writeFileSync(FILE, JSON.stringify(db)); } catch (e) { console.error("save failed:", e.message); } };
+// Loopback only, and not through the tunnel: the tunnel connects from this machine too, but adds these headers.
+// Also refused: any proxy header, a Host that is not localhost (DNS rebinding: a hostile site pointing its own name at 127.0.0.1), and a browser request that
+// comes from another site (a hostile page POSTing to localhost, or reading the answer). Scripts like curl send no Origin and still work.
+const isLocal = req => { const h = req.headers;
+  return /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !h["cf-connecting-ip"] && !h["x-forwarded-for"] && !h["x-forwarded-host"] && !h["forwarded"] && !h["x-real-ip"] && !h["cf-ray"]
+    && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(h.host || "") && (!h.origin || h.origin.toLowerCase() === "http://" + h.host.toLowerCase()) && !/cross-site|same-site/.test(h["sec-fetch-site"] || ""); };
 
 function ensure(d) {
+  let changed = db.first == null; // only write the file when something new was made (this runs on every /api/today request)
   db.first ??= d; // the archive starts the day this database was first started
   for (const m of MODES) {
     if (db.sets[d + ":" + m]) continue;
     let pool = AIR[m].filter(a => !(db.used[m] || []).includes(a[0]));
-    if (pool.length < PER) { db.used[m] = []; pool = AIR[m]; } // pool exhausted: start over
+    if (pool.length < PER) { db.used[m] = []; pool = AIR[m].slice(); } // pool exhausted: start over (a copy: splice below must not eat the airport list itself)
     const pick = [];
     while (pick.length < PER) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     db.sets[d + ":" + m] = pick;
-    (db.used[m] ||= []).push(...pick.map(a => a[0]));
+    (db.used[m] ||= []).push(...pick.map(a => a[0])); changed = true;
   }
-  save();
+  if (changed) save();
 }
 // Archive: players can open any day from db.first (the day this database was started) up to today. A day nobody has opened yet gets a stable
 // set from a seeded shuffle, stored so it never changes; today's sets come from ensure() above.
@@ -105,6 +114,8 @@ function randomSet(mode, st, skip = []) { // skip = airport codes the lobby host
 // "Play a friend": a 4-letter code shares one random set between two players. In memory only (a restart ends open games); rooms expire after a day.
 const rooms = new Map(), MAX_ROOMS = 300;
 let FIND = null; // search table for /api/find, built on first use
+const normFind = t => String(t ?? "").toLowerCase().replace(/['’`]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/ +/g, " ").trim(); // lower case, apostrophes dropped, other punctuation = a space
+const FIND_ALIAS = { ohare: "KORD", laguardia: "KLGA", seatac: "KSEA", mccarran: "KLAS", idlewild: "KJFK", liberty: "KEWR", dulles: "KIAD", reagan: "KDCA", hartsfield: "KATL", kennedy: "KJFK", logan: "KBOS" }; // famous names (spaces removed) the airport's official name doesn't spell the same way
 // A lobby's game settings (cfg), set by the lobby owner: kind easy | medium | hard (Normal / Hard / Extra Hard), custom (format, state, difficulty) or zip (airports near a ZIP).
 // genSet makes the five airports for the current settings (a zip lobby keeps the ZIP's coordinates in r.zp).
 function genSet(r) {
@@ -121,13 +132,16 @@ function genSet(r) {
 // Everything a player types or sends is untrusted. Names: no control, invisible or direction-changing characters, no angle brackets, one space between words, 12 characters.
 const NAME_BAD = new RegExp("[" + [[0, 31], [127, 159], [0x200b, 0x200f], [0x2028, 0x202e], [0x2060, 0x2069], [0xfeff, 0xfeff]].map(([x, y]) => String.fromCharCode(x) + "-" + String.fromCharCode(y)).join("") + "<>]", "g"); // control, zero-width, line/paragraph separators, direction overrides, BOM, angle brackets
 const cleanName = t => [...String(t ?? "").replace(NAME_BAD, "").replace(/\s+/g, " ").trim()].slice(0, 12).join("");
-const validId = t => typeof t === "string" && /^[\w-]{1,64}$/.test(t); // player ids are random UUIDs; this also rules out keys like "__proto__"
+const validId = t => typeof t === "string" && /^[\w-]{1,64}$/.test(t); // player ids are random UUIDs; "__proto__" still passes, which is safe because lobby players and trivia answers are null-prototype objects and scores are only written when the id is not already "in" the object
 // A small rate limit per client address (behind a tunnel the real address is in a header): at most N requests a minute per route.
 const hits = new Map();
-const clientIp = req => String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+const clientIp = req => String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().slice(0, 64); // capped: the header is client-controlled when the port is reachable directly
 function limited(req, route, max) {
   const now = Date.now(), k = route + "|" + clientIp(req); let h = hits.get(k);
-  if (!h || now - h.t > 60000) { if (hits.size > 5000) hits.clear(); hits.set(k, h = { t: now, n: 0 }); }
+  if (!h || now - h.t > 60000) {
+    if (hits.size > 20000) { for (const [x, v] of hits) if (now - v.t > 60000) hits.delete(x); if (hits.size > 20000) hits.clear(); } // drop only expired windows first, so a flood of fake addresses can't wipe everyone else's counters
+    hits.set(k, h = { t: now, n: 0 });
+  }
   return ++h.n > max;
 }
 const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c)) return c; } };
@@ -156,16 +170,19 @@ function roomTick(r) {
     r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
     // The lobby remembers its finished games (newest last, the last 15): what was played and everyone's result. Sent to a page only when it has changed.
-    r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: r.cfg, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, fin: q.fin ?? null })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift();
+    if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, fin: q.fin ?? null })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
   }
 }
 const zips = new Map();
 async function zipPoint(zip) {
   if (zips.has(zip)) return zips.get(zip);
-  const r = await fetch("https://api.zippopotam.us/us/" + zip, { signal: AbortSignal.timeout(5000) });
+  if (!/^\d{5}$/.test(zip)) return null; // the only thing that is ever put in the outside address: exactly five digits, to the one fixed host
+  const r = await fetch("https://api.zippopotam.us/us/" + zip, { signal: AbortSignal.timeout(5000), redirect: "error" }); // never follow a redirect to another host
   if (r.status === 404) return null;
   if (!r.ok) throw new Error("lookup failed");
   const pl = (await r.json()).places[0], p = { lat: +pl.latitude, lon: +pl.longitude };
+  if (!(Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180)) throw new Error("bad lookup answer"); // also catches NaN
+  if (zips.size >= 20000) zips.delete(zips.keys().next().value); // the cache never grows past 20,000 ZIPs (oldest goes first)
   zips.set(zip, p); return p;
 }
 // Static files: the page, its stylesheet, the game audio module, and the uisfx player (a self-contained ES module).
@@ -182,11 +199,29 @@ const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: 
 const serve = (res, f, cache = "no-cache") => { let body; try { body = fs.readFileSync(f); } catch { res.writeHead(404, { "content-type": "text/plain" }); return res.end("Not found"); } res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }); res.end(body); };
 // Every 30 seconds: let lobbies tidy themselves (players who left are dropped) and delete lobbies nobody is in.
 setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length || (r.closed && now - r.closed.at > 300000)) rooms.delete(k); } }, 30000).unref();
-http.createServer((req, res) => {
-  res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "same-origin");
+// An unexpected throw in a handler (sync, in a promise, or in a request-body callback) answers 500 instead of leaving the request hanging; it is still logged.
+const fail = (res, e) => { console.error("request failed:", e); try { if (!res.headersSent) { res.writeHead(500, { "content-type": "application/json", "cache-control": "no-store" }); res.end('{"error":"server error"}'); } else res.end(); } catch {} };
+const safe = (res, fn) => async (...a) => { try { await fn(...a); } catch (e) { fail(res, e); } };
+const server = http.createServer({ maxHeaderSize: 8192, connectionsCheckingInterval: 2000 },(req, res) => { try { handle(req, res); } catch (e) { fail(res, e); } }).on("error", e => { console.error("server error:", e); process.exit(1); }); // the crash guard above would hide a failed start (port in use): a dead server must exit so Docker restarts it
+// Slow-client limits (slowloris): the whole request head within 10 s, the whole request within 30 s, idle keep-alive connections closed after 5 s, and a cap on connections.
+Object.assign(server, { headersTimeout: 10000, requestTimeout: 30000, keepAliveTimeout: 65000, maxConnections: 1000 }); server.maxRequestsPerSocket = 200; // keepAliveTimeout is above the tunnel's idle time (Node's 5 s default makes a reused tunnel connection fail with a 502); headersTimeout stays short for slowloris, and an idle kept-alive connection is not affected by it (tested)
+server.listen(process.env.PORT || 3000, () => console.log("http://localhost:" + (process.env.PORT || 3000)));
+function handle(req, res) {
+  res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "strict-origin-when-cross-origin"); // (not "same-origin": that sends Google Maps no Referer, which breaks a key restricted by referrer)
   res.setHeader("content-security-policy", "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"); // no framing, no <base> tricks, no plugins
-  const u = new URL(req.url, "http://x"), mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
-  if (req.method === "GET" && u.pathname === "/") return (res.writeHead(200, { "content-type": "text/html", "cache-control": "no-cache" }), res.end(page()));
+  res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"); res.setHeader("cross-origin-opener-policy", "same-origin"); res.setHeader("x-frame-options", "DENY");
+  if (req.headers["x-forwarded-proto"] === "https") res.setHeader("strict-transport-security", "max-age=15552000"); // only when it arrived over https (through the tunnel)
+  let u; try { u = new URL(req.url, "http://x"); } catch { res.writeHead(400); return res.end(); } // a malformed address (e.g. "//") must not throw
+  if (limited(req, "all", 900)) { res.writeHead(429, { "content-type": "application/json", "cache-control": "no-store", "retry-after": "30" }); return res.end('{"error":"Slow down a little."}'); } // one address: 900 requests a minute in all, so no route can be used to hammer the server
+  // A browser tells us when a request comes from another website. Nothing here is meant to be called that way, so a cross-site POST (a form or fetch on someone else's page) is refused.
+  if (req.method === "POST" && req.headers["sec-fetch-site"] === "cross-site") { res.writeHead(403, { "content-type": "application/json", "cache-control": "no-store" }); return res.end('{"error":"forbidden"}'); }
+  const mode = u.searchParams.get("mode"), json = (o, s = 200) => (res.writeHead(s, { "content-type": "application/json", "cache-control": "no-store" }), res.end(JSON.stringify(o)));
+  if (req.method === "GET" && u.pathname === "/") { // the page gets the full Content-Security-Policy: only its own script (marked with a fresh random nonce each time) and what that script loads (Google Maps) may run
+    const n = require("crypto").randomBytes(16).toString("base64"), g = "https://*.googleapis.com https://*.gstatic.com https://*.google.com";
+    res.setHeader("content-security-policy", ["default-src 'self'", `script-src 'nonce-${n}' 'strict-dynamic'`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", `img-src 'self' data: blob: ${g} https://*.ggpht.com`,
+      "font-src 'self' https://fonts.gstatic.com data:", `connect-src 'self' ${g}`, "worker-src blob:", "frame-src 'none'", "media-src 'self' blob: data:", "manifest-src 'self'", "frame-ancestors 'none'", "base-uri 'self'", "object-src 'none'", "form-action 'self'"].join("; "));
+    return (res.writeHead(200, { "content-type": "text/html", "cache-control": "no-cache" }), res.end(page().replace("<script>", `<script nonce="${n}">`)));
+  }
   if (req.method === "GET" && STATIC[u.pathname]) return serve(res, STATIC[u.pathname]);
   if (req.method === "GET" && u.pathname === "/chart.jpg") { // today's faint background chart
     const f = chartOfTheDay();
@@ -195,7 +230,10 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/sounds") return json(fs.existsSync("sounds") ? fs.readdirSync("sounds").filter(f => /\.(mp3|wav|ogg)$/.test(f)) : []); // which of your sound files exist (so the page never probes for missing ones)
   if (req.method === "GET" && /^\/sounds\/[\w.-]+\.(mp3|wav|ogg)$/.test(u.pathname)) // sound effects you drop in ./sounds
     return fs.existsSync("." + u.pathname) ? serve(res, "." + u.pathname, "public, max-age=3600") : json({ error: "not found" }, 404);
-  if (req.method === "GET" && u.pathname === "/api/config") return json({ key: process.env.GOOGLE_MAPS_KEY || "" });
+  if (req.method === "GET" && u.pathname === "/api/config") { // the Maps key is meant for this page (restrict it by referrer in Google Cloud); a browser does not hand it to another website's script
+    if (req.headers["sec-fetch-site"] === "cross-site") return json({ error: "forbidden" }, 403);
+    return json({ key: process.env.GOOGLE_MAPS_KEY || "" });
+  }
   if (req.method === "GET" && u.pathname === "/api/lookup") { // coords of any known airport, for hot/cold distance
     const a = ALL.get((u.searchParams.get("code") || "").toUpperCase()); return json(a ? { lat: a[3], lon: a[4] } : {});
   }
@@ -210,6 +248,7 @@ http.createServer((req, res) => {
   }
   if (req.method === "GET" && u.pathname === "/api/near") { // "Airports near me": up to PER random airports within N miles of a US ZIP code (any difficulty)
     const zip = u.searchParams.get("zip") || "", miles = +u.searchParams.get("miles");
+    if (limited(req, "near", 30)) return json({ error: "Slow down a little." }, 429); // each new ZIP is an outside lookup
     if (!/^\d{5}$/.test(zip) || ![25, 50, 100, 250, 500].includes(miles)) return json({ error: "Enter a 5-digit ZIP code." }, 400);
     return zipPoint(zip).then(p => {
       if (!p) return json({ error: "Couldn't find that ZIP code." }, 404);
@@ -240,12 +279,14 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/find") { // airport search for the lobby's typed list: ?q=chicago (top 5 matches) or ?codes=KORD,KMDW (look those up): [[code, city, state, name], ...]
     if (limited(req, "find", 150)) return json({ error: "Slow down a little." }, 429);
     const row = a => [a[0], a[1], a[2], a[6]];
-    if (u.searchParams.has("codes")) return json(String(u.searchParams.get("codes")).slice(0, 800).toUpperCase().split(",").slice(0, 100).filter(c => /^[A-Z0-9]{3,4}$/.test(c) && ALL.has(c)).map(c => row(ALL.get(c))));
-    const q = String(u.searchParams.get("q") || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/ +/g, " ").trim().slice(0, 30);
+    if (u.searchParams.has("codes")) return json(String(u.searchParams.get("codes")).slice(0, 800).toUpperCase().split(",").slice(0, 100).map(c => /^[A-Z0-9]{3,4}$/.test(c) && (ALL.has(c) ? c : ALL.has("K" + c) && c.length === 3 ? "K" + c : "")).filter(Boolean).map(c => row(ALL.get(c)))); // a pasted "ORD" is read as KORD when only the K form exists
+    const q = normFind(u.searchParams.get("q")).slice(0, 30).trim(), qk = q.replace(/ /g, ""); // apostrophes and punctuation never break a match ("o'hare" = "ohare")
     if (!q) return json([]);
-    FIND ||= [...ALL.values()].map(a => ({ a, code: a[0].toLowerCase(), bare: a[0].slice(1).toLowerCase(), city: a[1].toLowerCase(), name: String(a[6]).toLowerCase(), st: a[2].toLowerCase() }));
-    const score = f => f.code === q || f.bare === q ? 0 : f.code.startsWith(q) || f.bare.startsWith(q) ? 1 : f.city.startsWith(q) ? 2 : f.city.includes(q) || f.name.includes(q) ? 3 : (q.length === 2 && f.st === q) ? 4 : 9;
-    return json(FIND.map(f => [score(f), f]).filter(x => x[0] < 9).sort((x, y) => x[0] - y[0] || (x[1].code < y[1].code ? -1 : 1)).slice(0, 5).map(x => row(x[1].a)));
+    if (!FIND) { const tier = new Map(), famous = new Set(Object.values(FIND_ALIAS)); // the famous airports (O'Hare, JFK...) come first of all ["easy", "medium", "hard"].forEach((t, i) => AIR[t].forEach(a => tier.has(a[0]) || tier.set(a[0], i)));
+      FIND = [...ALL.values()].map(a => ({ a, t: famous.has(a[0]) ? -1 : tier.get(a[0]) ?? 3, code: a[0].toLowerCase(), bare: a[0].slice(1).toLowerCase(), city: normFind(a[1]), name: normFind(a[6]), st: a[2].toLowerCase() })); }
+    // Best match first; among equal matches the well-known airports (Normal, then Hard, then Extra Hard) come before small ones, so "chicago" gives O'Hare before Aurora.
+    const score = f => f.code === q || f.bare === q || FIND_ALIAS[qk] === f.a[0] ? 0 : f.code.startsWith(q) || f.bare.startsWith(q) ? 1 : f.city === q ? 1.5 : f.city.startsWith(q) ? 2 : f.city.includes(q) || f.name.includes(q) ? 3 : (q.length === 2 && f.st === q) ? 4 : 9;
+    return json(FIND.map(f => [score(f), f]).filter(x => x[0] < 9).sort((x, y) => x[0] - y[0] || x[1].t - y[1].t || (x[1].code < y[1].code ? -1 : 1)).slice(0, 5).map(x => row(x[1].a)));
   }
   if (req.method === "GET" && u.pathname === "/api/dots") return (res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=86400" }), res.end(JSON.stringify(DOT))); // the locator-map dots (never changes)
   if (req.method === "GET" && u.pathname === "/api/learn") { // ?codes=KATL,KJFK -> { KATL: [tips], ... } for the ones we have notes on (asked for after a game, so no spoilers)
@@ -256,7 +297,7 @@ http.createServer((req, res) => {
   if (req.method === "GET" && u.pathname === "/api/archive") return json({ first: db.first }); // the earliest day players can go back to
   if (req.method === "GET" && u.pathname === "/api/state") { // practice game: 5 random airports in a state, from the chosen difficulty first, topped up from the others
     const st = u.searchParams.get("state");
-    if (!MODES.includes(mode) || (st !== "ALL" && !STATES.includes(st))) return json({ error: "bad request" }, 400); // "ALL" = any state
+    if (!(MODES.includes(mode) || mode === "all") || (st !== "ALL" && !STATES.includes(st))) return json({ error: "bad request" }, 400); // "ALL" = any state; mode "all" = every difficulty mixed (the Custom Game's "All")
     return json({ day: day(), airports: randomSet(mode, st) });
   }
   if (req.method === "GET" && u.pathname === "/api/today") {
@@ -268,7 +309,7 @@ http.createServer((req, res) => {
   if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name} | config {kind, ...} (owner only) | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | reset {code}
     if (limited(req, "room", 600)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 3e3 && req.destroy())); // 3 KB at most (a typed airport list is up to 100 codes)
-    return req.on("end", async () => {
+    return req.on("end", safe(res, async () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
       if (!p || typeof p !== "object" || !validId(p.id)) return json({ error: "bad request" }, 400);
       const now = Date.now(), name = cleanName(p.name); let r, code = String(p.code || "").toUpperCase(), zp = null;
@@ -282,6 +323,7 @@ http.createServer((req, res) => {
         if (![...ALL.values()].some(a => dist(zp.lat, zp.lon, a[3], a[4]) <= mi)) return json({ error: `No airports within ${mi} miles of ${z}. Try a bigger distance.` }, 404);
       }
       if (p.action === "create") {
+        if (limited(req, "roomnew", 20)) return json({ error: "Slow down a little." }, 429); // one address can't fill all the lobby slots
         if (!name) return json({ error: "Enter your name." }, 400);
         for (const [k, v] of rooms) if (now - v.at > 864e5) rooms.delete(k);
         if (rooms.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
@@ -290,7 +332,8 @@ http.createServer((req, res) => {
       roomTick(r); // also notices a lobby that has timed out
       if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
       if (p.action === "leave") { // leaving takes you off the list at once (an empty game is deleted)
-        delete r.players[p.id]; r.act = now; if (!Object.keys(r.players).length) rooms.delete(code); else { if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; roomTick(r); }
+        if (p.id in r.players) r.act = now; // only a real member's leaving counts as activity (a stranger can't keep a lobby alive)
+        delete r.players[p.id]; if (!Object.keys(r.players).length) rooms.delete(code); else { if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; roomTick(r); }
         return json({ left: true });
       }
       let me = r.players[p.id];
@@ -339,8 +382,8 @@ http.createServer((req, res) => {
       if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; // the owner left: the longest-waiting player takes over
       json({ code, day: day(), mode: r.mode, cfg: r.cfg, empty: !r.airports.length, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
-        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late ? r.airports : undefined, /* watchers never get the answers */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
-    });
+        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
+    }));
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.
   // {"t":"2026-11-22T10:00:00.000Z","kind":"daily","day":20779,"mode":"hard","rating":"meh","airports":["KABC"]}
@@ -349,20 +392,20 @@ http.createServer((req, res) => {
   if (req.method === "POST" && u.pathname === "/api/feedback") {
     if (limited(req, "feedback", 20)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
-    return req.on("end", () => {
+    return req.on("end", safe(res, () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
-      const ok = ["daily", "friend"].includes(p.kind) && Number.isInteger(p.day) && MODES.includes(p.mode) && ["fun", "meh", "hard"].includes(p.rating)
+      if (!p || typeof p !== "object") return json({ error: "invalid" }, 400); // a body of "null" would throw below
+      if (fs.existsSync(FEEDBACK) && fs.statSync(FEEDBACK).size > 5e6) return json({ error: "invalid" }, 503); // the file stops growing at 5 MB
+      const ok = ["daily", "friend"].includes(p.kind) && Number.isInteger(p.day) && p.day >= 0 && p.day < 1e6 && MODES.includes(p.mode) && ["fun", "meh", "hard"].includes(p.rating)
         && Array.isArray(p.airports) && p.airports.length <= PER && p.airports.every(c => ALL.has(c));
       if (!ok) return json({ error: "invalid" }, 400);
       fs.appendFile(FEEDBACK, JSON.stringify({ t: new Date().toISOString(), kind: p.kind, day: p.day, mode: p.mode, rating: p.rating, airports: p.airports }) + "\n", () => {});
       json({ ok: true });
-    });
+    }));
   }
   if (req.method === "GET" && u.pathname === "/api/feedback") {
-    const local = /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
-    if (!local) return json({ error: "forbidden" }, 403);
+    if (!isLocal(req)) return json({ error: "forbidden" }, 403);
     let rows = []; try { rows = fs.readFileSync(FEEDBACK, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)); } catch {}
-    res.setHeader("access-control-allow-origin", "*"); // so a dashboard page served from another local port can read it
     return json(rows);
   }
   // Share links: the page uploads its result picture (a PNG, 400 KB at most) and gets a short link, /s/<id>. That page carries Open Graph tags, which is what
@@ -371,8 +414,9 @@ http.createServer((req, res) => {
   if (req.method === "POST" && u.pathname === "/api/share") {
     if (limited(req, "share", 10)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 6e5 && req.destroy()));
-    return req.on("end", () => {
+    return req.on("end", safe(res, () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      if (!p || typeof p !== "object") return json({ error: "invalid" }, 400);
       const png = Buffer.from(String(p?.png || ""), "base64"), score = Math.floor(+p.score), of = Math.floor(+p.of);
       if (png.length < 100 || png.length > 4e5 || png.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a" || !(score >= 0 && of > 0 && score <= of && of <= 99)) return json({ error: "invalid" }, 400);
       const title = [...String(p.title ?? "").replace(NAME_BAD, " ").replace(/\s+/g, " ").trim()].slice(0, 40).join("") || "Game", id = require("crypto").randomBytes(5).toString("hex");
@@ -383,7 +427,7 @@ http.createServer((req, res) => {
         for (const [f] of old) { fs.rmSync(SHARES + "/" + f, { force: true }); fs.rmSync(SHARES + "/" + f.replace(".png", ".json"), { force: true }); }
       } catch { return json({ error: "Couldn't save that." }, 500); }
       json({ id });
-    });
+    }));
   }
   const sh = req.method === "GET" && /^\/s\/([0-9a-f]{10})(\.png)?$/.exec(u.pathname);
   if (sh) {
@@ -405,7 +449,7 @@ http.createServer((req, res) => {
   if (req.method === "POST" && u.pathname === "/api/report") {
     if (limited(req, "report", 10)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 4e3 && req.destroy()));
-    return req.on("end", () => {
+    return req.on("end", safe(res, () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
       if (!p || typeof p !== "object") return json({ error: "invalid" }, 400);
       const text = [...String(p.text ?? "").replace(NAME_BAD, " ").replace(/\s+/g, " ").trim()].slice(0, 500).join(""), code = String(p.code || "").toUpperCase();
@@ -414,31 +458,30 @@ http.createServer((req, res) => {
       try { if (fs.statSync(REPORTS).size > 5e6) return json({ error: "Reports are full for now. Thank you!" }, 503); } catch {}
       fs.appendFile(REPORTS, JSON.stringify({ t: new Date().toISOString(), kind: "study", code, text }) + "\n", () => {});
       json({ ok: true });
-    });
+    }));
   }
   if (req.method === "GET" && u.pathname === "/api/reports") {
-    const local = /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
-    if (!local) return json({ error: "forbidden" }, 403);
+    if (!isLocal(req)) return json({ error: "forbidden" }, 403);
     let rows = []; try { rows = fs.readFileSync(REPORTS, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)); } catch {}
-    res.setHeader("access-control-allow-origin", "*");
-    return json(rows);
+    return json(rows); // no CORS header: another website's script must not be able to read this
   }
   if (req.method === "POST" && u.pathname === "/api/reset") { // dev only: loopback clients can wipe all score stats
-    if (!/^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress)) return json({ error: "forbidden" }, 403);
+    if (!isLocal(req)) return json({ error: "forbidden" }, 403); // through the tunnel the client looks like loopback too, so the proxy headers must be checked here as well
     db.scores = {}; db.right = {}; save(); return json({ ok: true });
   }
   if (req.method === "POST" && u.pathname === "/api/score") {
     if (limited(req, "score", 30)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
-    return req.on("end", () => {
+    return req.on("end", safe(res, () => {
       let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      if (!p || typeof p !== "object") return json({ error: "invalid" }, 400);
       const ok = Number.isInteger(p.score) && p.score >= 0 && p.score <= 20 && validId(p.id) && /^(easy|medium|hard)(-city)?$/.test(p.mode) && validDay(p.day) && (p.right === undefined || (Number.isInteger(p.right) && p.right >= 0 && p.right <= PER));
       if (!ok) return json({ error: "invalid" }, 400);
       const k = p.day + ":" + p.mode, d = (db.scores[k] ||= {});
-      if (!(p.id in d)) { d[p.id] = p.score; if (p.right !== undefined) (db.right[k] ||= {})[p.id] = p.right; save(); } // first submission per player per day+mode wins
+      if (!(p.id in d) && Object.keys(d).length < 50000) { d[p.id] = p.score; if (p.right !== undefined) (db.right[k] ||= {})[p.id] = p.right; save(); } // first submission per player per day+mode wins; at most 50,000 players per day and mode, so the saved file and its rewrite stay small
       json(counts(k));
-    });
+    }));
   }
   json({ error: "not found" }, 404);
-}).listen(process.env.PORT || 3000, () => console.log("http://localhost:" + (process.env.PORT || 3000)));
+}
 // ponytail: JSON file + sync write, one process. Swap for SQLite/Redis if traffic outgrows it. Player id is client-generated, so not cheat-proof; answers are sent to the client.

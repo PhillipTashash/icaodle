@@ -49,6 +49,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
   async function loadFiles(c) {
     let present = [];
     try { const r = await fetchFile("/api/sounds"); present = r?.ok ? await r.json() : []; } catch {}
+    if (!Array.isArray(present)) present = []; // a non-list reply must not throw out of this background task
     for (const n of fileNames) {
       const f = ["wav", "mp3", "ogg"].map((e) => `${n}.${e}`).find((x) => present.includes(x));
       if (!f) continue;
@@ -76,7 +77,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
       const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
       o.type = "square"; o.frequency.value = freq;
       g.gain.setValueAtTime(0.25 * vol * volume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur);
+      o.connect(g); g.connect(ctx.destination); active.add(o); o.onended = () => active.delete(o); o.start(t); o.stop(t + dur); // tracked so mute cuts it off at once
       return true;
     } catch { return false; }
   }
@@ -90,9 +91,15 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     unlock() {
       if (!AudioContextCtor || !createUISFX) return false;
       if (!ui) {
-        ctx = new AudioContextCtor();
-        ui = createUISFX({ pack: PACK, volume, enabled, context: ctx });
-        loadFiles(ctx);
+        try {
+          ctx = new AudioContextCtor();
+          ui = createUISFX({ pack: PACK, volume, enabled, context: ctx });
+        } catch { // no usable audio: close any half-made context, stay silent, and let a later gesture try again
+          try { ctx?.close?.()?.catch?.(() => {}); } catch {}
+          ui = ctx = null;
+          return false;
+        }
+        loadFiles(ctx).catch(() => {});
       }
       try { ctx.resume?.(); ui.unlock?.(); } catch {}
       return true;
@@ -122,8 +129,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     async destroy() {
       const u = ui, c = ctx;
       ui = null; ctx = null; files.clear(); active.clear();
-      await u?.destroy();
-      await c?.close?.();
+      try { await u?.destroy(); } finally { try { await c?.close?.(); } catch {} } // always close the context, even if the player throws
     },
   };
 }

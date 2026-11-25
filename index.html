@@ -1,11 +1,12 @@
 <!doctype html>
+<html lang="en">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ICAOdle</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="icon" href="/icon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><meta name="theme-color" content="#0d1014">
 <link rel="stylesheet" href="/style.css">
 <main>
-<h2 class="top">
+<h1 class="top">
   <!-- Logo: four split-flap tiles spelling ICAO + "dle". Link to "/" = back to the menu (progress is saved in localStorage). -->
   <a href="/" title="Back to menu" aria-label="ICAOdle, back to menu"><svg width="190" height="48" viewBox="0 0 250 56" role="img">
     <defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset=".49" stop-color="#262c38"/><stop offset=".5" stop-color="#0d1014"/><stop offset=".51" stop-color="#1a1f28"/></linearGradient></defs>
@@ -16,92 +17,118 @@
       <g class="tile"><rect x="140" y="4" width="40" height="48" rx="5" fill="url(#lg)"/><text x="160" y="39">O</text></g>
     </g>
     <text x="188" y="40" font-family="system-ui,sans-serif" font-weight="bold" font-size="30" fill="#e8eaee">dle</text></svg></a>
-  <small id="round"></small></h2>
+  <small id="round"></small></h1>
+<div id="sr" class="sr" role="status" aria-live="polite" aria-atomic="true"></div><!-- screen-reader announcements (new clue, guess result, round result); see say() -->
 <div id="menu">
+  <div id="how1" hidden><span>New here? Name five airports from their satellite photos. Up to 4 points each, 20 in all.</span><span id="how1b"><button type="button" id="how1go">How to play</button><button type="button" id="how1x" class="ghost">Got it</button></span></div>
   <div id="streak" hidden></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
+  <div id="mcols"><!-- three sections; side by side on wide screens so the whole menu fits without scrolling, one column on phones -->
+  <div class="msec">
   <div class="lbl">Daily</div>
   <button data-m="easy">Normal<small>Major airports</small></button>
   <button data-m="medium">Hard<small>Regional airline airports</small></button>
   <button data-m="hard">Extra Hard<small>Small local airports</small></button>
+  </div>
+  <div class="msec">
   <div class="lbl">Friends</div>
   <div id="joinrow"><input id="vsCode" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Lobby code" aria-label="Lobby code"><button id="vsJoin">Join</button></div>
   <div id="joinErr" role="alert"></div>
   <button id="vsBtn" title="Same five airports as a friend, with a 4-letter join code">Start Lobby</button>
+  </div>
+  <div class="msec">
   <div class="lbl">Practice</div>
   <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
   <button id="customBtn" title="Pick a state and format, just for fun">Custom Game</button>
   <button id="listBtn" title="Build a list of airports you choose, just for fun">Custom List</button>
+  </div>
+  </div>
+  <button type="button" id="howBtn" class="ghost">How to play</button>
 </div>
-<dialog id="listDlg">
+<dialog id="howDlg" aria-labelledby="howTitle">
+  <button id="howX" class="ghost" aria-label="Close" title="Close">✕</button>
+  <p><b id="howTitle">How to play</b></p>
+  <ul>
+    <li>Five rounds. Each shows an airport from above. Type its ICAO code: <b class="code">KLAX</b> or just <b class="code">LAX</b>.</li>
+    <li>4 guesses per round. A miss unlocks a clue and shows hot or cold (within 500 mi), an arrow toward the answer and, from guess 3, the distance in miles. Your last guess is a choice of four codes.</li>
+    <li><b>Score:</b> 4 points for a first-guess solve, then 3, 2 and 1. A miss is 0. A game is out of 20.</li>
+    <li><b>Skip</b> uses up a guess and unlocks the next clue (on your last guess it ends the round with 0). <b>Give up</b> ends the round now with 0.</li>
+    <li><b>Grades:</b> A 70% or more (14/20), B 55%, C 40%, D 25%, F below.</li>
+    <li>Prefer no map? Custom Game has a City and state format.</li>
+  </ul>
+  <button id="howOk">Got it</button>
+</dialog>
+<dialog id="listDlg" aria-labelledby="listTitle">
   <button id="listX" class="ghost" aria-label="Close" title="Close">✕</button>
-  <p><b>Custom List</b></p>
+  <p><b id="listTitle">Custom List</b></p>
   <div id="listSlot"></div>
   <small class="note">Just for fun: five of your airports at random, not part of the daily set or the global scores.</small>
   <div id="listErr" role="alert"></div>
   <div id="listBtns"><button id="listGo">Start</button> <button id="listCancel" class="ghost">Cancel</button></div>
 </dialog>
-<dialog id="near">
-  <p><b>Zip Code</b></p>
+<dialog id="near" aria-labelledby="nearTitle">
+  <p><b id="nearTitle">Zip Code</b></p>
   <label>ZIP code <input id="zip" inputmode="numeric" maxlength="5" autocomplete="postal-code" placeholder="12345"></label>
   <label>Within <span><select id="miles"><option>25</option><option>50</option><option>100</option><option>250</option><option>500</option></select> miles</span></label>
   <small class="note">Up to 5 airports near that ZIP. Just for fun: no grade, no score, not saved.</small>
   <div id="nearErr" role="alert"></div>
   <div id="nearBtns"><button id="nearGo">Start</button> <button id="nearCancel" class="ghost">Cancel</button></div>
 </dialog>
-<dialog id="vs">
+<dialog id="vs" aria-labelledby="vsTitle">
   <button id="vsCancel" class="ghost" aria-label="Close" title="Close">✕</button>
-  <p><b>Start a lobby</b></p>
+  <p><b id="vsTitle">Start a lobby</b></p>
   <div id="vsRow"><label>Your name <input id="vsName" maxlength="12" autocomplete="nickname" placeholder="Name"></label></div>
   <button id="vsCreate">Create</button>
   <div id="vsErr" role="alert"></div>
 </dialog>
-<dialog id="askDlg">
+<dialog id="askDlg" aria-labelledby="askTitle" aria-describedby="askMsg">
   <p><b id="askTitle"></b></p>
   <p id="askMsg"></p>
   <div id="askBtns"><button id="askOk">Okay</button><button id="askNo" class="ghost">Cancel</button></div>
 </dialog>
-<dialog id="reportDlg">
+<dialog id="reportDlg" aria-labelledby="rpTitle">
   <div id="rpForm">
-    <p><b>Report incorrect info</b></p>
+    <p><b id="rpTitle">Report incorrect info</b></p>
     <p id="rpAbout"></p>
-    <textarea id="rpText" maxlength="500" rows="5" placeholder="What is wrong, and what should it say?" aria-label="What is wrong"></textarea>
+    <label for="rpText">What is wrong, and what should it say?</label>
+    <textarea id="rpText" maxlength="500" rows="5"></textarea>
     <div id="rpMsg" role="status"></div>
     <div id="rpBtns"><button id="rpSend">Submit</button><button id="rpCancel" class="ghost">Cancel</button></div>
   </div>
   <div id="rpThanks" hidden><p><b>Thank you for your contribution!</b></p><p>We read every report and use them to fix the notes.</p><button id="rpDone">Close</button></div>
 </dialog>
-<dialog id="shareDlg">
-  <p><b>Share your result</b></p>
+<dialog id="shareDlg" aria-labelledby="shTitle">
+  <p><b id="shTitle">Share your result</b></p>
   <img id="shImg" alt="Your result card: your score and a row of colored squares">
-  <div id="shBtns"><button id="shLink">Copy link</button><button id="shX">Share on X</button><button id="shInsta">Instagram</button><button id="shSave" class="ghost">Save image</button><button id="shMore" class="ghost" hidden>More…</button></div>
+  <div id="shBtns"><button id="shLink">Copy link</button><button id="shX" class="ghost">Share on X</button><button id="shInsta" class="ghost">Instagram</button><button id="shSave" class="ghost">Save image</button><button id="shMore" class="ghost" hidden>More…</button></div>
   <div id="shMsg" role="status"></div>
   <button id="shClose" class="ghost">Close</button>
 </dialog>
-<dialog id="tmo">
-  <h3>Server Timeout</h3>
+<dialog id="tmo" aria-labelledby="tmoTitle">
+  <h3 id="tmoTitle">Server Timeout</h3>
   <p id="tmoText"></p>
   <button id="tmoClose">Close</button>
 </dialog>
-<dialog id="ask">
-  <p><b>Joining lobby <span id="askCode"></span></b></p>
+<dialog id="ask" aria-labelledby="askJoinTitle">
+  <p><b id="askJoinTitle">Joining lobby <span id="askCode"></span></b></p>
   <label>Your name <input id="askName" maxlength="12" autocomplete="nickname" placeholder="Name"></label>
   <div id="askErr" role="alert"></div>
   <div id="askBtns"><button id="askJoin">Join</button> <button id="askCancel" class="ghost">Cancel</button></div>
 </dialog>
 <div id="lobby" hidden>
-  <div id="lbHead"><h3 id="lbTitle"></h3><span id="lbTip">Copied!</span></div>
+  <div id="lbHead"><h3 id="lbTitle"></h3><button type="button" id="lbCopy" class="ghost">Copy invite link</button><span id="lbTip">Copied!</span></div>
   <div id="lbMsg"></div>
+  <div id="lbNote" role="status" aria-live="polite"></div>
   <div id="lbCfg" hidden>
     <div id="lbKind" role="group" aria-label="Game type"><button type="button" data-k="easy" data-tip="Major airports: the big hubs most people have flown through.">Normal</button><button type="button" data-k="medium" data-tip="Regional airline airports, a step down from the big hubs.">Hard</button><button type="button" data-k="hard" data-tip="Small local airports. Tough, even for frequent flyers.">Extra Hard</button><button type="button" data-k="list" data-tip="Pick the airports yourself. Five at random from your list.">List</button><button type="button" data-k="custom" data-tip="Choose a format, a state and a difficulty.">Custom</button><button type="button" data-k="zip" data-tip="Airports near a ZIP code, within the radius you pick.">Zip code</button></div>
     <div id="lbCustom" class="lbOpts" hidden>
       <label>Format <select id="lbFmt"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label>
       <label>State <select id="lbSt"><option value="">All states</option></select></label>
-      <label>Difficulty <select id="lbDiff"><option value="all">All</option><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
+      <label>Difficulty <select id="lbDiff"><option value="all">All (mixed)</option><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
     </div>
     <div id="lbList" hidden>
       <div class="lbOpts" id="lbListFmtRow"><label><select id="lbListFmt" aria-label="Format"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label></div>
-      <div id="lbFindBox"><input id="lbFind" maxlength="30" autocomplete="off" spellcheck="false" placeholder="Type a code or name (KORD, Chicago…)" role="combobox" aria-expanded="false" aria-controls="lbFindRes" aria-label="Find an airport"><div id="lbFindRes" role="listbox" hidden></div></div>
+      <div id="lbFindBox"><input id="lbFind" maxlength="30" autocomplete="off" spellcheck="false" placeholder="Code or city, or paste a list" role="combobox" aria-expanded="false" aria-controls="lbFindRes" aria-label="Find an airport"><div id="lbFindRes" role="listbox" hidden></div></div>
       <div id="lbChips"></div>
       <div id="lbListBtns"><button type="button" id="lbListUse">Use this list</button><button type="button" id="lbListClear" class="ghost">Clear</button><button type="button" id="lbListDl" class="ghost">Download</button><button type="button" id="lbListUpBtn" class="ghost">Upload</button><input type="file" id="lbListUp" accept=".json,application/json" hidden></div>
       <div id="lbListMsg" role="status"></div>
@@ -126,7 +153,7 @@
   <div id="opts">
     <label>Format <select id="fmt"><option value="map">Map</option><option value="city">City &amp; state only</option></select></label>
     <label>State <select id="st"><option value="">All states</option></select></label>
-    <label>Difficulty <select id="diff"><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
+    <label>Difficulty <select id="diff"><option value="all">All (mixed)</option><option value="easy">Normal</option><option value="medium">Hard</option><option value="hard">Extra Hard</option></select></label>
     <small class="note">Custom games are practice: 5 random airports, <b>not</b> part of the daily set or the global scores.</small>
   </div>
   <div><button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button></div>
@@ -134,21 +161,21 @@
 <div id="game" hidden>
   <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
-</div><div id="map"></div><div id="col"><div id="guesses"></div><div id="cluebox"></div><div id="studybox" hidden></div></div></div>
-  <form id="f"><span id="help" tabindex="0" role="note" aria-label="Guess can be with the K (KLAX) prefix or without (LAX)." data-tip="Guess can be with the K prefix or without.">?</span><span id="gwrap"><input id="g" maxlength="4" autocomplete="off" placeholder="ICAO" aria-label="ICAO code"><span id="notScored" hidden>Daily repeat, just for fun. No score.</span></span> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up</span><span class="lbl alt">Are you sure?</span></button></div></form>
+</div><div id="map" role="region" aria-label="Satellite map of the mystery airport. It is a picture, so there is no text version; the City and state format in Custom Game is a text-only way to play."></div><div id="col"><div id="guesses"></div><div id="cluebox"></div><div id="studybox" hidden></div></div></div>
+  <form id="f"><button type="button" id="help" class="ghost" aria-label="How to play" aria-haspopup="dialog" title="How to play">?</button><span id="gwrap"><input id="g" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ICAO" aria-label="ICAO code, with or without the K, for example KLAX or LAX"><span id="notScored" hidden>Daily repeat, just for fun. No score.</span></span> <div id="acts"><button id="go">Guess</button><button id="skip" type="button" class="ghost" title="Pass this guess (costs a guess). On your last guess it gives up the round.">Skip (costs a guess)</button><button id="giveup" type="button" class="ghost" title="Give up this round (counts as a loss)"><span class="lbl">Give up (0 points)</span><span class="lbl alt">Are you sure?</span></button></div></form>
   <div id="stats" hidden>
     <div id="grade" role="img"><div class="letter"></div><div class="pct"></div></div>
     <div id="result"><div id="statline"></div><div id="bestline" title="Most rounds solved on the first guess in a row"></div><div id="quip"></div></div>
-    <canvas id="chart" width="600" height="220" hidden></canvas>
-    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden onclick="location.href=menuUrl()">Main Menu</button><button id="share" hidden>Share</button></div>
+    <div id="chartbox" hidden><canvas id="chart" width="600" height="220" role="img" aria-label="Score distribution"></canvas><p id="chartSum"></p></div>
+    <div id="endbtns"><button id="replay" hidden>Play again</button><button id="again" hidden>Main Menu</button><button id="share" hidden>Share</button></div>
   </div>
-  <div id="choices" hidden></div>
+  <div id="choices" hidden tabindex="-1" role="group" aria-label="Final guess: pick the airport code"></div>
   <div id="pcol"></div>
   <div id="msg"></div>
 </div>
 <details id="dev" hidden><summary>Dev</summary><button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
 </main>
-<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙️</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button data-r="fun">😄 Fun</button><button data-r="meh">😐 Meh</button><button data-r="hard">😣 Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
+<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button class="ghost" data-r="fun">Fun</button><button class="ghost" data-r="meh">Meh</button><button class="ghost" data-r="hard">Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
   $reset.onclick=async()=>{if(!await ask("Wipe all stats and local progress?"))return;
@@ -157,7 +184,7 @@ if(location.hostname=="localhost"){$reset=document.getElementById("reset");docum
   Promise.all(["easy","medium","hard"].map(m=>fetch(`/api/today?mode=${m}`).then(r=>r.json()))).then(ds=>{
     document.getElementById("devAnswers").textContent=ds.map((d,i)=>["Normal","Hard","Extra Hard"][i]+": "+d.airports.map(a=>a[0]).join(" ")).join("\n")}).catch(()=>{})}
 let PER=5; const TRIES=4; // 3 hint stages => 4th guess is the last. PER is the rounds in this game: 5, or fewer in an "Airports near me" game
-const NAME={easy:"Normal",medium:"Hard",hard:"Extra Hard"}; // what players see; the keys stay easy/medium/hard in saves, scores and the server
+const NAME={easy:"Normal",medium:"Hard",hard:"Extra Hard",all:"Mixed"}; // what players see; the keys stay easy/medium/hard in saves, scores and the server
 let DAY,MODE,today,SAVE,S,map,$=id=>document.getElementById(id);
 // New sets generate at UTC midnight (matches server.js).
 function tick(){const m=Math.floor(((Math.floor(Date.now()/864e5)+1)*864e5-Date.now())/6e4);$("timer").textContent=`New set in ${Math.floor(m/60)}h ${m%60}m`}
@@ -180,7 +207,7 @@ paintMenu();
 // Streak: consecutive UTC days with at least one finished daily game (any difficulty), read from the saves. Today not played yet doesn't break it.
 (()=>{const days=new Set();try{for(const k of Object.keys(localStorage)){const m=k.match(/^icaodle([0-9]+)(easy|medium|hard)/);if(m&&JSON.parse(localStorage[k]).scores.length>=5)days.add(+m[1])}}catch{}
   let d=days.has(TODAY)?TODAY:TODAY-1,n=0;while(days.has(d)){n++;d--}
-  if(n){$("streak").hidden=false;$("streak").textContent=`🔥 ${n} day streak`}})();
+  if(n){$("streak").hidden=false;$("streak").textContent=`Streak: ${n} day${n==1?"":"s"}`}})();
 fetch("/api/archive").then(r=>r.json()).then(d=>{FIRST=Math.min(d.first,TODAY);const p=+new URLSearchParams(location.search).get("day");if(p>=FIRST&&p<=TODAY)PICK=p;paintMenu()}).catch(()=>{}); // ?day=N comes back here from a finished earlier-day game
 // Sound: sfx.js = uisfx "mechanical" pack + your /sounds files. The code loads with the page but stays silent until the first
 // pointerdown / keydown unlocks audio, and nothing plays while muted. snd("event") is a no-op until then.
@@ -188,7 +215,18 @@ let SND=null;
 // On a phone, focusing the text box pops the keyboard over the board, so only desktops get the automatic focus.
 const focusInput=()=>{if(!matchMedia("(pointer:coarse)").matches)$("g").focus()};
 const snd=e=>SND&&SND.play(e);
-const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 Sound on":"🔇 Sound off";$("mute").setAttribute("aria-pressed",String(!on));if(SND)$("vol").value=SND.enabled?SND.volume:0}; // while muted the slider sits at 0; the real volume is kept and comes back when sound is turned on
+// Screen-reader announcements: the hidden #sr status region is emptied first, so the same sentence can be announced twice.
+const say=t=>{const e=$("sr");e.textContent="";setTimeout(()=>e.textContent=t,60)};
+// How to play: a dialog (the "?" beside the answer box and a button on the menu open it), plus a one-time card on the menu for first-time visitors.
+// If the browser blocks storage the card stays hidden (better than showing it on every visit).
+const howSeen=()=>{try{return !!localStorage.icaoHow}catch{return true}};
+const howDone=()=>{try{localStorage.icaoHow=1}catch{}$("how1").hidden=true};
+$("how1").hidden=howSeen();
+const openHow=()=>{snd("open");howDone();$("howDlg").showModal()};
+$("help").onclick=$("howBtn").onclick=$("how1go").onclick=openHow;
+$("how1x").onclick=howDone;
+$("howOk").onclick=$("howX").onclick=()=>{snd("back");$("howDlg").close()};
+const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"Sound: on":"Sound: off";if(SND)$("vol").value=SND.enabled?SND.volume:0}; // while muted the slider sits at 0; the real volume is kept and comes back when sound is turned on
 (async()=>{try{
   const [{createSound},{createUISFX}]=await Promise.all([import("/sfx.js"),import("/vendor/uisfx.js")]);
   SND=createSound({createUISFX,storage:localStorage,AudioContextCtor:window.AudioContext||window.webkitAudioContext});
@@ -199,11 +237,11 @@ const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"🔊 
 // Back-arrow button (left edge of the answer panel): leave to the main menu. Daily progress is saved; a practice game isn't, so that one asks first.
 let ROOM=null; // {code} for a "Play a friend" game
 let LOCAL=null; // {zip,miles} for an "Airports near me" game
-const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:NAME[MODE]+dateTag();
+const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:ST=="LIST"?"Custom List":NAME[MODE]+dateTag(); // a Custom List game says so (not "Normal")
 const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "Normal · Nov 20 1/5" on an earlier day
 const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
 // Our own Okay / Cancel popup (instead of the browser's): ask("text") resolves true for Okay, false for Cancel.
-function ask(msg,ok="Okay",title="Are you sure?"){return new Promise(res=>{const d=$("askDlg"),done=v=>{d.close();res(v)};$("askMsg").textContent=msg;$("askOk").textContent=ok;$("askTitle").textContent=title;$("askOk").onclick=()=>done(true);$("askNo").onclick=()=>done(false);d.oncancel=e=>{e.preventDefault();done(false)};d.showModal()})}
+function ask(msg,ok="Okay",title="Are you sure?",single=false){return new Promise(res=>{const d=$("askDlg"),done=v=>{d.close();res(v)};$("askNo").hidden=single;$("askMsg").textContent=msg;$("askOk").textContent=ok;$("askTitle").textContent=title;$("askOk").onclick=()=>done(true);$("askNo").onclick=()=>done(false);d.oncancel=e=>{e.preventDefault();done(false)};d.showModal()})}
 $("menuBack").onclick=async()=>{if(PRACTICE&&S&&S.i<PER&&!await ask(ROOM?"Leave this game? You'll drop out for everyone.":REDO?"Leave this round? A repeat of the daily isn't saved.":"Leave this practice game? Practice games aren't saved.","Main Menu","Possible Pilot Deviation"))return;await vsLeave();location.href=menuUrl()};
 // Settings: the gear fades the sound and particle controls in above it; a click elsewhere or Escape tucks them away again.
 const setOpen=on=>{$("soundctl").classList.toggle("open",on);$("gear").setAttribute("aria-expanded",String(on))};
@@ -212,7 +250,7 @@ document.addEventListener("click",e=>{if(!e.target.closest("#soundctl"))setOpen(
 document.addEventListener("keydown",e=>{if(e.key==="Escape")setOpen(false)});
 // Particles (the confetti and the planes drifting across the menu) can be switched off; the choice is remembered.
 const fxOn=()=>{try{return localStorage.icaoFx!=="off"}catch{return true}};
-const paintFx=()=>{$("fx").textContent=fxOn()?"✨ Particles on":"✨ Particles off";$("fx").setAttribute("aria-pressed",String(!fxOn()))};
+const paintFx=()=>{$("fx").textContent=fxOn()?"Particles: on":"Particles: off"};
 $("fx").onclick=()=>{try{localStorage.icaoFx=fxOn()?"off":"on"}catch{}paintFx();if(!fxOn())sky.stop();else if(!$("menu").hidden)sky.start()};
 paintFx();
 $("mute").onclick=()=>{if(!SND)return;SND.unlock();SND.setEnabled(!SND.enabled);paintSound()};
@@ -250,7 +288,7 @@ function confetti(speed=5,secs=0){ // speed in m/s, where 1 m = 100 px, so 5 m/s
   const today=Math.floor(Date.now()/864e5); // once a day: after the first play, the logo just sits on ICAO until tomorrow
   try{if(localStorage["icaodle:intro"]==today)return;localStorage["icaodle:intro"]=today}catch{}
   const ABC="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  document.querySelectorAll("h2.top .tile").forEach((g,i)=>{
+  document.querySelectorAll("h1.top .tile").forEach((g,i)=>{
     const text=g.querySelector("text"),t=ABC.indexOf(text.textContent),
       gap=75+Math.random()*20,                      // ms per flap
       settle=1000+i*450+Math.random()*120;          // when this tile lands: I first, O last
@@ -262,9 +300,11 @@ function confetti(speed=5,secs=0){ // speed in m/s, where 1 m = 100 px, so 5 m/s
 // Split-flap display: each cell steps through the ring one flap at a time until it lands on the target letter.
 const RING="-ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 // One flap word per round (PER of them), each starting as K---; a solved/lost round keeps its answer.
-const buildFlap=()=>$("flap").innerHTML=Array.from({length:PER},()=>`<div class="w">${[..."K---"].map(c=>`<span>${c}</span>`).join("")}<div class="nm"></div></div>`).join("");
+const buildFlap=()=>$("flap").innerHTML=Array.from({length:PER},(_,i)=>`<div class="w" role="button" tabindex="0" aria-label="Round ${i+1}">${[..."K---"].map(c=>`<span>${c}</span>`).join("")}<div class="nm"></div></div>`).join("");
 function flap(word,r,i=0){ // left to right: each letter lands before the next one starts
-  if(i>=word.length)return;const el=$("flap").children[r].children[i];
+  if(i>=word.length)return;
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches){[...word].forEach((ch,k)=>$("flap").children[r].children[k].textContent=ch);return} // reduced motion: no flipping, the letters just appear
+  const el=$("flap").children[r].children[i];
   const n=(RING.indexOf(word[i])-RING.indexOf(el.textContent)+RING.length)%RING.length,gap=500/(n||1); // each letter takes ~0.5s however far it has to flip
   (function step(){if(el.textContent==word[i])return flap(word,r,i+1);el.textContent=RING[(RING.indexOf(el.textContent)+1)%RING.length];snd("flap");
     el.classList.remove("f");void el.offsetWidth;el.classList.add("f");setTimeout(step,gap)})()}
@@ -274,37 +314,45 @@ const runAt=r=>{let n=0;while(r-n>=0&&S.scores[r-n]==TRIES)n++;return n};
 const ALT=t=>FMT=="city"?t[8]||[]:[]; // other airports in the same city count as right answers only in the City and state format
 let SHOWN=[]; // the code the player typed for each solved round (another airport in the same city counts)
 const nameOf=r=>{const n=$("flap").children[r].querySelector(".nm"),al=ALT(today[r]),shown=al.find(x=>x[0]==SHOWN[r]);n.textContent=shown?shown[3]:today[r][6];
-  const others=[today[r][0],...al.map(x=>x[0])].filter(x=>x!=(shown?shown[0]:today[r][0]));if(others.length)n.insertAdjacentHTML("beforeend",`<i>also ${others.join(" ")}</i>`);
+  const others=[today[r][0],...al.map(x=>x[0])].filter(x=>x!=(shown?shown[0]:today[r][0]));if(others.length)n.insertAdjacentHTML("beforeend",`<i>also ${esc(others.join(" "))}</i>`);
+  n.insertAdjacentHTML("beforeend",`<em>${S.scores[r]>0?"Solved":"Missed"} · ${S.scores[r]}/${TRIES}</em>`); // says it in words too: red and green alone are not enough
+  $("flap").children[r].setAttribute("aria-label",`Round ${r+1}: ${today[r][0]}, ${S.scores[r]>0?"solved":"missed"}, ${S.scores[r]} of ${TRIES} points`);
   if(S.scores[r]==1)n.insertAdjacentHTML("beforeend","<b>Final guess</b>"); // solved with the last guess (score 1 of 4)
   const run=runAt(r);
   if(run>=2)n.insertAdjacentHTML("beforeend",`<b class="st${Math.min(run,4)}">${run}x streak</b>`)};
 const paint=r=>$("flap").children[r].classList.add(S.scores[r]>0?"ok":"no");
 // V = round being viewed. Rounds before S.i are finished and can be reviewed with Back/Next.
 let V=0;
-const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",i==V);g.classList.toggle("go",i<=Math.min(S.i,PER-1))}); // "go" = a round you can click: finished ones and the current one
+const navs=()=>[...$("flap").children].forEach((g,i)=>{g.classList.toggle("cur",i==V);i==V?g.setAttribute("aria-current","true"):g.removeAttribute("aria-current");g.classList.toggle("go",i<=Math.min(S.i,PER-1))}); // "go" = a round you can click: finished ones and the current one
 // Round over (solved, lost or skipped): flip the answer in, then move straight on after a beat.
 function reveal(c){nameOf(S.i-1);flap(c,S.i-1);paint(S.i-1);
-  $("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
+  $("go").disabled=$("skip").disabled=$("giveup").disabled=true; // the text box stays enabled during the pause, so letters typed ahead for the next round are kept (Enter does nothing while Guess is disabled)
+  focusInput();
+  const pts=S.scores[S.i-1];say(pts?`Correct: ${c}. ${pts} of ${TRIES} points.`:$("msg").textContent||`The answer was ${c}.`);
   setTimeout(()=>{$("msg").textContent="";if(S.i>=PER){const top=LOCAL?S.scores.every(v=>v>0):S.scores.reduce((a,b)=>a+b,0)==PER*TRIES;
       if(runAt(PER-1)<PER)snd("endGame"); // a 5-in-a-row already played streak5 as its end-of-game sound
       if(top)confetti(4,10)} // 100%: ten seconds of confetti
     show();focusInput()},1500)}
 // Each airport row on the left is a button: click a finished round to review it, or the current round to get back to guessing.
-$("flap").onclick=e=>{const i=[...$("flap").children].indexOf(e.target.closest(".w"));if(i<0||i==V||i>Math.min(S.i,PER-1)||busy)return;snd("forward");$("msg").textContent="";i<S.i?view(i):(show(),focusInput())};
+$("flap").onclick=e=>{const i=[...$("flap").children].indexOf(e.target.closest(".w"));if(i<0||i==V||i>Math.min(S.i,PER-1)||busy)return;snd("forward");$("msg").textContent="";i<S.i?view(i):(show(),focusInput());
+  if($("board").classList.contains("over")&&matchMedia("(max-width:820px)").matches)$("map").scrollIntoView({block:"nearest",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}; // on a phone the results sit above the map: bring the reviewed airport's map into view
+$("flap").onkeydown=e=>{if((e.key=="Enter"||e.key==" ")&&e.target.classList.contains("w")){e.preventDefault();e.target.click()}}; // the rows are keyboard buttons too
 function save(){if(!SAVE)return;try{localStorage[SAVE]=JSON.stringify(S)}catch{}}
 // The key lives in .env on the server (never in this file or git); the browser still has to receive it, so restrict it by referrer in Google Cloud.
 let MAPSP=null; // the Maps script is loaded once, however many maps the page makes
 function loadMaps(){return MAPSP||=fetch("/api/config").then(r=>r.json()).then(({key})=>new Promise((ok,bad)=>{
-  window.gm_authFailure=()=>{$("map").textContent="Google Maps rejected the API key (check key, enabled APIs, billing, referrer)."};
-  const s=document.createElement("script");s.src=`https://maps.googleapis.com/maps/api/js?key=${key}`;s.onload=ok;s.onerror=bad;document.head.append(s)}))}
+  window.gm_authFailure=()=>mapFail("Google Maps rejected the API key (check key, enabled APIs, billing, referrer).");
+  const s=document.createElement("script");s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}`;s.onload=ok;s.onerror=bad;document.head.append(s)})).catch(e=>{MAPSP=null;throw e})} // a failed load is not remembered, so a later try can succeed
 let FMT="map",ST="",PRACTICE=false,REDO=false; // REDO: the daily airports again, in a new random order, saved nowhere and counted nowhere
 // Menu options persist (localStorage) so "Change state" returns to the same selection; ?go=&fmt=&st= auto-starts (used by Play again).
 fetch("/api/states").then(r=>r.json()).then(list=>{
-  $("st").innerHTML+=list.map(x=>`<option>${x}</option>`).join("");
+  $("st").innerHTML+=list.map(x=>`<option>${esc(x)}</option>`).join("");
   const p=new URLSearchParams(location.search);let o={};try{o=JSON.parse(localStorage.icaoOpts)}catch{}
   $("fmt").value=p.get("fmt")||o.fmt||"map";$("st").value=p.get("st")??o.st??"";
   $("diff").value=o.diff||"easy";
-  if(p.get("go")){if(p.get("re"))PICK=+p.get("re");start(p.get("go"),p.get("fmt")||"map",p.get("st")||"",undefined,!!p.get("re"))}
+  // Address parameters are untrusted: only the known values get through (the server checks them again).
+  const goOk=["easy","medium","hard"].includes(p.get("go"))||(p.get("go")=="all"&&!p.get("re")),fmtOk=p.get("fmt")=="city"?"city":"map",stOk=/^[A-Z]{2,3}$/.test(p.get("st")||"")?p.get("st"):"",reOk=Number.isInteger(+p.get("re"))&&+p.get("re")>0&&+p.get("re")<=TODAY;
+  if(goOk){if(p.get("re")&&reOk)PICK=+p.get("re");start(p.get("go"),fmtOk,stOk,undefined,!!p.get("re")&&reOk)}
   if(p.get("near"))$("nearGo").click();
   if(p.get("list")&&Array.isArray(LISTSAVED.codes)&&LISTSAVED.codes.length)playList(LISTSAVED.codes.filter(CODE_OK),LISTSAVED.fmt=="city"?"city":"map",()=>{}); // Play again from a Custom List game
   if(p.get("join")){setCode(p.get("join"));try{$("vsName").value=localStorage.vsName||""}catch{}
@@ -321,7 +369,9 @@ $("nearBtn").onclick=()=>{snd("open");$("nearErr").textContent="";NEAR.showModal
 $("nearCancel").onclick=()=>{snd("back");NEAR.close()};
 $("nearGo").onclick=async()=>{const zip=$("zip").value.trim(),miles=$("miles").value,err=m=>$("nearErr").textContent=m;
   if(!/^\d{5}$/.test(zip))return err("Enter a 5-digit ZIP code.");
+  if($("nearGo").disabled)return;$("nearGo").disabled=true;
   err("Looking…");const d=await fetch(`/api/near?zip=${zip}&miles=${miles}`).then(r=>r.json()).catch(()=>({error:"Couldn't look that up. Try again."}));
+  $("nearGo").disabled=false;
   if(d.error)return err(d.error);
   try{localStorage.icaoNear=JSON.stringify({zip,miles})}catch{}
   LOCAL={zip,miles};NEAR.close();start("easy","map","NEAR",d)};
@@ -330,15 +380,16 @@ $("zip").onkeydown=e=>{if(e.key=="Enter")$("nearGo").click()};
 // The server owns the phases (lobby -> playing -> over); this page polls it once a second.
 const VS=$("vs"),vsErr=m=>$("vsErr").textContent=$("askErr").textContent=m,vsId=()=>{try{return sessionStorage.vsid||=crypto.randomUUID()}catch{return "x"+Math.random()}}; // per tab, so two tabs on one computer are two players
 const esc=t=>String(t).replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
-const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,hn:HN,...o})}).then(async r=>{const d=await r.json();if(!r.ok)throw d;return d});
-let HIST=[],HN=-1,HISTKEY="",CLOSEEND=0,TV=null,TVD=null,tvRev=-1,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
+const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),code:ROOM&&ROOM.code,tv:TV&&TV.id,hn:HN,ga:GA,...o})}).then(async r=>{const d=await r.json();if(!r.ok){d.status=r.status;throw d}return d}); // the status lets the poll tell "game is gone" (404/410) from "slow down" (429) or a hiccup
+let GA,HOLD=null,PREVN=null,PREVC="",noteT=0,HIST=[],HN=-1,HISTKEY="",CLOSEEND=0,TV=null,TVD=null,tvRev=-1,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
-$("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal()};
+$("vsBtn").onclick=()=>{try{$("vsName").value=localStorage.vsName||""}catch{}$("vsName").value||=fakeName();snd("open");vsErr("");VS.showModal();$("vsName").select()};
 $("vsCancel").onclick=()=>{snd("back");VS.close()};
-async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");
+let VSBUSY=false; // a double click must not create two lobbies (or start two poll loops)
+async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");if(VSBUSY)return;
   try{localStorage.vsName=name}catch{}
-  vsErr("Working…");try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){vsErr(e.error||"Couldn't reach the server. Try again.")}}
+  vsErr("Working…");VSBUSY=true;try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){const m=(e&&e.error)||"Couldn't reach the server. Try again.";vsErr(m);if(!VS.open&&!$("ask").open)ask(m,"Okay","Couldn't join",true)}VSBUSY=false} // a rematch rejoin (auto=1) has no popup open: say why it failed instead of sitting silently on the menu
 $("vsCreate").onclick=()=>vsGo({action:"create",code:null});
 $("vsJoin").onclick=()=>{if(getCode().length!=4)return $("joinErr").textContent="Enter the 4-letter code.";openAsk()};
 function openAsk(){let n="";try{n=localStorage.vsName||""}catch{}$("askName").value=n||fakeName();$("askCode").textContent=getCode();vsErr("");$("ask").showModal();$("askName").select()}
@@ -352,7 +403,11 @@ $("askCancel").onclick=()=>{$("ask").close();history.replaceState(null,"","/")};
 $("askName").onkeydown=e=>{if(e.key=="Enter")$("askJoin").click()};
 $("vsName").onkeydown=e=>{if(e.key=="Enter")$("vsCreate").click()};
 const vsLink=()=>location.origin+"/?join="+ROOM.code;
-$("lbTitle").onclick=async e=>{if(!e.target.closest("b"))return;try{await navigator.clipboard.writeText(vsLink());const t=$("lbTip");t.classList.remove("show");void t.offsetWidth;t.classList.add("show")}catch{prompt("Copy this link:",vsLink())}}; // click the lobby code to copy the invite link; "Copied!" pops up beside it and fades
+async function copyInvite(){try{await navigator.clipboard.writeText(vsLink());const t=$("lbTip"),b=$("lbCopy");t.classList.remove("show");void t.offsetWidth;t.classList.add("show");b.textContent="Copied ✓";clearTimeout(copyT);copyT=setTimeout(()=>b.textContent="Copy invite link",1800)}catch{prompt("Copy this link:",vsLink())}}
+let copyT=0;
+$("lbTitle").onclick=e=>{if(e.target.closest("b"))copyInvite()}; // click the lobby code, or the Copy invite link button, to copy the invite link; "Copied!" pops up and fades
+$("lbCopy").onclick=copyInvite;
+$("lbTitle").onkeydown=e=>{if((e.key=="Enter"||e.key==" ")&&e.target.closest("b")){e.preventDefault();e.target.click()}}; // the code works from the keyboard too
 $("lbReady").onclick=()=>{const me=VSD.players.find(p=>p.me);vsPost({action:"ready",value:VSD.phase=="over"||!me.ready}).then(vsHandle).catch(()=>{})};
 // Leaving tells the server right away (so the others see you go), then returns to the menu. Closing the page from the lobby does the same; a page that is starting the next game does not.
 async function vsLeave(){if(!ROOM)return;const c=ROOM.code;ROOM=null;INGAME=false;try{await fetch("/api/room",{method:"POST",keepalive:true,body:JSON.stringify({id:vsId(),code:c,action:"leave"})})}catch{}}
@@ -364,7 +419,7 @@ function enterLobby(d){$("menu").hidden=$("custom").hidden=true;$("lobby").hidde
 // Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
 // plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
 // Gentle polling: every 2 s in the lobby, every 3 s in a game (a background tab is throttled by the browser but keeps checking, so it still gets put into the game when it starts).
-function pollLoop(){setTimeout(async()=>{await vsPoll();pollLoop()},INGAME?3000:2000)}
+let POLLT;function pollLoop(){clearTimeout(POLLT);if(!ROOM)return;POLLT=setTimeout(async()=>{await vsPoll();pollLoop()},INGAME?3000:2000)} // stops once there is no ROOM (left or timed out); one timer at a time
 addEventListener("visibilitychange",()=>{if(!document.hidden&&ROOM)vsPoll()}); // catch up the moment you come back to the tab
 // The server closed the lobby (5 minutes of nothing happening, or 10 minutes without a game starting): say so, then back to the main menu.
 function lobbyTimedOut(why){if(!ROOM)return;ROOM=null;INGAME=false;
@@ -375,37 +430,54 @@ $("tmo").oncancel=()=>{location.href="/"};
 async function vsPoll(){
   if(!ROOM)return;
   const o={action:"sync"};if(INGAME&&S)Object.assign(o,{rounds:S.i,total:S.scores.reduce((a,b)=>a+b,0),right:S.scores.filter(v=>v>0).length,streak:bestRun(),done:S.i>=PER});
-  try{vsHandle(await vsPost(o))}catch(e){if(e&&e.timeout)return lobbyTimedOut(e.timeout);if(e&&e.error){alert(e.error);location.href="/"}}} // a network blip is ignored; the game being gone sends you to the menu
+  try{vsHandle(await vsPost(o))}catch(e){if(e&&e.timeout)return lobbyTimedOut(e.timeout);if(e&&e.error&&(e.status==404||e.status==410)){await ask(e.error,"Okay","Game over",true);location.href="/"}}} // only a vanished game ejects you; a 429/503 is just retried on the next poll // a network blip is ignored; the game being gone sends you to the menu
 function vsHandle(d){
   VSD=d;if(d.history)HIST=d.history;if(d.hn!=null)HN=d.hn;
   CDEND=d.cd!=null?Date.now()+d.cd:0;
   if(INGAME){ // on the board: the right-hand tab lists everyone
     $("pcol").innerHTML="<b>Players</b>"+d.players.filter(p=>!p.late).map(p=>`<div class="${p.me?"me":""}">${esc(p.name)}<span>${p.done?"✓ Finished":p.rounds+"/"+PER+" rounds"} · ${p.total} pts</span></div>`).join("");
     if(d.left!=null)ENDS=Date.now()+d.left;
-    if(d.phase=="over"){if(S.i<PER)vsTimeout();INGAME=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;renderLobby(d);askFeedback()}
+    if(d.phase=="over"){if(S.i<PER)vsTimeout();INGAME=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;showLobby(d);say("Game over. The results are in the lobby.");askFeedback()}
     return}
   CLOSEEND=d.closeIn!=null?Date.now()+d.closeIn:0; // when this lobby will time out if nothing happens
   if(d.trivia){if(d.trivia.qs)TV={id:d.trivia.id,qs:d.trivia.qs};TVD=d.trivia}else TVD=null; // lobby trivia (the question text is only sent once per set)
   const me=d.players.find(p=>p.me);LATEEND=d.phase=="playing"&&d.left!=null?Date.now()+d.left:0;
-  renderLobby(d);if(d.phase=="playing"&&!(me&&me.late))beginGame(d)}
+  showLobby(d);if(d.phase=="playing"&&!(me&&me.late))beginGame(d)}
 // The lobby has three faces: waiting (Ready toggles), a game in progress (live scores; players who joined late only watch), and game over (ranked results).
 const lateMsg=ms=>"A game is in progress ("+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0")+" left). You'll join the next one.";
 const fmtT=ms=>Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0"); // 2:41
-function renderLobby(d){
+// Results stay put: when the game ends, each player keeps seeing its results until THEY press Ready. If another player's Ready has already opened the next lobby (the server
+// resets everyone to the lobby on the first Ready after a game), a player who hasn't pressed Ready yet still sees the finished game's board (HOLD) with a line about the new lobby;
+// pressing Ready (or the next game starting, or leaving) ends the hold. The server's data is untouched: the finished game is already in Previous games.
+function showLobby(d){
+  const me=d.players.find(p=>p.me);
+  if(d.phase=="over")HOLD=me&&!me.late?d:null;
+  else if(!(d.phase=="lobby"&&HOLD&&HOLD.hn==d.hn&&me&&!me.ready))HOLD=null;
+  noteChanges(d);renderLobby(HOLD&&d.phase=="lobby"?HOLD:d,d)}
+// A short quiet notice when a friend joins or leaves (names only, shown as text for 6 seconds). A rename (one out, one in) is not announced.
+function noteChanges(d){
+  const names=d.players.filter(p=>!p.me).map(p=>p.name);
+  if(PREVC!=d.code){PREVC=d.code;PREVN=null}
+  if(PREVN){const was=[...PREVN],now=[...names];for(const n of names){const i=was.indexOf(n);if(i>=0)was.splice(i,1)}for(const n of PREVN){const i=now.indexOf(n);if(i>=0)now.splice(i,1)}
+    if(!(was.length==1&&now.length==1)&&(was.length||now.length)){$("lbNote").textContent=[...now.map(n=>n+" joined"),...was.map(n=>n+" left")].join(" · ");clearTimeout(noteT);noteT=setTimeout(()=>$("lbNote").textContent="",6000)}}
+  PREVN=names}
+function renderLobby(d,live=d){ // d: what to show (a held results board, or the live data); live: the server's current data (settings, who is in, who is ready)
   const over=d.phase=="over",playing=d.phase=="playing",me=d.players.find(p=>p.me);
   const ranked=over?d.players.filter(p=>!p.late).sort((a,b)=>b.total-a.total):d.players,latecomers=over?d.players.filter(p=>p.late):[]; // after a game, anyone who joined late is listed below the ranking
-  const N=d.n||5,status=p=>over?(p.late?"Waiting to start":`${p.total} pts · ${p.right}/${N} solved${p.fin!=null?" · "+fmtT(p.fin):""}`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts${p.fin!=null?" · "+fmtT(p.fin):""}`:`${p.rounds}/${N} rounds · ${p.total} pts`):(p.ready?"✓ Ready":"Not ready");
-  const row=(p,i)=>`<div class="${p.me?"me":""}"><span>${over&&!p.late?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}</span><span>${status(p)}</span>${p.wins?`<i class=star title="Games won">⭐${p.wins>1?"×"+p.wins:""}</i>`:""}</div>`;
-  $("lbTitle").innerHTML=`Lobby · <b title="Click to copy the invite link">${d.code}</b>`;
-  if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=[...ranked.map(row),...latecomers.map(row)].join("");
-  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=d.players.length<2||!!d.empty;$("lbReady").title=d.empty?"Switch at least one airport on":d.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
+  const N=d.n||5,status=p=>over?(p.late?"Waiting to start":`<span class="num">${p.total}/${N*TRIES}</span><span class="num">${p.right}/${N}</span><span class="num">${p.fin!=null?fmtT(p.fin):"–"}</span>`):playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts${p.fin!=null?" · "+fmtT(p.fin):""}`:`${p.rounds}/${N} rounds · ${p.total} pts`):(p.ready?"✓ Ready":"Not ready");
+  const row=(p,i)=>`<div class="${p.me?"me":""}${over&&!p.late?" tbl":""}"><span>${over&&!p.late?(i+1)+". ":""}${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}${p.wins?`<i class=star title="Games won" aria-label="${p.wins} game${p.wins==1?"":"s"} won">★${p.wins>1?"×"+p.wins:""}</i>`:""}</span>${over&&!p.late?status(p):`<span class="wide">${status(p)}</span>`}</div>`;
+  if($("lbTitle").dataset.c!=d.code){$("lbTitle").dataset.c=d.code;$("lbTitle").innerHTML=`Lobby · <b role="button" tabindex="0" title="Click to copy the invite link">${esc(d.code)}</b>`} // only rebuilt when the code changes, so keyboard focus on it survives the refresh
+  if(!document.activeElement.classList.contains("nm"))$("lbPlayers").innerHTML=(over&&ranked.length?`<div class="hd tbl"><span>Player</span><span>Points</span><span>Solved</span><span>Time</span></div>`:"")+[...ranked.map(row),...latecomers.map(row)].join("");
+  const rdy=!over&&!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=live.players.length<2||!!live.empty;$("lbReady").title=live.empty?"Switch at least one airport on":live.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
   $("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy); // after a game, Ready starts the next one
   // After a game: one callout with the longest first-guess streak in the lobby (everyone who shares it is named).
   const best=over?Math.max(0,...ranked.map(p=>p.streak||0)):0,who=ranked.filter(p=>(p.streak||0)==best).map(p=>p.name);
   $("lbStreak").hidden=!(over&&best>0);
-  if(over&&best>0)$("lbStreak").textContent="🔥 Best streak: "+(who.length>2?who.slice(0,-1).join(", ")+" and "+who[who.length-1]:who.join(" and "))+", "+best+" in a row";
-  renderCfg(d,playing);renderHist(over);
-  $("lbMsg").textContent=over?"":playing?lateMsg(d.left||0):d.empty?"Switch at least one airport on to play.":d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
+  if(over&&best>0)$("lbStreak").textContent="Best streak: "+(who.length>2?who.slice(0,-1).join(", ")+" and "+who[who.length-1]:who.join(" and "))+", "+best+" in a row";
+  renderCfg(live,playing);renderHist(over);
+  $("lobby").classList.toggle("over",over); // results first: the board sits right under the code, above the host's settings
+  const held=over&&live.phase=="lobby"; // the next lobby is already open while this player is still reading the results
+  $("lbMsg").textContent=held?(live.players.length<2?"The next game's lobby is open. Waiting for friends.":"The next game's lobby is open: "+live.players.filter(p=>p.ready).length+" of "+live.players.length+" ready. Press Ready to join."):over?"":playing?lateMsg(d.left||0):d.empty?"Switch at least one airport on to play.":d.cd!=null?"Starting in "+Math.ceil(d.cd/1e3)+"…":d.players.length<2?"Waiting for friends: share the code or the link.":"";renderTrivia()}
 // Previous games in this lobby (newest first): what was played and everyone's score. While a game's results are showing above, that game is left out of this list.
 function renderHist(over){
   const list=(over?HIST.slice(0,-1):HIST).slice().reverse(),key=HN+":"+list.length,box=$("lbHist");
@@ -424,7 +496,7 @@ function renderCfg(d,playing){ // the host gets working controls; everyone else 
   document.querySelectorAll("#lbCfg button,#lbCfg select,#lbCfg input").forEach(e=>e.disabled=ro);
   if($("lbSt").options.length<2)$("lbSt").innerHTML=$("st").innerHTML; // the state list, filled once
   const shown=!ro&&ZIPOPEN?"zip":!ro&&LISTOPEN?"list":c.kind;
-  document.querySelectorAll("#lbKind button").forEach(b=>b.classList.toggle("on",b.dataset.k==shown));
+  document.querySelectorAll("#lbKind button").forEach(b=>{b.classList.toggle("on",b.dataset.k==shown);b.setAttribute("aria-pressed",String(b.dataset.k==shown))});
   $("lbCustom").hidden=shown!="custom";$("lbList").hidden=shown!="list"&&!LISTMENU;$("lbZip").hidden=shown!="zip";if(shown=="list"&&!LISTMENU)paintList(c.kind=="list"?c:{},ro);
   const ae=ro?null:document.activeElement;
   if(c.kind=="custom"){if(ae!==$("lbFmt"))$("lbFmt").value=c.fmt;if(ae!==$("lbSt"))$("lbSt").value=c.st;if(ae!==$("lbDiff"))$("lbDiff").value=c.mode}
@@ -461,7 +533,7 @@ function paintAir(c){
   $("lbAirNote").textContent=own?"Tap an airport to switch it off or on.":"Only the host can change these.";
   $("lbAirAll").hidden=!own;$("lbAirNav").hidden=pages<2;$("lbAirPg").textContent=(AIRPAGE+1)+" / "+pages;$("lbAirPrev").disabled=AIRPAGE<=0;$("lbAirNext").disabled=AIRPAGE>=pages-1;
   $("lbAirList").replaceChildren(...LBLIST.slice().sort((a,b)=>a[0]<b[0]?-1:1).slice(AIRPAGE*AIRPER,(AIRPAGE+1)*AIRPER).map(([code,,,city,st])=>{const isOn=!off.has(code);
-    return mk("button",{type:"button",className:"air"+(isOn?" on":""),disabled:!own,title:city+", "+st,onclick:()=>vsPost({action:"airport",ap:code,on:!isOn}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d)}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."})},mk("b",{textContent:code}),mk("small",{textContent:city}))}))}
+    return mk("button",{type:"button",className:"air"+(isOn?" on":""),disabled:!own,title:city+", "+st,"aria-pressed":String(isOn),onclick:()=>vsPost({action:"airport",ap:code,on:!isOn}).then(d=>{$("lbCfgErr").textContent="";vsHandle(d)}).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."})},mk("b",{textContent:code}),mk("small",{textContent:city}))}))}
 $("lbAirSel").onclick=()=>vsPost({action:"airportAll",on:true}).then(vsHandle).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."});
 $("lbAirNone").onclick=()=>vsPost({action:"airportAll",on:false}).then(vsHandle).catch(e=>{$("lbCfgErr").textContent=(e&&e.error)||"Couldn't change that."});
 $("lbAirPrev").onclick=()=>{AIRPAGE=Math.max(0,AIRPAGE-1);paintAir(VSD.cfg)};$("lbAirNext").onclick=()=>{AIRPAGE++;paintAir(VSD.cfg)};
@@ -474,7 +546,8 @@ async function paintZipMap(c){
   const box=$("lbMap");box.hidden=!(c&&c.kind=="zip"&&c.lat!=null);if(box.hidden)return;
   const key=c.zip+":"+c.miles;if(key==LBKEY)return;LBKEY=key;
   let list=[];try{list=await fetch("/api/within?lat="+c.lat+"&lon="+c.lon+"&miles="+c.miles).then(r=>r.json())}catch{}
-  try{await loadMaps()}catch{$("lbMapNote").textContent="The map couldn't load.";return}
+  if(!Array.isArray(list))list=[]; // an error reply is not a list
+  try{await loadMaps()}catch{if(key!=LBKEY)return;LBLIST=list;LBLISTKEY=key;AIRKEY="";AIRPAGE=0;paintAir(c);$("lbMapNote").textContent="The map couldn't load, but you can still pick airports below.";return} // no map: the airport buttons still work
   if(key!=LBKEY)return;
   const G=google.maps,ctr={lat:c.lat,lng:c.lon};
   LBMAP||=new G.Map($("lbMapCanvas"),{mapTypeId:"roadmap",styles:LBSTYLE,disableDefaultUI:true,zoomControl:true,gestureHandling:"cooperative",center:ctr,zoom:7});
@@ -505,10 +578,11 @@ function paintList(c,ro){ // lobby: called with the settings on every refresh
   $("lbFindBox").hidden=$("lbListBtns").hidden=ro;
   if(!ro){$("lbListUse").textContent=active&&!DIRTY?"List in use":"Use this list";$("lbListUse").disabled=!DRAFT.length||(active&&!DIRTY)}
   paintChips(ro)}
+let FINDQ=""; // the text the shown predictions are for
 async function findAirports(){
   const q=$("lbFind").value.trim(),n=++FINDN;
-  if(!q){FINDROWS=[];paintFind();return}
-  try{const rows=await fetch("/api/find?q="+encodeURIComponent(q)).then(r=>r.json());if(n!=FINDN||!Array.isArray(rows))return;rememberRows(rows);FINDROWS=rows.filter(x=>CODE_OK(x[0]));FINDSEL=0;paintFind()}catch{}}
+  if(!q){FINDROWS=[];FINDQ="";paintFind();return true}
+  try{const rows=await fetch("/api/find?q="+encodeURIComponent(q)).then(r=>r.json());if(n!=FINDN)return true;if(!Array.isArray(rows))return false;rememberRows(rows);FINDROWS=rows.filter(x=>CODE_OK(x[0]));FINDQ=q;FINDSEL=0;paintFind();return true}catch{return false}}
 let MX=-1,MY=-1;addEventListener("mousemove",e=>{MX=e.clientX;MY=e.clientY},{passive:true});
 function selectHit(i){FINDSEL=i;[...$("lbFindRes").children].forEach((d,j)=>{d.classList.toggle("sel",j==i);d.setAttribute("aria-selected",String(j==i))})}
 function paintFind(){
@@ -521,13 +595,33 @@ function addAirport(code){
   if(DRAFT.includes(code))lbListMsg(code+" is already in your list.");
   else if(DRAFT.length>=100)lbListMsg("A list can have up to 100 airports.");
   else{DRAFT.push(code);DIRTY=true;lbListMsg("");$("listErr").textContent="";paintChips(false);$("lbListUse").disabled=false;$("lbListUse").textContent="Use this list"}
-  $("lbFind").value="";FINDROWS=[];paintFind();$("lbFind").focus()}
+  FINDN++;$("lbFind").value="";FINDROWS=[];paintFind();$("lbFind").focus()} // FINDN++: a search still in flight must not bring the dropdown back
+// Several codes at once (pasted or typed): "KORD, KMDW KATL" or one per line. Space-only text counts as a list only for 3+ codes or K-codes ("san jose" stays a city search).
+const codeTokens=t=>String(t).toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+const looksLikeList=t=>{const k=codeTokens(t);return k.length>=2&&k.every(x=>/^[A-Z0-9]{3,4}$/.test(x))&&(/[,;\r\n]/.test(t)||k.length>=3||k.every(x=>/^K[A-Z]{3}$/.test(x)))};
+async function addMany(text){
+  const all=codeTokens(text),toks=[...new Set(all.filter(x=>/^[A-Z0-9]{3,4}$/.test(x)))].slice(0,100);
+  lbListMsg("Checking…");let rows;try{rows=await fetch("/api/find?codes="+encodeURIComponent(toks.join(","))).then(r=>r.json())}catch{return lbListMsg("Couldn't check those. Try again.")}
+  if(!Array.isArray(rows))return lbListMsg("Couldn't check those. Try again.");
+  rememberRows(rows);let added=0,dup=0;
+  for(const x of rows){if(!CODE_OK(x[0]))continue;if(DRAFT.includes(x[0])){dup++;continue}if(DRAFT.length>=100)break;DRAFT.push(x[0]);added++}
+  if(added){DIRTY=true;CHIPKEY="";$("listErr").textContent="";paintChips(false);$("lbListUse").disabled=false;$("lbListUse").textContent="Use this list"}
+  const bad=toks.length-rows.length;FINDN++;
+  lbListMsg((added?added+" airport"+(added==1?"":"s")+" added":"Nothing new added")+(dup?"; "+dup+" already in your list":"")+(bad>0?"; "+bad+" not recognized":"")+(DRAFT.length>=100?" (the list is full at 100)":"")+".");
+  $("lbFind").value="";FINDROWS=[];FINDQ="";paintFind()}
+// Enter: if predictions for what is typed haven't arrived yet (the 150 ms wait, or a slow reply), fetch them now and use those, never the old ones.
+async function enterFind(){
+  const v=$("lbFind").value.trim();if(!v)return;
+  if(looksLikeList(v))return addMany(v);
+  clearTimeout(findT);if(FINDQ!=v||!FINDROWS.length){const ok=await findAirports();if(!ok)return lbListMsg("Couldn't search right now. Try again.");if($("lbFind").value.trim()!=v)return} // typing went on meanwhile: that newer text has its own search
+  if(FINDROWS.length)addAirport(FINDROWS[FINDSEL][0]);else lbListMsg("No airport matches that. Try a code or a city.")}
+$("lbFind").onpaste=e=>{const t=e.clipboardData&&e.clipboardData.getData("text");if(t&&looksLikeList(t)){e.preventDefault();addMany(t)}};
 let findT=0;
 $("lbFind").oninput=()=>{clearTimeout(findT);findT=setTimeout(findAirports,150)};
 $("lbFind").onkeydown=e=>{
   if(e.key=="ArrowDown"&&FINDROWS.length){e.preventDefault();FINDSEL=(FINDSEL+1)%FINDROWS.length;paintFind()}
   else if(e.key=="ArrowUp"&&FINDROWS.length){e.preventDefault();FINDSEL=(FINDSEL+FINDROWS.length-1)%FINDROWS.length;paintFind()}
-  else if(e.key=="Enter"){e.preventDefault();if(FINDROWS.length)addAirport(FINDROWS[FINDSEL][0]);else lbListMsg("No airport matches that. Try a code or a city.")}
+  else if(e.key=="Enter"){e.preventDefault();enterFind()}
   else if(e.key=="Escape"){FINDROWS=[];paintFind()}};
 $("lbFind").onblur=()=>{FINDROWS=[];paintFind()};
 $("lbListUse").onclick=()=>{if(!DRAFT.length)return;lbListMsg("Saving…");
@@ -552,7 +646,8 @@ $("lbListUp").onchange=async e=>{
   lbListMsg(DRAFT.length+" airport"+(DRAFT.length==1?"":"s")+" loaded"+(codes.length>DRAFT.length?"; "+(codes.length-DRAFT.length)+(codes.length-DRAFT.length==1?" wasn't recognized and was":" weren't recognized and were")+" skipped":"")+(LISTMENU?". Press Start to play them.":". Press Use this list to play them."))};
 // The main menu's Custom List button: the same builder (search, chips, download, upload) is moved into a popup, then back to the lobby panel afterwards.
 let LISTSAVED={};try{LISTSAVED=JSON.parse(localStorage.icaoListGame)}catch{}
-const listBack=()=>{if(!LISTMENU)return;LISTMENU=false;$("lbList").classList.remove("menu");$("lbList").hidden=true;$("lbCfg").insertBefore($("lbList"),$("lbZip"))};
+const listBack=()=>{if(!LISTMENU)return;LISTMENU=false;DIRTY=false;LISTSRC="~"; // the menu's draft must not leak into a lobby's builder
+$("lbList").classList.remove("menu");$("lbList").hidden=true;$("lbCfg").insertBefore($("lbList"),$("lbZip"))};
 $("listBtn").onclick=()=>{snd("open");LISTMENU=true;LISTRO=false;
   DRAFT=(Array.isArray(LISTSAVED.codes)?LISTSAVED.codes:[]).filter(CODE_OK).slice(0,100);DIRTY=true;CHIPKEY="";
   $("listSlot").append($("lbList"));$("lbList").classList.add("menu");$("lbList").hidden=false;
@@ -562,7 +657,9 @@ $("listBtn").onclick=()=>{snd("open");LISTMENU=true;LISTRO=false;
 const listClose=()=>{$("listDlg").close();listBack()};
 $("listCancel").onclick=()=>{snd("back");listClose()};$("listX").onclick=()=>{snd("back");listClose()};$("listDlg").onclose=listBack;
 async function playList(codes,fmt,err){ // five of the airports at random; shared by the Start button and "Play again"
+  if($("listGo").disabled)return;$("listGo").disabled=true;
   err("Starting…");const d=await fetch("/api/list?codes="+encodeURIComponent(codes.join(","))).then(r=>r.json()).catch(()=>({error:"Couldn't start that. Try again."}));
+  $("listGo").disabled=false;
   if(d.error)return err(d.error);
   try{localStorage.icaoListGame=JSON.stringify({codes,fmt})}catch{}
   if($("listDlg").open)listClose();start("easy",fmt,"LIST",d)}
@@ -570,7 +667,7 @@ $("listGo").onclick=()=>{if(!DRAFT.length)return void($("listErr").textContent="
 // ---- Lobby trivia (desktop browsers only): 5 questions while you wait. After the last one you see everyone's right and wrong.
 // It floats in the empty space under the Ready/Leave buttons, centered between them and the bottom of the screen (or sits right under them if the screen is short).
 const PCQ=matchMedia("(hover:hover) and (pointer:fine) and (min-width:821px)");
-const mk=(t,p,...k)=>{const e=document.createElement(t);Object.assign(e,p||{});e.append(...k);return e};
+const mk=(t,p,...k)=>{const e=document.createElement(t);for(const [a,v] of Object.entries(p||{}))a.startsWith("aria-")?e.setAttribute(a,v):e[a]=v;e.append(...k);return e}; // aria-* keys must be attributes (assigning them as properties does nothing)
 const pips=res=>mk("span",{className:"tvpips"},...res.map(v=>mk("i",{className:v==null?"":v?"ok":"bad",textContent:v==null?"•":v?"✓":"✗"})));
 function placeTrivia(){} /* the card now sits in the page right under the lobby (see style.css), so it scrolls with everything else and never covers it */
 function renderTrivia(){
@@ -605,39 +702,55 @@ function renderTrivia(){
       ...(TVD.others||[]).map(o=>mk("div",{className:"tvrow"},mk("span",{textContent:o.name}),pips(o.res)))];
     if(!(TVD.others||[]).length)kids.push(mk("p",{className:"tvres",textContent:"Nobody else is here yet."}))}
   box.replaceChildren(...kids);placeTrivia()}
-PCQ.addEventListener("change",()=>{tvSig="";if(VSD)renderLobby(VSD)});
+PCQ.addEventListener("change",()=>{tvSig="";if(VSD)showLobby(VSD)});
 addEventListener("resize",()=>placeTrivia());
 // Footer, next to the version: how long until the lobby closes for inactivity (resets whenever someone joins, leaves, readies up or answers trivia).
 setInterval(()=>{const el=$("lobbyClock"),ms=ROOM&&!INGAME&&CLOSEEND?Math.max(0,CLOSEEND-Date.now()):-1;el.hidden=ms<0;
   if(ms>=0){el.textContent="Lobby closes in "+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");el.classList.toggle("soon",ms<60000)}},500);
 function beginGame(d){
   if(PLAYED){location.href="/?join="+ROOM.code+"&auto=1";return} // a second game: a fresh page is the simplest clean slate (it rejoins this game and starts right away)
-  INGAME=PLAYED=true;ENDS=Date.now()+d.left;$("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
+  GA=d.hn;INGAME=PLAYED=true;LATEEND=0;ENDS=Date.now()+d.left; // LATEEND=0: the "game in progress" line is for watchers only (left set, it would overwrite the results message when the game ends). GA: tells the server this page already has this game's airports, so later check-ins don't carry them again
+  $("lobby").hidden=true;$("board").classList.add("vs");$("vsTimer").hidden=false;$("round").style.display="none";
   start(d.mode||"easy",d.cfg?d.cfg.fmt:"map","ROOM",{day:d.day,airports:d.airports})}
 // Time is up: every round you haven't finished counts as missed, and you land on the results.
 function vsTimeout(){while(S.scores.length<PER)S.scores.push(0);S.i=PER;S.fails=0;S.guesses=[];hideCH();show()}
 setInterval(()=>{
-  if(INGAME&&S){const ms=Math.max(0,ENDS-Date.now());$("vsTimer").textContent="⏱ "+Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");if(!ms&&S.i<PER)vsTimeout();
+  if(INGAME&&S){const ms=Math.max(0,ENDS-Date.now());$("vsTimer").textContent=Math.floor(ms/6e4)+":"+String(Math.floor(ms/1e3)%60).padStart(2,"0");if(!ms&&S.i<PER)vsTimeout();
     const sec=Math.ceil(ms/1e3); // sounds while you're still playing: a beep at each minute mark, then one a second for the last 5 seconds
     if(sec<lastSec){lastSec=sec;if(S.i<PER){if(sec>=1&&sec<=5)snd("tick");else if(sec%60==0&&sec<300)snd("minute")}}}
   else if(LATEEND&&!INGAME)$("lbMsg").textContent=lateMsg(Math.max(0,LATEEND-Date.now()));
   else if(CDEND&&!INGAME){const n=Math.max(0,Math.ceil((CDEND-Date.now())/1e3));$("lbMsg").textContent="Starting in "+n+"…";
-    if(n!=lastTick){lastTick=n;if(n>=1&&n<=3)snd("tick");if(n==0)vsPoll()}} // a beep for each of the last three seconds
+    if(n!=lastTick){if(lastTick==-1&&n>0)say("Game starting in "+n+" seconds.");lastTick=n;if(n>=1&&n<=3)snd("tick");if(n==0)vsPoll()}} // a beep for each of the last three seconds
   else lastTick=-1},250);
-async function start(m,fmt,st,data,redo){
+let STARTING=false;
+async function start(...a){if(STARTING)return;STARTING=true;try{await startGame(...a)}finally{STARTING=false}} // a double click must not start two games; any end (success, error, early return) lets the next game start
+// Maps blocked, offline or rejected: say so and offer the City and state format (same airports, no map needed) instead of leaving a dead end.
+let LASTSTART=null;
+async function mapFail(why){
+  $("map").textContent=why;$("map").style.padding="1em";
+  if(FMT=="city"||!LASTSTART)return;
+  if(await ask("The satellite map isn't available right now. Play this game in the City and state format instead? It uses the same airports and needs no map.","Play City and state","Map unavailable"))startGame(LASTSTART[0],"city",...LASTSTART.slice(2))}
+async function startGame(m,fmt,st,data,redo){
+  LASTSTART=[m,fmt,st,data,redo];
   MODE=m;FMT=fmt;ST=st;REDO=!!redo;PRACTICE=!!ST||REDO;$("notScored").hidden=!REDO; // a replay of the daily says so under the answer box
- 
-  const d=data||await fetch(ST?`/api/state?mode=${encodeURIComponent(m)}&state=${encodeURIComponent(ST)}`:`/api/today?mode=${encodeURIComponent(m)}&day=${+PICK}`).then(r=>r.json());
+  const d=data||await fetch(ST?`/api/state?mode=${encodeURIComponent(m)}&state=${encodeURIComponent(ST)}`:`/api/today?mode=${encodeURIComponent(m)}&day=${+PICK}`).then(r=>r.json()).catch(()=>null);
+  if(!d||!Array.isArray(d.airports)||!d.airports.length){return void ask((d&&d.error)||"Couldn't load that game. Try again.","Okay","Couldn't start",true)}
   DAY=d.day;today=d.airports;if(REDO)today=[...today].sort(()=>Math.random()-.5);PER=today.length;buildFlap();
-  if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answersdocument.querySelector("h2.top a").href=menuUrl(); // the logo returns to the menu on the same day
+  if(location.hostname=="localhost")$("devAnswers").textContent=tag()+": "+today.map(a=>a[0]).join(" "); // dev only: this game's answers
+  document.querySelector("h1.top a").href=menuUrl(); // the logo returns to the menu on the same day (this line used to be swallowed by the comment above)
 SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice games aren't saved
-  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{} S=S||{i:0,fails:0,scores:[]};
+  S=null;if(SAVE)try{S=JSON.parse(localStorage[SAVE])}catch{}
+  // A saved game comes from localStorage, which anything on this computer can edit: use it only if it has exactly the expected shape (numbers, and guesses that look like guesses).
+  const isInt=(v,max)=>Number.isInteger(v)&&v>=0&&v<=max;
+  if(!(S&&typeof S=="object"&&isInt(S.i,PER)&&isInt(S.fails,TRIES)&&Array.isArray(S.scores)&&S.scores.length<=PER&&S.scores.every(v=>isInt(v,TRIES))&&(S.guesses===undefined||Array.isArray(S.guesses)&&S.guesses.length<=TRIES&&S.guesses.every(g=>typeof g=="string"&&/^[A-Za-z0-9 ↑]{1,24}$/.test(g)))))S=null;
+  S=S||{i:0,fails:0,scores:[]};
   snd(S.i>=PER?"open":ROOM?"go":"start"); // reopening a finished game just opens its results
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
   today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
-  if(FMT=="city"){$("map").classList.add("txt");if(!DOTS)fetch("/api/dots").then(r=>r.json()).then(d=>{DOTS=d;if(S&&S.i<PER)side()}).catch(()=>{})} // no map in this format: the city and state are the whole prompt
-  else{await loadMaps();map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
+  if(FMT=="city"){$("map").classList.add("txt");$("map").style.padding="";$("map").setAttribute("aria-label","City and state of the mystery airport");if(!DOTS)fetch("/api/dots").then(r=>r.json()).then(d=>{DOTS=d;if(S&&S.i<PER)side()}).catch(()=>{})} // no map in this format: the city and state are the whole prompt
+  else{try{await loadMaps()}catch{return mapFail("The map couldn't load.")} // Google Maps blocked or offline: offer the text format instead of a dead end
+    map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
   show();focusInput()}
 // Right column: Guesses (used/4), and under it Clues. Each miss unlocks the next clue and it pops in: region, then city/state, then the first letter.
 const REGION={};
@@ -646,20 +759,31 @@ let DOTS=null; // the locator map's dots, fetched once for City and state games
 const CITY_KEYS=[["region"],["loc"],["name","first","last"]]; // City and state: 2nd clue = nearest big airport + locator map; 3rd adds the last letter
 function dotMap(t){if(!DOTS)return"";const D=DOTS,x=Math.round((t[4]-D.lon0)/(D.lon1-D.lon0)*D.w),y=Math.round((D.lat1-t[3])/(D.lat1-D.lat0)*D.h);
   return `<svg class="dotmap" viewBox="0 0 ${D.w} ${D.h}" role="img" aria-label="Map of the airports with the answer highlighted"><path d="${D.d}"/><circle class="tg" cx="${x}" cy="${y}" r="3"/><circle class="ring" cx="${x}" cy="${y}" r="8"/></svg>`}
-const nearClue=t=>{const n=t[9];return (n?`${n[2]} mi ${n[3]} of ${n[0]}<br>(${esc(n[1])})`:"")+dotMap(t)};
+const nearClue=t=>{const n=t[9];return (n?`${esc(n[2])} mi ${esc(n[3])} of ${esc(n[0])}<br>(${esc(n[1])})`:"")+dotMap(t)};
 const CLUE_KEYS=[["region"],["loc"],["name","first"]]; // 1st miss: region (and the map gains place names); 2nd: city/state; 3rd: the airport name with its city blanked out, plus the first letter
+// One guess as markup. Stored form: "KDEN", "skip", or "KDEN cold↑270" with an optional " 523 mi". The arrow is turned to the bearing and followed by
+// a compass point (NE), so direction never relies on the arrow alone; screen readers get the three-digit bearing. Each part stays on one line ("523 mi" never splits).
+const COMPASS=["N","NE","E","SE","S","SW","W","NW"];
+function guessHTML(g){
+  if(!g)return"&mdash;";
+  const m=g.match(/^([A-Z0-9]{3,4}) (hot|cold)↑(\d{1,3})(?: (\d+) mi)?$/);
+  if(!m)return g=="skip"?"Skipped":esc(g);
+  const deg=+m[3],cp=COMPASS[Math.round(deg/45)%8];
+  return `<span class="gc">${esc(m[1])}</span> <span class="gh">${m[2]}</span> <span class="dir" style="transform:rotate(${deg}deg)" aria-hidden="true">↑</span><span class="gb">${cp}<span class="sr"> (bearing ${String(deg).padStart(3,"0")} degrees)</span></span>`+(m[4]?` <span class="gd">${m[4]} mi</span>`:"")}
 let seenClues={i:-1,n:0}; // how many clues of this round were already showing, so only a newly unlocked one pops up
 function side(){
   const t=today[S.i],f=S.fails,KEYS=FMT=="city"?CITY_KEYS:CLUE_KEYS,n=Math.min(f,KEYS.length), // every miss (or skip) unlocks the next clue; the last guess has all three
-  val={region:REGION[t[2]]||t[2],
-    loc:FMT=="city"?nearClue(t):`${t[1]}, ${t[2]}`, // the city format already shows the city, so its 2nd clue is the nearest big airport and a locator map
-    last:`Ends with ${[...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[3]))].join(" or ")}`,
-    first:`Starts with ${[...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[1]))].join(" or ")}`, // the letter after the K (every right answer's, when a city has several airports)
-    name:t[6].replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
+  val={region:esc(REGION[t[2]]||t[2]),
+    loc:FMT=="city"?nearClue(t):`${esc(t[1])}, ${esc(t[2])}`, // the city format already shows the city, so its 2nd clue is the nearest big airport and a locator map
+    last:`Ends with ${esc([...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[3]))].join(" or "))}`,
+    first:`Starts with ${esc([...new Set([t[0],...ALT(t).map(x=>x[0])].map(x=>x[1]))].join(" or "))}`, // the letter after the K (every right answer's, when a city has several airports)
+    name:esc(t[6]).replace(new RegExp(t[1].split(/[^A-Za-z]+/).filter(w=>w.length>2).join("|")||"$^","gi"),m=>"_".repeat(m.length))}, // the airport's name with any city word blanked
   known=seenClues.i===S.i?seenClues.n:n; // after a reload, or a new round, nothing counts as new
   seenClues={i:S.i,n};
-  $("guesses").innerHTML=`<b>Guesses</b>`+Array.from({length:TRIES},(_,k)=>`<div>${((S.guesses||[])[k]||"&mdash;").replace(/↑(\d+)/,'<span class="dir" style="transform:rotate($1deg)">↑</span>')}</div>`).join("");
-  $("cluebox").innerHTML="<b>Clues</b>"+KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("")}
+  $("guesses").innerHTML=`<b>Guesses</b>`+Array.from({length:TRIES},(_,k)=>`<div>${guessHTML((S.guesses||[])[k])}</div>`).join("");
+  $("cluebox").innerHTML="<b>Clues</b>"+KEYS.slice(0,n).map((ks,j)=>`<div${j>=known?' class="pop"':""}>${ks.map(k=>val[k]).join("<br>")}</div>`).join("");
+  const fresh=[...$("cluebox").querySelectorAll(".pop")].map(d=>d.innerText.replace(/\s+/g," ").trim());
+  if(fresh.length){const lg=(S.guesses||[]).slice(-1)[0],tmp=document.createElement("div");tmp.innerHTML=guessHTML(lg);say(tmp.textContent.replace(/\s+/g," ").trim()+". New clue: "+fresh.join(". "))}} // tell screen readers what the last guess showed and which clue it unlocked
 function forfeit(text){hideCH();const c=today[S.i][0];S.scores.push(0);S.i++;S.fails=0;S.guesses=[];
   $("msg").textContent=`${text}: ${c}`;snd("lost");save();reveal(c)}
 $("skip").onclick=()=>{if(S.i>=PER||busy)return;
@@ -677,7 +801,7 @@ gu.onclick=()=>{if(S.i>=PER||busy)return;
   disarm();forfeit("Gave up")};
 gu.onblur=()=>disarm();
 function setMap(t,zoom,minZ){
-  if(FMT=="city"){$("map").innerHTML=`<span>${t[1]}<br>${t[2]}</span>`;return}const lat=t[3],lon=t[4],B=.03;
+  if(FMT=="city"){$("map").innerHTML=`<span>${esc(t[1])}<br>${esc(t[2])}</span>`;return}const lat=t[3],lon=t[4],B=.03;
   // Free pan/zoom, but limited: can't pan far from the airport, can't zoom out past the starting view until the zoom-out hint (1st miss) unlocks it.
   map.setOptions({minZoom:minZ,maxZoom:Math.min(20,t[5]+3),restriction:{latLngBounds:{north:lat+B,south:lat-B,east:lon+B,west:lon-B}}});
   map.setCenter({lat,lng:lon});map.setZoom(zoom)}
@@ -687,6 +811,8 @@ function show(){
   $("g").disabled=$("go").disabled=false;$("skip").disabled=$("giveup").disabled=false;
   const t=today[S.i],[c,city,st,,,z]=t,f=S.fails;
   $("round").textContent=`${tag()} ${S.i+1}/${PER}`;
+  if(!f&&S.i>0)say(`Round ${S.i+1} of ${PER}.`); // (a new clue or guess result is announced by side() instead)
+  $("skip").textContent=f>=TRIES-1?"Skip (loses the round)":"Skip (costs a guess)"; // the cost is stated on the button, not only in a hover tip
   side();setMap(t,f>=1?10:z,f>=1?10:z-1);
   if(FMT!="city")map.setMapTypeId(f>=1?"hybrid":"satellite"); // after a miss the map gains road and place names
   choose(c,f)}
@@ -696,12 +822,14 @@ const hideCH=()=>{CH.hidden=true;$("f").hidden=false}; // the answer panel and t
 async function choose(c,f){hideCH();CH.innerHTML="";if(f<TRIES-1||S.i>=PER)return;
   const d=await fetch("/api/decoys?code="+c+"&skip="+ALT(today[S.i]).map(x=>x[0])).then(r=>r.json()).catch(()=>null);if(!d)return; // couldn't load the choices: the answer panel stays
   if(S.fails<TRIES-1||today[S.i][0]!=c)return; // the round moved on while loading
-  CH.innerHTML="<b>Final guess</b>"+[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${x}</button>`).join("");CH.hidden=false;$("f").hidden=true}
-CH.onclick=e=>{if(e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}};
+  const hadFocus=!document.activeElement||document.activeElement==document.body||$("f").contains(document.activeElement);
+  CH.innerHTML="<b>Final guess</b>"+[c,...d].sort(()=>Math.random()-.5).map(x=>`<button type="button" class="ghost">${esc(x)}</button>`).join("");CH.hidden=false;$("f").hidden=true;
+  if(hadFocus)CH.focus({preventScroll:true})} // hiding the answer box would drop keyboard focus to the page: put it on the panel instead (one Tab then reaches the first code)
+CH.onclick=e=>{if(!busy&&e.target.matches("button")){$("g").value=e.target.textContent;$("f").requestSubmit()}}; // (busy: a second click while the first choice is being checked must not leave its text in the box for the next round)
 function view(v){ // review a finished round: its airport, answer and result; no guessing
   V=v;navs();$("cluebox").hidden=CH.hidden=true;const t=today[v];$("g").disabled=$("go").disabled=$("skip").disabled=$("giveup").disabled=true;
   $("round").textContent=`${tag()} ${v+1}/${PER}`;
-  $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${t[0]}</div><div>${t[1]}, ${t[2]}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
+  $("guesses").innerHTML=`<b>Round ${v+1}</b><div>${S.scores[v]>0?"Solved":"Missed"}</div><div>${esc(t[0])}</div><div>${esc(t[1])}, ${esc(t[2])}</div><div>Score ${S.scores[v]}/${TRIES}</div>`;
   setMap(t,t[5],t[5]-1);paintStudy()}
 const HOT=500; // miles: within this = hot, otherwise cold
 const bearing=(a,b,c,d)=>{const r=Math.PI/180;return Math.round((Math.atan2(Math.sin((d-b)*r)*Math.cos(c*r),Math.cos(a*r)*Math.sin(c*r)-Math.sin(a*r)*Math.cos(c*r)*Math.cos((d-b)*r))/r+360)%360)}; // compass degrees from the guess to the answer
@@ -713,6 +841,7 @@ $("f").onsubmit=async e=>{e.preventDefault();
   if(g.length==3)g="K"+g; if(!/^K[A-Z]{3}$/.test(g))return;
   busy=1;const i0=S.i,t=today[S.i],c=t[0],alts=ALT(t),ok=g==c||alts.some(x=>x[0]==g);let lbl=g; // City and state game: another airport in the same city is also right
   if(!ok){const a=await fetch("/api/lookup?code="+g).then(r=>r.json()).catch(()=>({}));
+    if(S.i!=i0){busy=0;return} // time ran out while we looked it up: the round is already over
     if(a.lat!=null){const [d,p]=[[t[3],t[4]],...alts.map(x=>[x[1],x[2]])].map(p=>[miles(a.lat,a.lon,p[0],p[1]),p]).sort((x,y)=>x[0]-y[0])[0]; // hot/cold and the arrow point at the nearest right answer
       lbl+=(d<=HOT?" hot":" cold")+"↑"+bearing(a.lat,a.lon,p[0],p[1])+((S.guesses||[]).length>=2?` ${Math.round(d)} mi`:"")}} // distance shown from the 3rd guess on
   if(ok){SHOWN[S.i]=g;S.scores.push(TRIES-S.fails);S.i++;S.fails=0;S.guesses=[];$("msg").textContent="";snd("streak"+Math.max(1,Math.min(runAt(S.i-1),5)));confetti()} // the solve sound climbs with the first-guess run: streak1 ... streak5 (streak1 also for a solve after a miss)
@@ -770,7 +899,7 @@ $("rpSend").onclick=async()=>{const text=cleanReport($("rpText").value);
   catch{$("rpMsg").textContent="Couldn't send that. Try again.";$("rpSend").disabled=false}};
 function end(){
   loadStudy();
-  $("bestline").textContent="🔥 Best streak: "+bestRun()+" in a row";
+  $("bestline").textContent="Best streak: "+bestRun()+" in a row";
   const t=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length,pct=LOCAL?100*right/PER:100*t/(PER*TRIES);
   $("f").hidden=$("notScored").hidden=true;$("stats").hidden=$("again").hidden=false; // the results replace the answer panel; the board stays above
   $("board").classList.add("over"); // the guesses/clues column goes and the map takes its width
@@ -778,9 +907,9 @@ function end(){
   const q=QUIPS[GRADES.findIndex(([m])=>Math.round(pct)>=m)]; // same tiers as the letter grade
   $("quip").textContent=q[Math.floor(Math.random()*q.length)];
   $("stats").classList.toggle("nochart",LOCAL||PRACTICE); // no global stats for these
-  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b>`;$("again").textContent="Main Menu";$("replay").hidden=false;$("replay").onclick=()=>location.href="/?near=1";return} // near-me games: no grade, no score, nothing sent
+  if(LOCAL){$("grade").hidden=true;$("statline").innerHTML=`<b>${right}/${PER}</b> solved`;say(`Game over. You solved ${right} of ${PER}.`);$("again").textContent="Main Menu";$("replay").hidden=false;$("replay").onclick=()=>location.href="/?near=1";return} // near-me games: no grade, no score, nothing sent
   showGrade(t);
-  $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;
+  $("statline").innerHTML=`<b>${t}/${PER*TRIES}</b> points`;say(`Game over. You scored ${t} out of ${PER*TRIES} points. Grade ${$("grade").children[0].textContent}.`);
   if(ROOM){vsPoll();return} // friend games: tell the server you're done right now; your own results show while the others finish, then everyone returns to the lobby, where the feedback question is asked
   if(PRACTICE){$("replay").hidden=false;if(REDO)$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=REDO?`/?go=${MODE}&fmt=${FMT}&re=${DAY}`:ST=="LIST"?"/?list=1":`/?go=${MODE}&fmt=${FMT}&st=${ST}`;return} // practice: replay or change state, no global score
   $("share").hidden=false;askFeedback();$("replay").hidden=false;$("replay").textContent="Shuffle, play again.";$("replay").onclick=()=>location.href=`/?go=${MODE}&fmt=${FMT}&re=${DAY}`; // play the daily again for fun: new order, no change to your score
@@ -798,7 +927,7 @@ async function shareCard(){
     x.fillStyle="#1a1f28";x.beginPath();x.roundRect(px,110,130,160,16);x.fill();x.fillStyle="#0d1014";x.fillRect(px,189,130,3);
     x.fillStyle="#ffb81c";x.font="bold 110px monospace";x.fillText("ICAO"[k],px+65,230)}
   x.fillStyle="#e8eaee";x.font="bold 70px system-ui,sans-serif";x.fillText(title,mid,370); // e.g. "Normal Game" (and the date for an earlier day)
-  S.scores.forEach((v,k)=>{x.fillStyle=SQ[v];x.beginPath();x.roundRect(mid-PER*60+k*120+6,430,108,108,18);x.fill()});
+  S.scores.forEach((v,k)=>{x.fillStyle=SQ[v];x.beginPath();x.roundRect(mid-PER*60+k*120+6,430,108,108,18);x.fill();x.fillStyle="#0d1014";x.font="bold 64px system-ui,sans-serif";x.fillText(v,mid-PER*60+k*120+60,505)}); // the points (0 to 4) printed on each square, dark on all four colors (5.9:1 or better): color is never the only cue
   x.fillStyle="#ffb81c";x.font="bold 190px system-ui,sans-serif";x.fillText(t+"/"+PER*TRIES,mid,760);
   x.fillStyle="#e8eaee";x.font="bold 64px system-ui,sans-serif";x.fillText("I played this. Challenge me!",mid,890);
   x.fillStyle="#9aa3b2";x.font="48px system-ui,sans-serif";x.fillText(location.host,mid,970);
@@ -807,11 +936,11 @@ async function shareCard(){
 async function uploadShare(s){
   try{const b=new Uint8Array(await s.blob.arrayBuffer());let bin="";for(let i=0;i<b.length;i+=8192)bin+=String.fromCharCode(...b.subarray(i,i+8192));
     const r=await fetch("/api/share",{method:"POST",body:JSON.stringify({png:btoa(bin),score:s.score,of:s.of,title:s.title})}),d=await r.json();
-    if(d.id){s.link=location.origin+"/s/"+d.id;s.text=s.text.replace(location.origin,s.link)}}catch{}}
+    if(/^[0-9a-f]{10}$/.test(d.id)){s.link=location.origin+"/s/"+d.id;s.text=s.text.replace(location.origin,s.link)}}catch{}}
 const shMsg=m=>$("shMsg").textContent=m;
 async function openShare(){
   if(SHARE)URL.revokeObjectURL(SHARE.url);
-  SHARE=await shareCard();$("shImg").src=SHARE.url;shMsg("");SHARE.ready=uploadShare(SHARE);$("shMore").hidden=!navigator.share;$("shareDlg").showModal()}
+  SHARE=await shareCard();$("shImg").src=SHARE.url;$("shImg").alt=`Your result card: ${SHARE.title}, ${SHARE.score} out of ${SHARE.of} points. Points per round: ${S.scores.join(", ")}, out of ${TRIES} each.`;shMsg("");SHARE.ready=uploadShare(SHARE);$("shMore").hidden=!navigator.share;$("shareDlg").showModal()}
 const copyText=async t=>{try{await navigator.clipboard.writeText(t);return true}catch{return false}};
 const saveImage=()=>{const a=Object.assign(document.createElement("a"),{href:SHARE.url,download:"icaodle.png"});a.click()};
 $("share").onclick=openShare;
@@ -831,7 +960,7 @@ function askFeedback(){
   if(!ROOM){try{if(localStorage[key])return;localStorage[key]=1}catch{}} // a daily is asked once, even if you reopen its results later
   FBASKED=true;
   setTimeout(()=>{$("fbTitle").textContent="How was this game?";$("fbRate").hidden=false;$("fbWhy").hidden=true;
-    $("fbAir").innerHTML=today.map(a=>`<button type="button" class="ghost" data-c="${a[0]}" title="${esc(a[1])}, ${a[2]}" aria-pressed="false">${a[0]}</button>`).join("");$("fbInline").hidden=false},500)} // friend games ask in the lobby, after the game
+    $("fbAir").innerHTML=today.map(a=>`<button type="button" class="ghost" data-c="${esc(a[0])}" title="${esc(a[1])}, ${esc(a[2])}" aria-pressed="false">${esc(a[0])}</button>`).join("");$("fbInline").hidden=false},500)} // friend games ask in the lobby, after the game
 function fbSend(rating,airports){fetch("/api/feedback",{method:"POST",body:JSON.stringify({kind:ROOM?"friend":"daily",day:DAY,mode:MODE,rating,airports})}).catch(()=>{});fbClose()}
 $("fbRate").onclick=e=>{const b=e.target.closest("button");if(!b)return;FBR=b.dataset.r;if(FBR=="fun")return fbSend(FBR,[]);
   $("fbTitle").textContent="Which airports bothered you?";$("fbRate").hidden=true;$("fbWhy").hidden=false};
@@ -845,22 +974,31 @@ function postScore(){
   const score=S.scores.reduce((a,b)=>a+b,0),right=S.scores.filter(v=>v>0).length;let id;try{id=localStorage.pid=localStorage.pid||crypto.randomUUID()}catch{id=crypto.randomUUID()}
   return fetch("/api/score",{method:"POST",body:JSON.stringify({id,day:DAY,mode:MODE+(FMT=="city"?"-city":""),score,right})}).then(r=>r.json())}
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+// Score distribution: a histogram, one bar per possible score (0 to 20 points), bar height = number of players. Axes are titled, the y axis has numbers, and the same
+// facts are written out under the chart (and in the canvas label) so nothing depends on seeing the picture. Your bar is amber AND carries a "You" line.
 function chart(d,me){
-  const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1);
-  c.hidden=false;
+  const dist=d.dist,c=$("chart"),x=c.getContext("2d"),n=PER*TRIES+1,m=Math.max(...Object.values(dist),1),total=Object.values(dist).reduce((a,v)=>a+v,0);
+  $("chartbox").hidden=false;
+  const below=Object.entries(dist).reduce((a,[k,v])=>a+(+k<me?v:0),0),pctBelow=total>1?Math.round(100*below/total):null;
+  const sum=`${total} player${total==1?"":"s"} so far. Average ${d.avg.toFixed(1)} out of ${PER*TRIES} points. You scored ${me}`+(pctBelow==null?". You are the first to post a score.":`, higher than ${pctBelow}% of players.`);
+  $("chartSum").textContent=sum;c.setAttribute("aria-label","Score distribution. "+sum);
   // draw at the size it's shown (times the screen's pixel density) so the text stays sharp, instead of stretching a fixed 600px bitmap
-  const W=Math.max(300,c.clientWidth),H=220,dpr=devicePixelRatio||1,w=W/n,base=190;
+  const W=Math.max(300,c.clientWidth),H=244,dpr=devicePixelRatio||1,padL=34,w=(W-padL)/n,base=190,top=40;
   c.width=W*dpr;c.height=H*dpr;c.style.height=H+"px";x.scale(dpr,dpr);
-  for(let k=0;k<n;k++){const h=(dist[k]||0)/m*150;x.globalAlpha=k==me?1:.35;x.fillStyle=k==me?css("--brand"):css("--text");x.fillRect(k*w+2,base-h,w-4,h);x.globalAlpha=1}
-  x.fillStyle=css("--muted");x.font="11px system-ui";x.textAlign="center";for(let k=0;k<n;k+=5)x.fillText(k,k*w+w/2,base+14);
+  x.font="12px system-ui";x.fillStyle=css("--muted");x.strokeStyle=css("--border");x.lineWidth=1;x.textAlign="right";
+  for(const v of [...new Set([0,Math.round(m/2),m])]){const y=Math.round(base-v/m*(base-top))+.5;x.beginPath();x.moveTo(padL,y);x.lineTo(W,y);x.stroke();x.fillText(v,padL-6,y+4)} // light gridlines at 0, half and the tallest bar
+  x.save();x.translate(10,(base+top)/2);x.rotate(-Math.PI/2);x.textAlign="center";x.fillText("Players",0,0);x.restore();
+  for(let k=0;k<n;k++){const bh=(dist[k]||0)/m*(base-top);x.globalAlpha=k==me?1:.5;x.fillStyle=k==me?css("--brand"):css("--text");x.fillRect(padL+k*w+1.5,base-bh,w-3,bh);x.globalAlpha=1}
+  x.fillStyle=css("--muted");x.textAlign="center";for(let k=0;k<n;k+=5)x.fillText(k,padL+k*w+w/2,base+16);
+  x.fillText("Points (out of "+PER*TRIES+")",padL+(W-padL)/2,base+36);
   // dotted vertical lines: the average player's score and yours; labels sit on opposite sides (and different heights) so they don't collide, and flip so they never run off the edge
-  const mark=(v,col,label,y,align)=>{const px=(v+.5)*w;x.strokeStyle=x.fillStyle=col;x.lineWidth=2;x.setLineDash([4,4]);
-    x.beginPath();x.moveTo(px,34);x.lineTo(px,base);x.stroke();x.setLineDash([]);x.font="bold 12px system-ui";
-    const tw=x.measureText(label).width;if(align=="right"&&px-5-tw<0)align="left";else if(align=="left"&&px+5+tw>W)align="right";
+  const mark=(v,col,label,y,align)=>{const px=padL+(v+.5)*w;x.strokeStyle=x.fillStyle=col;x.lineWidth=2;x.setLineDash([4,4]);
+    x.beginPath();x.moveTo(px,y+6);x.lineTo(px,base);x.stroke();x.setLineDash([]);x.font="bold 12px system-ui";
+    const tw=x.measureText(label).width;if(align=="right"&&px-5-tw<padL)align="left";else if(align=="left"&&px+5+tw>W)align="right";
     x.textAlign=align;x.fillText(label,px+(align=="left"?5:-5),y)};
   const lowAvg=d.avg<=me;
   mark(d.avg,css("--text"),`Average ${d.avg.toFixed(1)}`,12,lowAvg?"right":"left");
-  mark(me,css("--brand"),`You ${me}`,26,lowAvg?"left":"right")}
+  mark(me,css("--brand"),`You ${me}`,28,lowAvg?"left":"right")}
 // Menu background: a few muted planes fly straight across the screen. Most are small and slow, behind the containers; a few are larger,
 // faster and fainter, passing in front of them for depth. Two colors only (amber and grey). Runs only while the menu / custom screen is
 // showing (start() stops it).
@@ -884,7 +1022,7 @@ const sky=(()=>{
       cx.globalAlpha=p.a;cx.fillStyle=cols[p.col];cx.scale(p.s/2,p.s/2);cx.fill(PLANE);cx.restore()}
   }
   // a click on empty menu background (not a button, link, field, footer or the logo) launches another plane, up to MAX
-  function onClick(e){if(planes.length>=MAX||e.target.closest("button,a,select,input,label,#opts,footer,h2,dialog"))return;planes.push(spawn(Math.random()<.3,false,{x:e.clientX,y:e.clientY}))}
+  function onClick(e){if(planes.length>=MAX||e.target.closest("button,a,select,input,label,#opts,footer,h1,dialog"))return;planes.push(spawn(Math.random()<.3,false,{x:e.clientX,y:e.clientY}))}
   function tick(n){if(!running)return;const dt=Math.min(.05,(n-last)/1e3);last=n;step(dt);draw();raf=requestAnimationFrame(tick)}
   function size(){W=cb.width=cf.width=innerWidth;H=cb.height=cf.height=innerHeight}
   return{
@@ -902,4 +1040,5 @@ const sky=(()=>{
   };
 })();
 sky.start();
+$("again").onclick=()=>location.href=menuUrl(); // (was an inline onclick="" attribute; the page's Content-Security-Policy does not allow those)
 </script>

@@ -44,6 +44,13 @@ test("SSR safety: importing and creating a sound with no window/AudioContext nev
   assert.equal(s.ready, false);
 });
 
+test("a throwing AudioContext leaves the sound silent and unlock() returns false instead of throwing", () => {
+  const s = createSound({ createUISFX: () => ({}), AudioContextCtor: class { constructor() { throw new Error("no audio"); } } });
+  assert.equal(s.unlock(), false);
+  assert.equal(s.ready, false);
+  assert.equal(s.play("start"), null);
+});
+
 test("every event maps to a real uisfx cue, and the pack is real", () => {
   assert.ok(packNames.includes(PACK));
   for (const [event, e] of Object.entries(EVENTS)) assert.ok(cueNames.includes(e.cue), `${event} -> ${e.cue}`);

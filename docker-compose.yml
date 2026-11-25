@@ -4,9 +4,20 @@ services:
     image: icaodle:latest
     restart: unless-stopped
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - "${HOST_PORT:-3000}:3000"      # if cloudflared runs on this same machine, use "127.0.0.1:${HOST_PORT:-3000}:3000" so only the tunnel can reach the game
     environment:
       GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:?put your Google Maps key in .env (see .env.example)}
+    # Hardening: the game only ever writes to /data, never needs root powers, and should not be able to use up the whole machine.
+    # The three lines below are off by default. They passed a test with a new, empty data volume (the game started and saved scores, reports and
+    # share pictures), but not with an existing one. To turn them on, un-comment them and check the game still starts and saves scores:
+    # read_only: true                  # the container's own files can't be changed (only /data and /tmp are writable)
+    # tmpfs:
+    #   - /tmp
+    # cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 512m
     volumes:
       - icaodle-data:/data            # daily sets + scores
       # - ./sounds:/app/sounds:ro     # uncomment to change the sound files without rebuilding the image
