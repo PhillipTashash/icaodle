@@ -220,7 +220,7 @@ function roomTick(r) {
     r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
     // The lobby remembers its finished games (newest last, the last 15): what was played and everyone's result. Sent to a page only when it has changed.
-    if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), ...roundMap(r, ps), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, streak: q.streak || 0, fin: q.fin ?? null, log: q.log || [] })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
+    if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), ...roundMap(r, ps), players: ps.map(q => ({ c: q.c ?? 0, name: q.name, total: q.total, right: q.right, streak: q.streak || 0, fin: q.fin ?? null, log: q.log || [] })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
   }
 }
 const zips = new Map();
@@ -392,7 +392,7 @@ function handle(req, res) {
         if (p.action !== "create" && p.action !== "join") return json({ error: "You're no longer in that game." }, 410);
         if (!name) return json({ error: "Enter your name." }, 400);
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
-        me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby" }; // late = joined while a game is on (or just finished)
+        me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby", c: [0, 1, 2, 3, 4].find(n => !Object.values(r.players).some(q => q.c === n)) ?? 0 }; // c: their color (the first one free), the same in every game while they stay // late = joined while a game is on (or just finished)
       }
       if (typeof p.tvOk === "boolean") me.tvOk = p.tvOk; // does this player's page show the lobby trivia?
       me.seen = now; if (name) { if (name !== me.name) r.act = now; me.name = name; }
@@ -447,7 +447,7 @@ function handle(req, res) {
       roomTick(r);
       json({ code, day: day(), mode: r.mode, cfg: r.cfg, empty: !r.airports.length, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
-        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, viewing: !!q.viewing, wins: q.wins || 0, me: k === p.id })) });
+        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ c: q.c ?? 0, fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, viewing: !!q.viewing, wins: q.wins || 0, me: k === p.id })) });
     }));
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.

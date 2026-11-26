@@ -734,3 +734,65 @@ main:has(#lobby:not([hidden])){justify-content:flex-start}
 /* round maps: state borders under the airport dots, and small markers (guesses are rings in the player's color, the answer a solid amber dot) */
 .routemap .states{fill:none;stroke:var(--muted);stroke-linejoin:round;stroke-linecap:round;opacity:.4}
 .routemap .pin{fill:var(--bg);stroke:var(--pc);stroke-width:1.2}
+/* lobby rows start with the player's colored dot (the same color as their arrows on the maps) */
+#lbPlayers .ldot{display:inline-block;width:1.5em;height:1.5em;line-height:1.5em;margin-right:.6em;border-radius:50%;background:var(--pc);color:var(--bg);font-style:normal;font-weight:700;text-align:center;flex:none}
+/* the key under a round map: dot, name, a short route, then that round's award */
+#lbHist .rview button.rkey{display:flex;align-items:center;gap:.5em}
+.rkey i{flex:none;margin-right:0}.rkey b{flex:none;white-space:nowrap}
+.rkey .rroute{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92em}
+.rkey .rbadge{flex:none;margin-left:auto;padding:.1em .6em;border:1px solid var(--accent);border-radius:99px;color:var(--accent);font-style:normal;font-size:.82em;white-space:nowrap}
+@media (max-width:820px){#lbHist .rview button.rkey{flex-wrap:wrap}.rkey .rroute{flex-basis:100%;order:3}}
+/* an award's meaning pops up above it on hover (on a phone, when its row is tapped) */
+.rkey .rbadge{position:relative}
+.rkey .rbadge::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + .6em);width:max-content;max-width:16em;padding:.4em .65em;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);font-size:.8rem;line-height:1.3;white-space:normal;text-align:left;box-shadow:0 4px 14px #0008;opacity:0;pointer-events:none;transition:opacity .12s;z-index:6}
+.rkey .rbadge:hover::after,.rkey:focus-visible .rbadge::after{opacity:1}
+/* the last game, under the Ready / Leave buttons (one card, no drop-down) */
+#lbHist .hgame{margin:.4em 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:.9em}
+#lbHist .hhead{font-weight:600}
+/* ---- Lobby, flat and quiet: the code is the headline, settings are underlined tabs, players are hairline rows with a status word,
+   one strong button (Ready) and plain-text secondary actions. Boxes only where something needs one (the map, trivia). */
+#lobby #lbTitle b{font-size:1.9em;letter-spacing:.14em;padding:0;border-radius:0}#lobby #lbTitle b:hover{background:none;color:var(--text)}
+#lobby #lbCopy{min-height:0;padding:0;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:400;text-decoration:underline;text-underline-offset:3px}
+#lobby #lbCopy:hover{color:var(--text);filter:none}
+#lobby #lbCfg{padding:0;border:0;border-radius:0;background:none}
+#lobby #lbKind{gap:.2em 1.2em;border-bottom:1px solid var(--border)}
+#lobby #lbKind button,#lobby #lbCfg.ro #lbKind button:disabled{flex:none;min-height:0;padding:.55em 0;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:none;box-shadow:none;color:var(--muted);font-weight:500;outline-offset:2px}
+#lobby #lbKind button:hover{color:var(--text);filter:none}
+#lobby #lbKind button.on,#lobby #lbCfg.ro #lbKind button.on:disabled{color:var(--text);background:none;border-color:transparent;border-bottom-color:var(--accent);box-shadow:none}
+#lobby #lbPlayers div{margin:0;padding:.65em .1em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;align-items:center}
+#lobby #lbPlayers div:last-child{border-bottom:0}
+#lobby #lbPlayers div.me{border-color:var(--border)}
+#lbPlayers .you{margin-left:.5em;color:var(--muted);font-size:.8em}
+#lbPlayers .pst{font-size:.85em;white-space:nowrap}#lbPlayers .pst.yes{color:var(--ok)}#lbPlayers .pst.no{color:var(--muted)}#lbPlayers .pst.busy{color:var(--accent)}
+#lobby #lbBtns{align-items:center;gap:1.2em}
+#lobby #lbLeave{min-height:0;padding:.4em 0;border:0;background:none;box-shadow:none;color:var(--muted);font-weight:400}
+#lobby #lbLeave:hover{color:var(--text);filter:none}
+/* the last game: no card, the map is the only box */
+#lobby #lbHist .hgame{margin:.4em 0 0;padding:0;border:0;background:none}
+#lobby #lbHist .hhead{font-size:1.05em}
+#lobby #lbHist .rbtns{gap:.2em 1.1em;border-bottom:1px solid var(--border)}
+#lobby #lbHist .rbtns button{min-height:0;padding:.5em 0;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:none;box-shadow:none;color:var(--muted);font-size:.9em}
+#lobby #lbHist .rbtns button.on{color:var(--text);border-bottom-color:var(--accent);background:none;box-shadow:none}
+#lobby #lbHist .rview{margin:.6em 0;padding:0;border:0;background:none}
+#lobby #lbHist .rview .routemap{border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+#lobby #lbHist .rview button.rkey{margin:0;padding:.5em .3em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none}
+#lobby #lbHist .rview button.rkey:hover,#lobby #lbHist .rview button.rkey[aria-pressed=true]{background:color-mix(in srgb,var(--pc) 10%,transparent);box-shadow:inset 3px 0 0 var(--pc)}
+#lobby #lbHist .hrow{padding:.45em .1em;border:0;border-bottom:1px solid var(--border);border-radius:0}
+#lobby #lbHist .hrow:last-child{border-bottom:0}
+#lobby #lbHist .hrow.win{background:none;color:var(--accent)}
+@media (max-width:820px){#lobby #lbKind{gap:.1em .9em}#lobby #lbHist .rbtns{flex-wrap:nowrap;gap:.6em}#lobby #lbHist .rbtns button{flex:1;font-size:.8em}}
+#lobby #lbPlayers input.nm{field-sizing:content;width:auto;min-width:3ch;max-width:12em} /* as wide as the name, so "you" sits right after it */
+#lobby #lbHist{margin-top:1.6rem}
+@media (max-width:820px){#lobby #lbKind{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0 .75em}#lobby #lbKind button{white-space:nowrap;font-size:.88em;min-width:0}} /* phones: the tabs stay on one line (and scroll sideways if a screen is very narrow) */
+/* between rounds: the guesses fade as the map pulls back out, the answer fades last; the next round's answer fades in */
+.routemap.leaving .pl,.routemap.leaving .glabs{opacity:0!important;transition:opacity .3s}
+.routemap.leaving .targets{opacity:0;transition:opacity .25s .75s}
+.routemap .targets{animation:rfade .4s} /* no fill: a held animation would block the fade-out transition */@keyframes rfade{from{opacity:0}}
+/* the round tabs' underline: one bar that slides to the round on show, with a slight overshoot */
+#lbHist .rbtns{position:relative}
+#lbHist .rrow{display:flex;flex-wrap:wrap;gap:.2em 1.1em}
+#lobby #lbHist .rbtns button.on{border-bottom-color:transparent}
+#lbHist .rbar{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--accent);transition:transform .38s cubic-bezier(.3,1.5,.5,1),width .38s cubic-bezier(.3,1.5,.5,1)}
+#lbHist .rbar[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){#lbHist .rbar{transition:none}}
+@media (max-width:820px){#lbHist .rrow{flex-wrap:nowrap;gap:.6em}#lbHist .rrow button{flex:1}}

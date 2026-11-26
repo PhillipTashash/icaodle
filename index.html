@@ -144,8 +144,8 @@
   <div id="lbMap" hidden><div id="lbMapCanvas"></div><div id="lbMapNote"></div></div>
   <div id="lbAir" hidden><div id="lbAirTop"><b id="lbAirHead"></b><span id="lbAirAll"><button type="button" id="lbAirSel">Select all</button><button type="button" id="lbAirNone">Deselect all</button></span><span id="lbAirNav" hidden><button type="button" id="lbAirPrev" aria-label="Previous airports">◀</button><span id="lbAirPg"></span><button type="button" id="lbAirNext" aria-label="More airports">▶</button></span></div><div id="lbAirList"></div><div id="lbAirNote"></div></div>
   <div id="lbPlayers"></div>
-  <div id="lbHist" hidden></div>
   <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
+  <div id="lbHist" hidden></div>
   <div id="tvBar" role="timer" hidden><i></i><span></span></div>
   <div id="trivia" hidden></div>
 </div>
@@ -530,7 +530,7 @@ function podium(g){
   const box=mk("div",{className:"podium",role:"img","aria-label":"Podium: "+ps.map((q,k)=>ordinal(rank[k])+" "+q.name+", "+q.total+" points").join("; ")}),stage=mk("div",{className:"pstage"},mk("i",{className:"pbase"}));box.append(stage);
   const w=84/n,lastDelay=(n-1)*.4;
   order.forEach((k,slot)=>{const q=ps[k],h=Math.max(20,q.total/top*130),win=rank[k]==1;
-    const col=mk("div",{className:"pcolm pc"+k+(win?" win":"")},mk("div",{className:"pbar"}),mk("div",{className:"plab"},mk("span",{textContent:ordinal(rank[k])}),mk("b",{textContent:q.total})),mk("div",{className:"pname",textContent:q.name,title:q.name}));
+    const col=mk("div",{className:"pcolm "+pcOf(q,k)+(win?" win":"")},mk("div",{className:"pbar"}),mk("div",{className:"plab"},mk("span",{textContent:ordinal(rank[k])}),mk("b",{textContent:q.total})),mk("div",{className:"pname",textContent:q.name,title:q.name}));
     if(win)col.append(crown());
     col.style.cssText="left:"+(8+slot*w+1)+"%;width:"+(w-2)+"%;--h:"+h+"px;--d:"+((n-1-k)*.4)+"s;--cd:"+(lastDelay+.9)+"s";stage.append(col)});
   return box}
@@ -547,7 +547,11 @@ async function backToLobby(){
   $("again").disabled=true;
   let d;try{d=await vsPost({action:"reset"})}catch{$("again").disabled=false;return say("Couldn't reach the server. Try again.")}
   INGAME=FINAL=false;$("game").hidden=true;$("round").textContent="";$("lobby").hidden=false;HISTKEY="";vsHandle(d)}
-function showLobby(d){noteChanges(d);renderLobby(d);
+let PREVRDY=null; // everyone's Ready, by name, from the last refresh (for the ready / not-ready ticks)
+function showLobby(d){noteChanges(d);
+  const rd=Object.fromEntries(d.players.map(q=>[q.name,!!q.ready]));
+  if(PREVRDY&&d.phase=="lobby"){const ch=d.players.filter(q=>q.name in PREVRDY&&PREVRDY[q.name]!=!!q.ready);if(ch.length&&SND)SND.lobby(ch.some(q=>q.ready)?"ready":"unready")}
+  PREVRDY=d.phase=="lobby"?rd:null;renderLobby(d);
   const sig=JSON.stringify([d.code,d.phase,d.cfg,d.players.map(p=>[p.name,p.ready,p.viewing])]);if(sig!=IDLESIG){IDLESIG=sig;nudgeWait()}}
 // Trivia nudge: after 15 seconds with nothing happening in the lobby (nobody joins, leaves, readies up or changes a setting, and you haven't clicked or typed),
 // the trivia card glows for a few seconds, once. Anything happening starts the 15 seconds over. Once you have used the card, it never glows again (until a reload).
@@ -561,16 +565,15 @@ function noteChanges(d){
   const names=d.players.filter(p=>!p.me).map(p=>p.name);
   if(PREVC!=d.code){PREVC=d.code;PREVN=null}
   if(PREVN){const was=[...PREVN],now=[...names];for(const n of names){const i=was.indexOf(n);if(i>=0)was.splice(i,1)}for(const n of PREVN){const i=now.indexOf(n);if(i>=0)now.splice(i,1)}
-    if(!(was.length==1&&now.length==1)&&(was.length||now.length)){$("lbNote").textContent=[...now.map(n=>n+" joined"),...was.map(n=>n+" left")].join(" · ");clearTimeout(noteT);noteT=setTimeout(()=>$("lbNote").textContent="",6000)}}
+    if(!(was.length==1&&now.length==1)&&(was.length||now.length)){SND&&SND.lobby(now.length?"join":"leave");$("lbNote").textContent=[...now.map(n=>n+" joined"),...was.map(n=>n+" left")].join(" · ");clearTimeout(noteT);noteT=setTimeout(()=>$("lbNote").textContent="",6000)}}
   PREVN=names}
 let LBROWS="";
 function renderLobby(d){
   const playing=d.phase=="playing",me=d.players.find(p=>p.me);
   const N=d.n||5,status=p=>playing?(p.late?"Waiting to start":p.done?`✓ Finished · ${p.total} pts${p.fin!=null?" · "+fmtT(p.fin):""}`:`${p.rounds}/${N} rounds · ${p.total} pts`):"";
-  // A colored dot says where each player is; its name shows beside it on hover or keyboard focus (and is read out), so color isn't the only way to tell.
-  const dot=p=>{if(playing&&p.late)return"";const [cls,label]=playing||p.viewing?["busy","Still playing"]:p.ready?["yes","Ready"]:["no","Not ready"];return`<span class="dot ${cls}" tabindex="0" role="img" aria-label="${label}" data-tip="${label}"></span>`};
-  const row=p=>`<div class="${p.me?"me":""}"><span>${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}${p.wins?`<i class=star title="Games won" aria-label="${p.wins} game${p.wins==1?"":"s"} won">★${p.wins>1?"×"+p.wins:""}</i>`:""}</span><span class="wide">${status(p)}${dot(p)}</span></div>`;
-  if($("lbTitle").dataset.c!=d.code){$("lbTitle").dataset.c=d.code;$("lbTitle").innerHTML=`Lobby · <b role="button" tabindex="0" title="Click to copy the invite link">${esc(d.code)}</b>`} // only rebuilt when the code changes, so keyboard focus on it survives the refresh
+  const dot=p=>{if(playing&&p.late)return"";const [cls,label]=playing||p.viewing?["busy","still playing"]:p.ready?["yes","ready"]:["no","not ready"];return`<span class="pst ${cls}">${label}</span>`}; // a short word in a color (the word says it, so color isn't the only cue)
+  const row=p=>`<div class="${p.me?"me":""}"><span><i class="ldot pc${p.c||0}" aria-hidden="true">${esc(initial(p))}</i>${p.me?`<input class="nm" value="${esc(p.name)}" maxlength="12" aria-label="Your name" title="Click to change your name">`:esc(p.name)}${p.me?"<small class=you>you</small>":""}${p.wins?`<i class=star title="Games won" aria-label="${p.wins} game${p.wins==1?"":"s"} won">★${p.wins>1?"×"+p.wins:""}</i>`:""}</span><span class="wide">${status(p)}${dot(p)}</span></div>`;
+  if($("lbTitle").dataset.c!=d.code){$("lbTitle").dataset.c=d.code;$("lbTitle").innerHTML=`<span class="sr">Lobby </span><b role="button" tabindex="0" title="Click to copy the invite link">${esc(d.code)}</b>`} // only rebuilt when the code changes, so keyboard focus on it survives the refresh
   const rows=d.players.map(row).join("");if(!document.activeElement.classList.contains("nm")&&rows!==LBROWS){$("lbPlayers").innerHTML=rows;LBROWS=rows} // rebuilt only on a change, so a focused dot keeps focus
   const rdy=!playing&&me&&me.ready;$("lbReady").hidden=playing;$("lbReady").disabled=d.players.length<2||!!d.empty;$("lbReady").title=d.empty?"Switch at least one airport on":d.players.length<2?"Waiting for another player to join":""; // Ready needs at least two people in the lobby
   $("lbReady").textContent=rdy?"Ready ✓ (click to cancel)":"Ready";$("lbReady").classList.toggle("on",!!rdy);
@@ -596,7 +599,7 @@ function routeInfo(g,p,i){
 // their color: thick leaving the first guess, thinner on every leg after (it halves each time), so it narrows toward the last guess. Picking a player in the key
 // under the map fades the others (mapFocus). Every arrow piece and marker carries data-step, so playRoute can draw everyone's route one airport at a time.
 // ponytail: only markers for the very same airport are spread apart; two different airports very close together can still overlap.
-const initial=p=>([...p.name][0]||"?").toUpperCase();
+const initial=p=>([...p.name][0]||"?").toUpperCase(),pcOf=(p,k)=>"pc"+(p.c??k); // a player's color class: the one the lobby gave them (older games: by place)
 // One leg of an All-tab route: a filled arrow from a to b whose half-width eases from w0 to w1 (exponentially, so the narrowing snaps rather than slopes),
 // with a small head on the end. f (0..1) draws only that much of it, from the tail, for the animation. With a control point c the arrow bends through it
 // (a quadratic curve), which is how two markers too close for a straight arrow still get one: a small hop over the top.
@@ -612,12 +615,14 @@ function arrowD(a,b,w0,w1,f,c){
   return"M"+[...L,at(end,hw),at(tip,0),at(end,-hw),...R].join("L")+"Z"}
 // Draws an All map one step at a time: everyone's first guesses together, then everyone's next leg together, and so on. Returns how long that takes (ms).
 const STEP_MS=900,DRAW_MS=550;
-function playRoute(svg,wait=0){
+function playRoute(svg,wait=0,onStep){ // onStep(n): called as each step starts (for its sound)
   const els=[...svg.querySelectorAll("[data-step]")],last=Math.max(0,...els.map(e=>+e.dataset.step));
   for(const e of els){e.classList.add("wait");if(e._a)e.setAttribute("d","")}
   const t0=performance.now()+wait;
+  let fired=-1;
   requestAnimationFrame(function frame(now){
     if(!svg.isConnected)return;let more=false;
+    while(onStep&&fired<last&&now-t0>=(fired+1)*STEP_MS)onStep(++fired);
     for(const e of els){const f=Math.min(1,Math.max(0,(now-t0-e.dataset.step*STEP_MS)/DRAW_MS));
       if(f>0&&e.classList.contains("wait")){e.classList.remove("wait");if(!e._a)e.classList.add("pop")}
       if(e._a&&e._f!==f){e._f=f;e.setAttribute("d",arrowD(e._a,e._b,e._w0,e._w1,1-Math.pow(1-f,3),e._c))} // eases out: quick off the marker, settling at the next one
@@ -648,15 +653,22 @@ function roundSvg(D,g,players,i){
       out.push(sv("line",{class:cls,x1:x,y1:y,x2:tx,y2:ty}),sv("path",{class:cls+" head",d:"M"+tx+" "+ty+"L"+(tx-ux*5-uy*2.8)+" "+(ty-uy*5+ux*2.8)+"L"+(tx-ux*5+uy*2.8)+" "+(ty-uy*5-ux*2.8)+"Z"}))}
     return out};
   const label=(at,text,cls,dy)=>{const left=at[0]>D.w/(all?2:1)-(all?0:50);return sv("text",{class:cls,x:at[0]+(left?-8:8),y:Math.max(7,Math.min(D.h-2,at[1]+dy)),"text-anchor":left?"end":"start"},text)};
+  // Each arrow is a curve from one marker to the next. It starts straight; if it would lie along an arrow already drawn (anyone's), it bends a little to one
+  // side, then the other, then further, and takes the first that's clear. Markers too close for a straight arrow always get a hop. Either way the arrow leaves
+  // its marker's edge and ends touching the next marker, its tip aimed at that marker's center (along the curve's last direction), right into the answer's dot.
+  const curves=[],bez=(a,c,b,t)=>{const u=1-t;return[u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1]]};
+  const along=(a,c,b,t0,t1,n)=>Array.from({length:n},(_,s)=>bez(a,c,b,t0+(t1-t0)*s/(n-1)));
+  const clash=pts=>curves.some(q=>pts.filter(p=>q.some(o=>Math.hypot(p[0]-o[0],p[1]-o[1])<2.6)).length>2);
   if(all)runs.forEach((r,k)=>{const path=[...r.stops.map(x=>x.p),...(r.solved?[place(r.target)]:[])],legs=[];
     for(let j=1;j<path.length;j++){const a=path[j-1],b=path[j],len=Math.hypot(b[0]-a[0],b[1]-a[1]);if(len<1.5)continue; // the very same spot: nothing to point at
-      const ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len,stop=r.solved&&j==path.length-1?3.8:4,el=sv("path",{class:"leg","data-step":j});
-      Object.assign(el,{_w0:Math.max(.8,2.4*.5**(j-1)),_w1:Math.max(.55,2.4*.5**j)}); // half as wide on every leg
-      if(len>=16)Object.assign(el,{_a:[a[0]+ux*4,a[1]+uy*4],_b:[b[0]-ux*stop,b[1]-uy*stop]});
-      else{const up=ux>0?1:-1,nx=uy*up,ny=-ux*up; // too close for a straight arrow: a hop from the top of one marker over to the top of the other
-        Object.assign(el,{_a:[a[0]+nx*4,a[1]+ny*4],_b:[b[0]+nx*stop,b[1]+ny*stop],_c:[(a[0]+b[0])/2+nx*13,(a[1]+b[1])/2+ny*13]})}
+      const ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len,up=ux>0?1:-1,nx=uy*up,ny=-ux*up,rB=r.solved&&j==path.length-1?2:3.2,el=sv("path",{class:"leg","data-step":j}); // n: sideways, upward first
+      const bends=len<16?[13,-13,20,-20]:[0,.16,-.16,.32,-.32].map(f=>f*len),ctrl=f=>[(a[0]+b[0])/2+nx*f,(a[1]+b[1])/2+ny*f];
+      const c=ctrl(bends.find(f=>!clash(along(a,ctrl(f),b,.15,.85,12)))??bends[0]),toward=(from,to)=>{const l=Math.hypot(to[0]-from[0],to[1]-from[1])||1;return[(to[0]-from[0])/l,(to[1]-from[1])/l]};
+      curves.push(along(a,c,b,.1,.9,14));
+      const s=toward(a,c),e=toward(c,b); // the curve's first and last directions
+      Object.assign(el,{_a:[a[0]+s[0]*3.2,a[1]+s[1]*3.2],_b:[b[0]-e[0]*rB,b[1]-e[1]*rB],_c:c,_w0:Math.max(.8,2.4*.5**(j-1)),_w1:Math.max(.55,2.4*.5**j)}); // half as wide on every leg
       el.setAttribute("d",arrowD(el._a,el._b,el._w0,el._w1,1,el._c));legs.push(el)}
-    kids.push(sv("g",{class:"pl pc"+k,"data-k":k},...legs,
+    kids.push(sv("g",{class:"pl "+pcOf(r.p,k),"data-k":k},...legs,
       ...r.stops.map((x,j)=>sv("circle",{class:"pin",cx:x.p[0],cy:x.p[1],r:2.6,"data-step":j},sv("title",{},r.p.name+", guess "+x.n+": "+x.c)))))});
   // In All, every airport is named once (the answer above its dot, each guessed one under its marker or markers, appearing with the first marker placed
   // there). Each name takes the first free spot of below, above, right and left (the answer's: above first), so two airports close together don't stack.
@@ -682,14 +694,56 @@ function roundSvg(D,g,players,i){
 // The newest game's All map starts on the whole country, then zooms in to its close-up (zoomIn) before the guesses are drawn. The close-up's markers are already
 // in place but hidden (playRoute), so only the dots and the answer move: their spacing grows while their size stays the same. Returns when it ends (ms).
 const ZOOM_WAIT=600,ZOOM_MS=1200;
-function zoomIn(svg,D){
+const easeIO=f=>f<.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2;
+// zoomAt(svg, D)(e) places the map's dots, borders and answer at zoom e: 0 = the whole country, 1 = the round's close-up.
+function zoomAt(svg,D){
   const z=svg._z,W=D.w,H=D.h,c1=[z.bx+z.bw/2,z.by+z.bw*H/W/2];
-  const at=e=>{const bw=W*Math.pow(z.bw/W,e),cx=W/2+(c1[0]-W/2)*e,cy=H/2+(c1[1]-H/2)*e,bx=cx-bw/2,by=cy-bw*H/W/2,k=W/bw; // even zoom steps, sliding over to the guesses
+  return e=>{const bw=W*Math.pow(z.bw/W,e),cx=W/2+(c1[0]-W/2)*e,cy=H/2+(c1[1]-H/2)*e,bx=cx-bw/2,by=cy-bw*H/W/2,k=W/bw; // even zoom steps, sliding over to the guesses
     const tr="translate("+(-bx*k).toFixed(1)+" "+(-by*k).toFixed(1)+") scale("+k.toFixed(3)+")";z.land.setAttribute("transform",tr);z.land.style.strokeWidth=(1.4/k).toFixed(3);z.states.setAttribute("transform",tr);z.states.style.strokeWidth=(.6/k).toFixed(3);
-    for(const t of z.tgs)t.el.setAttribute("transform","translate("+((t.at[0]-bx)*k).toFixed(1)+" "+((t.at[1]-by)*k).toFixed(1)+")")};
-  at(0);const t0=performance.now()+ZOOM_WAIT;
-  requestAnimationFrame(function frame(now){if(!svg.isConnected)return;const f=Math.min(1,Math.max(0,(now-t0)/ZOOM_MS));at(f<.5?4*f*f*f:1-Math.pow(-2*f+2,3)/2);if(f<1)requestAnimationFrame(frame)});
+    for(const t of z.tgs)t.el.setAttribute("transform","translate("+((t.at[0]-bx)*k).toFixed(1)+" "+((t.at[1]-by)*k).toFixed(1)+")")}}
+function zoomIn(svg,D,onStart){ // onStart: called as the zoom begins (for its sound)
+  const at=zoomAt(svg,D);at(0);const t0=performance.now()+ZOOM_WAIT;if(onStart)setTimeout(()=>svg.isConnected&&onStart(),ZOOM_WAIT);
+  requestAnimationFrame(function frame(now){if(!svg.isConnected)return;const f=Math.min(1,Math.max(0,(now-t0)/ZOOM_MS));at(easeIO(f));if(f<1)requestAnimationFrame(frame)});
   return ZOOM_WAIT+ZOOM_MS}
+// The end of a round, before the next one: everyone's guesses fade, the map pulls back out to the whole country, then the answer fades (style.css: .leaving).
+// The next round's map starts on the same whole-country view, so the swap doesn't show. Returns how long it takes (ms).
+const OUT_MS=1000;
+function zoomOut(svg,D){
+  const at=zoomAt(svg,D),t0=performance.now();svg.classList.add("leaving");
+  requestAnimationFrame(function frame(now){if(!svg.isConnected)return;const f=Math.min(1,(now-t0)/OUT_MS);at(1-easeIO(f));if(f<1)requestAnimationFrame(frame)});
+  return OUT_MS+250}
+// Achievements for one round of a finished game: each player gets the first one on this list they qualify for (a few go to just one player per round).
+// Distances are in miles from the answer; a route is the miles flown from guess to guess.
+function roundAwards(g,i){
+  const A=g.ans[i],far=(a,b)=>miles(a[0],a[1],b[0],b[1]);
+  const ps=g.players.map(p=>{const r=routeInfo(g,p,i),at=c=>r.right.includes(c)?A:g.at[c],real=r.log.filter(at),wrong=real.filter(c=>!r.right.includes(c)),ds=wrong.map(c=>far(g.at[c],A));
+    let route=0;for(let j=1;j<real.length;j++)route+=far(at(real[j-1]),at(real[j]));
+    return{...r,wrong,ds,route,fd:wrong[0]&&wrong[0]==r.log[0]?ds[0]:null,tries:r.solved?r.log.findIndex(c=>r.right.includes(c))+1:0}}); // fd: how far the first guess was, if it was a wrong airport
+  const top=(f,ok)=>{let k=-1,v=-Infinity;ps.forEach((q,j)=>{if(ok(q)&&f(q)>v){v=f(q);k=j}});return k}; // the one player with the most of f
+  const solvers=ps.filter(q=>q.solved).length,many=ok=>ps.filter(ok).length>1;
+  const closest=many(q=>q.fd!=null)?top(q=>-q.fd,q=>q.fd!=null):-1,scenic=top(q=>q.route,q=>q.route>800),lost=q=>!q.solved&&q.ds.length,farMiss=many(lost)?top(q=>q.ds[q.ds.length-1],lost):-1;
+  const L=[ // title, what it means, who gets it
+    ["Lone wolf","The only one who found it",q=>q.solved&&solvers==1&&ps.length>1],
+    ["Bullseye","Got it on the first guess",q=>q.tries==1],
+    ["Clutch","Found it on the last guess",q=>q.tries==TRIES],
+    ["Homing in","Every guess closer than the one before",q=>q.solved&&q.ds.length>1&&q.ds.every((d,j)=>!j||d<q.ds[j-1])],
+    ["Closest first guess","Nobody opened nearer",(q,k)=>k==closest],
+    ["So close","A wrong guess under 30 miles away",q=>q.ds.some(d=>d<30)],
+    ["Copycat","The same guesses as someone else, in the same order",(q,k)=>q.log.length>1&&ps.some((o,j)=>j!=k&&o.log.join()==q.log.join())],
+    ["Quick recovery","Found it on the second guess",q=>q.tries==2],
+    ["Scenic route","Flew the most miles getting there",(q,k)=>k==scenic],
+    ["Missed by a mile","Ended up the farthest away",(q,k)=>k==farMiss],
+    ["Wrong time zone","A guess over 1,500 miles away",q=>q.ds.some(d=>d>1500)],
+    ["Not close at all","Opened over 1,000 miles off",q=>q.fd>1000],
+    ["Great minds","Opened with the same wrong airport as someone else",(q,k)=>q.fd!=null&&ps.some((o,j)=>j!=k&&o.log[0]==q.log[0])],
+    ["Wrong way","Went farther away after a guess",q=>q.ds.some((d,j)=>j&&d>q.ds[j-1])],
+    ["Holding pattern","Two wrong guesses in a row under 75 miles apart",q=>q.wrong.some((c,j)=>j&&far(g.at[c],g.at[q.wrong[j-1]])<75)],
+    ["Frequent flyer","Over 2,500 miles of guessing",q=>q.route>2500],
+    ["Deja vu","Tried a wrong airport someone else also tried",(q,k)=>q.wrong.some(c=>ps.some((o,j)=>j!=k&&o.wrong.includes(c)))],
+    ["Lost in the clouds","Never found it",q=>!q.solved],
+    ["Skipper","Skipped a guess",q=>q.log.includes("skip")],
+    ["Steady","Found it on the third guess",q=>q.tries==3]];
+  return ps.map((q,k)=>{const a=L.find(x=>x[2](q,k));return a&&{t:a[0],d:a[1]}})}
 // Show one player's route on the All map (k), or everyone's markers again (-1). The chosen player is drawn above the others, under the targets.
 function mapFocus(svg,k){
   svg.classList.toggle("focus",k>=0);
@@ -698,46 +752,54 @@ function mapFocus(svg,k){
 // Round 1 ... 5 buttons under a finished game: press one to open its map (press it again to close it), then pick whose guesses to see: All, or one player.
 // For the newest game (auto), the map opens on Round 1 by itself and plays it: on All, it zooms in from the whole country (zoomIn), then everyone's guesses appear one airport at a time (playRoute), and once
 // the round is drawn it rests a moment and moves on, round 5 back to 1 (a single player's map just shows for 5 s). Pressing anything in it holds the round
-// for 15 s, then it carries on. It waits while it can't be seen. With reduced motion it opens on Round 1, drawn in full, and stays put.
-const SLIDE_MS=5000,HOLD_MS=15000,REST_MS=1800;
+// for 15 s, and resting the mouse on the players list holds it until 5 s after the mouse leaves; then it carries on. It waits while it can't be seen. With reduced motion it opens on Round 1, drawn in full, and stays put.
+const SLIDE_MS=5000,HOLD_MS=15000,REST_MS=1800,LEAVE_MS=5000,HOVERS=matchMedia("(hover:hover)").matches; // HOVERS: a real mouse (a tap leaves :hover stuck)
 function roundMaps(g,auto){
   if(!g.ans)return[];
   const cycle=!!auto&&!matchMedia("(prefers-reduced-motion: reduce)").matches;let due=Date.now()+SLIDE_MS,hold=0,tall=0;
-  const view=mk("div",{className:"rview",hidden:true}),bar=mk("div",{className:"rbtns",role:"group","aria-label":"Round maps"});let open=auto?0:-1,who=-1; // who: -1 = All
+  const view=mk("div",{className:"rview",hidden:true}),row=mk("div",{className:"rrow"}),under1=mk("i",{className:"rbar","aria-hidden":"true"}),bar=mk("div",{className:"rbtns",role:"group","aria-label":"Round maps"},row,under1);let open=auto?0:-1,pin,cur=null,looped=false,picked=-1; // cur: the map on show; looped/picked: see heard()
+  const heard=()=>!looped||open===picked; // sounds through the first pass of rounds, and for a round you picked; the endless loop after that stays quiet // pin: whose route stands out (-1 = nobody faded); starts on yours
+  const mine=(()=>{const me=VSD&&VSD.players.find(q=>q.me);return me?g.players.findIndex(q=>q.name==me.name):-1})(); // -1: you weren't in this game
   const toggle=(text,on,click)=>mk("button",{type:"button",className:"ghost"+(on?" on":""),textContent:text,"aria-pressed":String(on),onclick:click});
   async function paint(){
-    const focused=[...bar.children].indexOf(document.activeElement);
-    bar.replaceChildren(...g.codes.map((_,i)=>toggle("Round "+(i+1),i==open,()=>{open=open==i&&!auto?-1:i;paint()}))); // in the cycling map a press picks a round; it never closes it
-    if(focused>=0)bar.children[focused].focus({preventScroll:true});
+    const focused=[...row.children].indexOf(document.activeElement);
+    row.replaceChildren(...g.codes.map((_,i)=>toggle("Round "+(i+1),i==open,()=>{open=open==i&&!auto?-1:i;picked=open;paint()}))); // in the cycling map a press picks a round; it never closes it
+    if(focused>=0)row.children[focused].focus({preventScroll:true});
+    requestAnimationFrame(()=>{const b=row.children[open];under1.hidden=!b;if(b){under1.style.width=b.offsetWidth+"px";under1.style.transform="translateX("+b.offsetLeft+"px)"}}); // the underline slides (with a snap) to the round on show
     view.hidden=open<0;if(open<0)return;
     if(!DOTS)try{DOTS=await fetch("/api/dots?v=2").then(r=>r.json())}catch{return view.replaceChildren(mk("p",{textContent:"Couldn't load the map. Press the round again."}))}
     if(open<0)return;
-    const shown=who<0?g.players:[g.players[who]],tabs=g.players.length>1?[toggle("All",who<0,()=>{who=-1;paint()})]:[];
+    const shown=g.players;
     const words=p=>{const r=routeInfo(g,p,open);return[...(r.log.length?r.log.flatMap((c,k)=>[...(k?[" → "]:[]),mk("span",{className:r.right.includes(c)?"ok":"",textContent:c=="skip"?"Skipped":c+(r.right.includes(c)?" ✓":"")})]):["No guesses"]),r.first?" · Solved on the first try ★":r.solved?"":" · Missed, the answer was "+r.right.join(" or ")]};
     const svg=roundSvg(DOTS,g,shown,open);let under;
-    if(shown.length>1){ // the All tab: a key that is also the way to see a route. Point at a name (mouse), or press it to keep its route up; press again for everyone.
-      let pin=-1;const keys=shown.map((p,k)=>mk("button",{type:"button",className:"rpath rkey pc"+k,"aria-pressed":"false",onclick:()=>{pin=pin==k?-1:k;keys.forEach((b,j)=>b.setAttribute("aria-pressed",String(j==pin)));mapFocus(svg,pin)},
-        onpointerenter:e=>{if(e.pointerType=="mouse")mapFocus(svg,k)},onpointerleave:e=>{if(e.pointerType=="mouse")mapFocus(svg,pin)}},mk("i",{textContent:initial(p),"aria-hidden":"true"}),mk("b",{textContent:p.name+": "}),...words(p)));
-      under=[mk("p",{className:"rhint",textContent:"Point at or tap a player to highlight their route."}),...keys]}
-    else under=[mk("div",{className:"rpath"},...(who<0?[mk("b",{textContent:shown[0].name+": "})]:[]),...words(shown[0]))];
-    view.replaceChildren(mk("div",{className:"rwho",role:"group","aria-label":"Player"},...tabs,...g.players.map((q,k)=>{const x=routeInfo(g,q,open);return toggle(q.name+(x.first?" ★":x.solved?" ✓":" ✗"),k==who||g.players.length<2,()=>{who=k;paint()})})),
-      svg,...under);
+    if(shown.length>1){ // everyone on one map, your route standing out and the rest faded. The key under it picks whose route stands out: point at a name (mouse) for
+      // a look, press it to keep it; press the one standing out to go back to yours (on your own, to show everyone evenly).
+      if(pin===undefined)pin=mine;
+      const aw=roundAwards(g,open),short=p=>{const r=routeInfo(g,p,open);return r.log.length?r.log.flatMap((c,k)=>[...(k?[" → "]:[]),mk("span",{className:r.right.includes(c)?"ok":"",textContent:c=="skip"?"Skip":c})]):["No guesses"]};
+      const keys=shown.map((p,k)=>mk("button",{type:"button",className:"rpath rkey "+pcOf(p,k),"aria-pressed":String(k==pin),onclick:()=>{pin=pin!=k?k:k==mine?-1:mine;keys.forEach((b,j)=>b.setAttribute("aria-pressed",String(j==pin)));mapFocus(svg,pin)},
+        onpointerenter:e=>{if(e.pointerType=="mouse")mapFocus(svg,k)},onpointerleave:e=>{if(e.pointerType=="mouse")mapFocus(svg,pin)}},mk("i",{textContent:initial(p),"aria-hidden":"true"}),mk("b",{textContent:p.name+(k==mine?" (you)":"")}),mk("span",{className:"rroute"},...short(p)),...(aw[k]?[(e=>(e.dataset.tip=aw[k].d,e))(mk("em",{className:"rbadge"},aw[k].t,mk("span",{className:"sr",textContent:": "+aw[k].d})))]:[])));
+      under=[mk("p",{className:"rhint",textContent:mine>=0?"Your route stands out. Point at or tap a player to see theirs.":"Point at or tap a player to highlight their route."}),mk("div",{className:"rkeys"},...keys)];mapFocus(svg,pin)}
+    else under=[mk("div",{className:"rpath"},...words(shown[0]))];
+    view.replaceChildren(svg,...under);cur=shown.length>1?svg:null;
     if(cycle){tall=Math.max(tall,view.offsetHeight);view.style.minHeight=tall+"px"; // keeps the rows below from jumping up and down as rounds change
-      due=Date.now()+(shown.length>1?playRoute(svg,zoomIn(svg,DOTS))+REST_MS:SLIDE_MS)}}
+      const loud=heard()&&SND;due=Date.now()+(shown.length>1?playRoute(svg,zoomIn(svg,DOTS,loud?()=>SND.mapZoom(false):null),loud?s=>s?SND.mapStep(s):SND.mapPop():null)+REST_MS:SLIDE_MS)}}
   if(cycle){
     for(const el of [bar,view])for(const ev of ["pointerdown","keydown","click"])el.addEventListener(ev,()=>{hold=Date.now()+HOLD_MS},true);
     let seen=false;const timer=setInterval(()=>{
       if(!bar.isConnected){if(seen)clearInterval(timer);return} // the list was rebuilt: this copy is finished
       seen=true;if(!bar.offsetParent||document.hidden){hold=Math.max(hold,Date.now()+SLIDE_MS);return}
-      if(Date.now()>=Math.max(due,hold)){due=Date.now()+SLIDE_MS;open=(open+1)%g.codes.length;paint()}},250)}
+      if(HOVERS&&view.querySelector(".rkeys:hover"))hold=Math.max(hold,Date.now()+LEAVE_MS); // the mouse is on the players list: stay on this round, and for 5 s after it leaves
+      if(Date.now()>=Math.max(due,hold)){due=Infinity;const next=()=>{due=Date.now()+SLIDE_MS;open=(open+1)%g.codes.length;paint()}; // (paint sets the real due once the round is drawn)
+        if(cur&&cur.isConnected&&cur._z){if(heard()&&SND)SND.mapZoom(true);setTimeout(next,zoomOut(cur,DOTS))}else next();
+        if(open==g.codes.length-1)looped=true}},250)} // on All: pull back out first, then the next round
   paint();return[bar,view]}
+// The last game in this lobby, under the lobby: its round maps and everyone's result. The next game to finish takes its place (older games aren't shown).
 function renderHist(){
-  const list=HIST.slice().reverse(),key=HN+":"+list.length,box=$("lbHist");
-  box.hidden=!list.length;if(key==HISTKEY)return;HISTKEY=key;
-  box.replaceChildren(mk("b",{textContent:"Previous games"}),...list.map((g,i)=>{
-    const won=p=>g.players.length>1&&p.total==g.players[0].total,top=g.players.filter(won).map(p=>p.name);
-    return mk("details",{open:!i},mk("summary",{textContent:"Game "+g.n+" · "+cfgText(g.cfg)+(top.length?" · "+top.join(" and ")+(top.length>1?" tied (":" won (")+g.players[0].total+" pts)":"")}),
-      mk("div",{className:"hcodes",textContent:g.codes.join(" ")}),...roundMaps(g,!i),...g.players.map((p,i)=>mk("div",{className:"hrow"+(won(p)?" win":"")},mk("span",{},(i+1)+". "+p.name,...(won(p)?[crown()]:[])),mk("span",{textContent:p.total+" pts · "+p.right+"/"+g.codes.length+" solved"+(p.fin!=null?" · "+fmtT(p.fin):"")}))))}))}
+  const g=HIST[HIST.length-1],key=HN+":"+HIST.length,box=$("lbHist");
+  box.hidden=!g;if(key==HISTKEY)return;HISTKEY=key;if(!g)return box.replaceChildren();
+  const won=p=>g.players.length>1&&p.total==g.players[0].total,top=g.players.filter(won).map(p=>p.name);
+  box.replaceChildren(mk("div",{className:"hgame"},mk("div",{className:"hhead",textContent:"Last game · "+cfgText(g.cfg)+(top.length?" · "+top.join(" and ")+(top.length>1?" tied (":" won (")+g.players[0].total+" pts)":"")}),
+    mk("div",{className:"hcodes",textContent:g.codes.join(" ")}),...roundMaps(g,true),...g.players.map((p,i)=>mk("div",{className:"hrow"+(won(p)?" win":"")},mk("span",{},(i+1)+". "+p.name,...(won(p)?[crown()]:[])),mk("span",{textContent:p.total+" pts · "+p.right+"/"+g.codes.length+" solved"+(p.fin!=null?" · "+fmtT(p.fin):"")})))))}
 // ---- Lobby settings: the lobby owner picks what is played (Normal / Hard / Extra Hard, a custom game, or airports near a ZIP); everyone else just sees it.
 const KIND={list:"List",all:"All",easy:"Normal",medium:"Hard",hard:"Extra Hard",custom:"Custom",zip:"Zip code"};let ZIPOPEN=false,LISTOPEN=false;
 const cfgText=c=>!c?"":c.kind=="list"?"List · "+c.list.length+" airport"+(c.list.length==1?"":"s")+" · "+(c.fmt=="city"?"City & state only":"Map"):c.kind=="custom"?"Custom · "+(c.fmt=="city"?"City & state only":"Map")+" · "+(c.st||"All states")+" · "+KIND[c.mode]:c.kind=="zip"?"Zip code · airports within "+c.miles+" miles of "+c.zip:KIND[c.kind];
@@ -937,7 +999,7 @@ function triviaResults(mine){
   const best=players.filter(q=>q.win),locked=TVD.win||[]; // TVD.win keeps the names even if a winner has since left
   // The winner's name, big, and nothing else: no scores here. Until there is one, a line saying what is happening.
   const mineWon=best.some(q=>q.me),who=best.length&&best.length==locked.length?best.map(q=>q.name):locked;
-  const head=TVD.final&&who.length?mk("div",{className:"tvwinner"},crown(),mk("strong",{textContent:who.join(" & ")}),
+  const head=TVD.final&&who.length?mk("div",{className:"tvwinner"},...(mineWon?[crown()]:[]),mk("strong",{textContent:who.join(" & ")}),
       mk("span",{textContent:who.length>1?"share the crown!":mineWon?"win!":"wins!"})):
     mk("strong",{textContent:TVD.final?(players.filter(q=>q.in).length<2?"No crown: fewer than two players finished in time":"No crown this time"):
       TVD.due==null?"All done!":waiting.length?"Waiting on "+waiting.map(q=>q.name).join(", "):"Waiting for the others"});

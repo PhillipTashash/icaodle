@@ -85,7 +85,39 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     } catch { return false; }
   }
 
+  // Lobby and round-map sounds, made here (no files) and kept quiet, since the map replays them. Filtered noise for the airy parts, soft sine and
+  // triangle tones for the ticks and chimes. Each is tracked in `active`, so muting cuts it off at once.
+  let noise = null;
+  const noiseBuf = () => { if (noise && noise.sampleRate === ctx.sampleRate) return noise; noise = ctx.createBuffer(1, Math.round(ctx.sampleRate * 1.5), ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return noise; };
+  const run = (src, t, end) => { active.add(src); src.onended = () => active.delete(src); src.start(t); src.stop(end); };
+  function tone(freq, t, peak, a, d, type = "sine", to) {
+    const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(freq, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + a + d);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * volume), t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    o.connect(g); g.connect(ctx.destination); run(o, t, t + a + d + 0.02);
+  }
+  function whoosh(t, dur, f0, f1, peak, q, pan = [0, 0]) { // noise through a band-pass that sweeps from f0 to f1, swelling then fading, moving between the ears
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), p = ctx.createStereoPanner(); s.buffer = noiseBuf();
+    f.type = "bandpass"; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * volume), t + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    p.pan.setValueAtTime(pan[0], t); p.pan.linearRampToValueAtTime(pan[1], t + dur); s.connect(f); f.connect(g); g.connect(p); p.connect(ctx.destination); run(s, t, t + dur + 0.02);
+  }
+  const ok = () => !!ctx && enabled;
+  const extra = {
+    // one step of a round map: an airy flick as the arrows draw, then a soft tick as they land, a little higher every step so the round builds up
+    mapStep(step) { if (!ok()) return; const t = ctx.currentTime, k = Math.pow(1.12, step); try { whoosh(t, 0.4, 600 * k, 2400 * k, 0.6, 1.6); tone(1050 * k, t + 0.36, 0.12, 0.004, 0.09); } catch {} },
+    // the round's first guesses popping onto the map
+    mapPop() { if (!ok()) return; try { tone(420, ctx.currentTime, 0.18, 0.006, 0.16, "sine", 640); } catch {} },
+    // zooming: out between rounds (a falling swoosh, right to left), in toward the guesses (rising and quieter, left to right)
+    mapZoom(out) { if (!ok()) return; const t = ctx.currentTime; try { out ? whoosh(t, 1.05, 2600, 260, 0.6, 0.7, [0.4, -0.4]) : whoosh(t, 1.15, 300, 1800, 0.45, 0.8, [-0.3, 0.3]); } catch {} },
+    // the lobby: someone joins (two notes up), leaves (two notes down), readies up (a high tick) or stops being ready (a lower one)
+    lobby(kind) { if (!ok()) return; const t = ctx.currentTime; try {
+      if (kind === "join") { tone(660, t, 0.16, 0.005, 0.18, "triangle"); tone(990, t + 0.09, 0.14, 0.005, 0.22, "triangle"); }
+      else if (kind === "leave") { tone(880, t, 0.13, 0.005, 0.16, "triangle"); tone(590, t + 0.09, 0.12, 0.005, 0.2, "triangle"); }
+      else tone(kind === "ready" ? 1320 : 700, t, 0.14, 0.003, 0.08); } catch {} },
+  };
+
   return {
+    ...extra,
     get enabled() { return enabled; },
     get volume() { return volume; },
     get ready() { return ui !== null; },
