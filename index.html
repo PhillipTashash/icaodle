@@ -46,15 +46,36 @@
 <dialog id="howDlg" aria-labelledby="howTitle">
   <button id="howX" class="ghost" aria-label="Close" title="Close">✕</button>
   <p><b id="howTitle">How to play</b></p>
-  <ul>
-    <li>Five rounds. Each shows an airport from above. Type its ICAO code: <b class="code">KLAX</b> or just <b class="code">LAX</b>.</li>
-    <li>4 guesses per round. A miss unlocks a clue and shows hot or cold (within 500 mi), an arrow toward the answer and, from guess 3, the distance in miles. Your last guess is a choice of four codes.</li>
-    <li><b>Score:</b> 4 points for a first-guess solve, then 3, 2 and 1. A miss is 0. A game is out of 20.</li>
-    <li><b>Skip</b> uses up a guess and unlocks the next clue (on your last guess it ends the round with 0). <b>Give up</b> ends the round now with 0.</li>
-    <li><b>Grades:</b> A 70% or more (14/20), B 55%, C 40%, D 25%, F below.</li>
-    <li>Prefer no map? Custom Game has a City and state format.</li>
-  </ul>
-  <button id="howOk">Got it</button>
+  <!-- How to play as four short looping scenes (they advance by themselves; Next / the dots step through) -->
+  <div id="howSlides">
+    <figure class="hs on">
+      <svg viewBox="0 0 240 140" aria-hidden="true"><rect class="sat" width="240" height="140" rx="10"/>
+        <g class="zoomin"><rect x="0" y="0" width="90" height="60" fill="#2c3a2f"/><rect x="150" y="80" width="90" height="60" fill="#323a2b"/><rect x="160" y="0" width="80" height="50" fill="#29352c"/>
+          <rect x="20" y="66" width="200" height="9" fill="#8d96a1" transform="rotate(-16 120 70)"/><rect x="50" y="64" width="140" height="7" fill="#7d8691" transform="rotate(38 120 68)"/>
+          <rect x="96" y="92" width="58" height="16" rx="2" fill="#5c6570"/><rect x="104" y="108" width="40" height="8" fill="#b9c0c8"/></g>
+        <path class="aim" d="M84 34h-12v12M156 34h12v12M84 106h-12v-12M156 106h12v-12"/></svg>
+      <figcaption><b>Spot the airport</b></figcaption></figure>
+    <figure class="hs">
+      <svg viewBox="0 0 240 140" aria-hidden="true"><rect class="fld" x="45" y="44" width="150" height="46" rx="9"/>
+        <text class="k k1" x="80" y="75">K</text><text class="k k2" x="105" y="75">L</text><text class="k k3" x="130" y="75">A</text><text class="k k4" x="155" y="75">X</text>
+        <rect class="caret" x="68" y="55" width="2" height="24"/><path class="tick" d="M178 62l5 6 9-11"/></svg>
+      <figcaption><b>Type its code</b><small>KLAX or just LAX</small></figcaption></figure>
+    <figure class="hs">
+      <svg viewBox="0 0 240 140" aria-hidden="true"><rect class="mapbg" width="240" height="140" rx="10"/>
+        <circle class="tgt" cx="186" cy="44" r="11"/><text class="q" x="186" y="49">?</text>
+        <path class="route" d="M68 96Q118 52 170 48"/><path class="head" d="M174 47l-12-6 2 12z"/>
+        <circle class="gs" cx="60" cy="100" r="7"/><text class="lab warm" x="60" y="124">warm</text><text class="lab mi" x="122" y="88">312 mi</text></svg>
+      <figcaption><b>Misses give clues</b><small>Hot or cold, direction, distance</small></figcaption></figure>
+    <figure class="hs">
+      <svg viewBox="0 0 240 140" aria-hidden="true">
+        <rect class="bar b1" x="44" y="40" width="30" height="72" rx="4"/><rect class="bar b2" x="88" y="58" width="30" height="54" rx="4"/><rect class="bar b3" x="132" y="76" width="30" height="36" rx="4"/><rect class="bar b4" x="176" y="94" width="30" height="18" rx="4"/>
+        <text class="n" x="59" y="34">4</text><text class="n" x="103" y="52">3</text><text class="n" x="147" y="70">2</text><text class="n" x="191" y="88">1</text>
+        <text class="g" x="59" y="128">1st</text><text class="g" x="103" y="128">2nd</text><text class="g" x="147" y="128">3rd</text><text class="g" x="191" y="128">4th</text>
+        <text class="plus" x="59" y="82">+4</text></svg>
+      <figcaption><b>Solve sooner, score more</b><small>Up to 20 a game</small></figcaption></figure>
+  </div>
+  <div id="howNav"><span id="howDots"><button type="button" aria-label="Step 1"></button><button type="button" aria-label="Step 2"></button><button type="button" aria-label="Step 3"></button><button type="button" aria-label="Step 4"></button></span>
+  <button id="howOk">Next</button></div>
 </dialog>
 <dialog id="listDlg" aria-labelledby="listTitle">
   <button id="listX" class="ghost" aria-label="Close" title="Close">✕</button>
@@ -227,12 +248,24 @@ const say=t=>{const e=$("sr");e.textContent="";setTimeout(()=>e.textContent=t,60
 // How to play: a dialog (the "?" beside the answer box and a button on the menu open it), plus a one-time card on the menu for first-time visitors.
 // If the browser blocks storage the card stays hidden (better than showing it on every visit).
 const howSeen=()=>{try{return !!localStorage.icaoHow}catch{return true}};
-const howDone=()=>{try{localStorage.icaoHow=1}catch{}$("how1").hidden=true};
+// Dismissing the first-visit note: it fades out, then folds shut so the logo and menu glide into place instead of jumping
+const howDone=()=>{try{localStorage.icaoHow=1}catch{}const n=$("how1");if(n.hidden||n.dataset.going)return;n.dataset.going=1;
+  const t=matchMedia("(prefers-reduced-motion: reduce)").matches?0:1,cs=getComputedStyle(n),zero={height:0,marginTop:0,marginBottom:0,paddingTop:0,paddingBottom:0};n.style.overflow="hidden";
+  n.animate([{opacity:1},{opacity:0}],{duration:300*t,fill:"forwards"}).finished
+   .then(()=>n.animate([{height:n.offsetHeight+"px",marginTop:cs.marginTop,marginBottom:cs.marginBottom,paddingTop:cs.paddingTop,paddingBottom:cs.paddingBottom},zero],{duration:420*t,easing:"cubic-bezier(.4,0,.2,1)",fill:"forwards"}).finished)
+   .then(()=>{n.hidden=true;n.getAnimations().forEach(x=>x.cancel());n.style.overflow="";delete n.dataset.going})};
 $("how1").hidden=howSeen();
-const openHow=()=>{snd("open");howDone();$("howDlg").showModal()};
+// the How to play scenes: one shows at a time and they step along by themselves while the dialog is open
+let HS=0,HST;
+const howGo=i=>{const s=$("howSlides").children;HS=(i+s.length)%s.length;[...s].forEach((e,k)=>e.classList.toggle("on",k==HS));[...$("howDots").children].forEach((d,k)=>d.classList.toggle("on",k==HS));$("howOk").textContent=HS==s.length-1?"Got it":"Next"};
+const howAuto=()=>{clearInterval(HST);HST=setInterval(()=>howGo(HS+1),4000)};
+[...$("howDots").children].forEach((d,k)=>d.onclick=()=>{howGo(k);howAuto()});
+$("howDlg").addEventListener("close",()=>clearInterval(HST));
+const openHow=()=>{snd("open");howDone();howGo(0);howAuto();$("howDlg").showModal()};
 $("help").onclick=$("howBtn").onclick=$("how1go").onclick=openHow;
 $("how1x").onclick=howDone;
-$("howOk").onclick=$("howX").onclick=()=>{snd("back");$("howDlg").close()};
+$("howX").onclick=()=>{snd("back");$("howDlg").close()};
+$("howOk").onclick=()=>{if(HS<$("howSlides").children.length-1){howGo(HS+1);howAuto()}else{snd("back");$("howDlg").close()}};
 const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"Sound: on":"Sound: off";if(SND)$("vol").value=SND.enabled?SND.volume:0}; // while muted the slider sits at 0; the real volume is kept and comes back when sound is turned on
 (async()=>{try{
   const [{createSound},{createUISFX}]=await Promise.all([import("/sfx.js"),import("/vendor/uisfx.js")]);
