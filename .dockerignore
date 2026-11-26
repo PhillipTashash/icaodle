@@ -1,0 +1,16 @@
+.git
+.env
+.gitignore
+node_modules
+data.json
+feedback.jsonl
+reports.jsonl
+shares
+test
+build-airports.js
+build-states.js
+build-state-shapes.js
+*.md
+!sounds/README.md
+Dockerfile
+docker-compose.yml

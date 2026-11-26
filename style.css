@@ -1,0 +1,1081 @@
+/* ICAOdle — airport departure-board look: charcoal "ink" surfaces, signage amber, and status-board green / red.
+   Every color below comes from these tokens; add new colors here, not inline. */
+:root{
+  --ink-0:#0d1014;   /* page */
+  --ink-1:#161a21;   /* panels */
+  --ink-2:#212733;   /* raised: rows, cards, tiles */
+  --text:#e8eaee;
+  --muted:#8f9aac;
+  --dim:#8794a6;      /* disabled text, waiting flaps (4.5:1 on the flap tiles) */
+  --field:#738094;    /* border of text boxes and dropdowns: 3:1 or better against the page and panels */
+  --amber:#ffb81c;   /* airport signage amber: buttons, highlights, logo */
+  --ok:#3ddc84;      /* "on time" green */
+  --bad:#ff6b6b;     /* "cancelled" red */
+  --orange:#ff9f43;  /* the middle of the grade color scale */
+  --bg:var(--ink-0);--surface:var(--ink-1);--surface-2:var(--ink-2);--border:#3a4455;
+  --accent:var(--amber);--brand:var(--amber);
+  --on-accent:var(--ink-0);  /* text on amber */
+  --radius:12px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important} /* so display:flex rules (board, nav) don't override the hidden attribute */
+body{font:16px/1.4 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;display:flex;flex-direction:column;color:var(--text);text-align:center;background:var(--bg);min-height:100vh}
+h1,h2{margin:.4em}
+h1.top{font-size:1.5em}
+small{color:var(--muted)}
+a{color:var(--accent)}
+
+/* buttons, inputs */
+button{font:inherit;font-weight:700;padding:.55em 1.1em;border:0;border-radius:10px;cursor:pointer;color:var(--on-accent);background:var(--accent);
+  transition:filter .15s,transform .05s,background .15s}
+button:hover:not(:disabled){filter:brightness(1.1)}
+button:active:not(:disabled){transform:translateY(1px)}
+button:disabled{background:var(--surface-2);color:var(--dim);cursor:not-allowed}
+input,select{font:inherit;padding:.5em .7em;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:10px}
+input{text-transform:uppercase;font-family:ui-monospace,Consolas,monospace;letter-spacing:.2em;width:7em;text-align:center}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ghost,#again{background:transparent;border:1px solid var(--muted);color:var(--text);font-weight:600}
+.ghost:hover:not(:disabled),#again:hover:not(:disabled){background:var(--surface-2);filter:none}
+#reset{background:transparent;border:1px dashed var(--border);color:var(--muted);font-weight:400}
+
+/* header */
+h1.top{display:flex;align-items:center;justify-content:center;gap:.6em}
+
+/* menu */
+#menu button{display:block;margin:.8em auto;width:16em;padding:.9em;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--border)}
+#menu button:hover:not(:disabled){border-color:var(--accent);filter:none;background:var(--surface-2)}
+#menu button small{display:block;font-weight:400;margin-top:.2em}
+#menu button{position:relative}
+#menu button.done{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)} /* a 2px green outline, without nudging the layout */
+#menu .check{margin-left:.6em;white-space:nowrap;color:var(--ok);font-weight:700;font-size:.95em}
+#menu #customBtn{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-weight:500}
+#custom p{margin:1em}
+#opts{margin:1em auto;padding:1em;max-width:34em;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+#opts{text-align:left}
+#opts label{display:grid;grid-template-columns:6.5em 1fr;align-items:center;gap:.6em;margin:.7em 0;color:var(--muted);text-align:left} /* labels left-aligned, dropdowns line up in one column */
+#opts select{width:100%}
+.note{display:block;margin-top:.5em}
+
+/* board: flaps | map | guesses + nav */
+/* desktop board is a grid: [Main Menu / rounds] | [map] | [guesses + clues] */
+#board{display:grid;grid-template-columns:13em 1fr 13em;grid-template-rows:auto 1fr;gap:.5em 1em;min-height:55vh;width:90%;max-width:1000px;margin:1em auto 0}
+#lcol{display:contents}
+#menuBack,#flap{grid-column:1}
+#menuBack{grid-row:1}#flap{grid-row:2}
+#map{grid-column:2;grid-row:1/3;min-height:0}
+#col{grid-column:3;grid-row:1/3}
+#map{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+#map.txt{display:flex;align-items:center;justify-content:center;font:700 2.2em/1.3 Inter,system-ui,sans-serif;padding:.5em;color:var(--amber)}
+#col{display:flex;flex-direction:column;gap:.5em;min-height:0}
+#guesses,#cluebox{border:1px solid var(--border);border-radius:var(--radius);padding:.6em;overflow:auto;background:var(--surface)}
+#guesses b,#cluebox b{color:var(--accent);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#guesses hr{border:0;border-top:1px solid var(--border);margin:.8em 0}
+#guesses div,#cluebox div{padding:.4em;margin:.3em 0;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-family:ui-monospace,Consolas,monospace;letter-spacing:.05em}
+
+/* split-flap column */
+#flap{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:space-around;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:.3em}
+#flap .w{--a:var(--ink-2);--b:var(--ink-1);--t:var(--dim);flex:1;flex-wrap:wrap;align-content:center;display:flex;align-items:center;justify-content:center;width:100%;gap:.15em .45em;
+  padding:.4em 0;border-bottom:1px solid var(--border);opacity:.9;font-size:.7em;transition:font-size .6s ease,opacity .6s ease}
+#flap .w.cur{--a:#262c38;--b:#1a1f28;--t:var(--amber);opacity:1;font-size:1.05em} /* active flap grows, the rest shrink */
+#flap .w.cur span{outline:2px solid var(--accent);outline-offset:1px}
+#flap .w.cur{gap:.15em .8em} /* the outline is a fixed 2px, so the enlarged flap needs wider gaps than the small ones */
+#flap .w.ok{--a:#14301f;--b:#0f2417;--t:var(--ok)}
+#flap .w.no{--a:#3a1618;--b:#2a1012;--t:var(--bad)}
+#flap .w:last-child{border-bottom:0}
+#flap span{width:1.3em;line-height:1.7em;background:linear-gradient(var(--a) 49%,var(--ink-0) 50%,var(--b) 51%);color:var(--t);font:700 1.6em ui-monospace,Consolas,monospace;border-radius:.15em;display:inline-block;box-shadow:0 2px 6px #0008}
+#flap .nm b{display:block;margin-top:.4em;color:var(--amber);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+#flap .nm{flex-basis:100%;margin-top:.5em;font:12px/1.2 Inter,system-ui,sans-serif;color:var(--muted);padding:0 .4em}
+#flap span.f{animation:flip .045s ease-out}
+@keyframes flip{from{transform:rotateX(-80deg);filter:blur(1.6px)}to{transform:none;filter:blur(0)}}
+
+/* form row (gap = space between the text box and the buttons) */
+/* the answer area: its own panel, outlined in a muted amber */
+#f{display:flex;flex-wrap:wrap;gap:.6em .8em;justify-content:center;align-items:center;width:90%;max-width:1000px;margin:.5em auto 0;padding:.9em 1em;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+#f input{font-size:1.3em;width:5.5em;border:2px solid color-mix(in srgb,var(--accent) 50%,var(--border))} /* the one highlighted element: a muted amber outline */
+#f input:focus{outline:none;background:var(--surface-2)} /* no outline; focus shows as a lighter box instead */
+#f input::placeholder{color:var(--muted);opacity:.6}
+#msg{min-height:1.4em;color:var(--muted)}
+
+/* end screen: one box holding your numbers, the score graph, and the buttons (full box width) */
+#stats{width:90%;max-width:1000px;margin:.5em auto 0;padding:1em;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+#statline{line-height:1.7}
+#endbtns button{display:block;width:100%;margin:.5em 0 0}
+
+/* layout: everything centered on the screen, footer pinned below with the new-set countdown on the right */
+main{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1em}
+main>*{width:100%}
+footer{display:flex;justify-content:space-between;align-items:center;padding:.6em 1em}
+#soundctl{position:relative;display:flex;align-items:center}
+#gear{padding:.15em .55em;font-size:1em;line-height:1.3}
+/* the controls live in a small card above the gear and fade in when it is pressed */
+#settings{position:absolute;left:0;bottom:calc(100% + .5em);z-index:5;min-width:11em;display:flex;flex-direction:column;align-items:stretch;gap:.5em;padding:.7em;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px #0008;
+  opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .2s ease,transform .2s ease,visibility .2s}
+#soundctl.open #settings{opacity:1;visibility:visible;transform:none}
+#mute,#fx{padding:.2em .8em;font-size:.8em;font-weight:500}
+#vol{width:100%;padding:0;accent-color:var(--accent)}
+#timer{display:inline-block;font-size:.8em;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:.2em .7em}
+/* Give up: smooth red on hover; armed ("Are you sure?") is solid red */
+#giveup{transition:background-color .3s ease,color .3s ease,border-color .3s ease}
+#giveup{display:inline-grid;place-items:center} /* both labels share one cell, so the button is as wide as the longer one */
+#giveup .lbl{grid-area:1/1;transition:opacity .25s ease}
+#giveup .alt{opacity:0}
+#giveup.armed .lbl{opacity:0}
+#giveup.armed .alt{opacity:1}
+#giveup:hover:not(:disabled){color:var(--bad);border-color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+#giveup.armed{background:var(--bad);border-color:var(--bad);color:var(--on-accent)}
+#giveup.armed:hover:not(:disabled){background:var(--bad);color:var(--on-accent);filter:brightness(1.08)}
+/* answer row: ? | text box | [ Guess / Skip + Give up ]. Guess is as tall as the text box and exactly as wide as the two small buttons beneath it,
+   which are equal to each other and only as big as their text needs. */
+#f{align-items:stretch} /* the text box stretches to the full height of the Guess + Skip/Give up stack; the ? stays centered */
+#f input{align-self:stretch}
+#help{align-self:center}
+#acts{display:inline-grid;grid-template-columns:1fr 1fr;gap:.5rem}
+#go{grid-column:1/-1;height:3.4rem;padding:0 1.4em;font-size:1.15em}
+#skip,#giveup{font-size:.8em;padding:.3em .7em}
+/* right column: Guesses on top (its own height), Clues fills the rest */
+#guesses{flex:0 0 auto}
+#cluebox{flex:1;min-height:0;display:flex;flex-direction:column}
+/* custom screen buttons: Start is the longer, main one */
+#customGo{min-width:12em;padding:.7em 2em}
+#customBack{padding:.7em 1.4em}
+/* Main Menu: a quiet button above the rounds */
+#menuBack{padding:.5em;background:transparent;border:1px solid var(--border);color:var(--muted)}
+#menuBack:hover:not(:disabled){color:var(--accent);border-color:var(--accent);background:var(--surface-2);filter:none}
+/* falling-planes effect sits behind every container: the canvas is at z-index 0, page content above it */
+.fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+.fx.front{z-index:3} /* the few big planes that fly over the containers (menu background) */
+main,footer{position:relative;z-index:1}
+/* results screen: big letter grade, percentage underneath; its color is set from the score (red -> orange -> green) */
+#grade{margin:.1em 0 .5em;line-height:1}
+#grade .letter{font-size:7rem;font-weight:900;letter-spacing:-.02em;}
+#grade .pct{font-size:1.6rem;font-weight:700;margin-top:.1em}
+/* logo: large on the title screen (menu and custom setup), the usual size once a game is showing */
+h1.top svg{width:320px;height:auto}
+main:has(#game:not([hidden])) h1.top svg{width:190px}
+/* logo tiles squash briefly each time they flip */
+.tile{transform-box:fill-box;transform-origin:center}
+.tile.f{animation:tileflip .12s ease-out}
+@keyframes tileflip{from{transform:scaleY(.15);filter:blur(2.2px)}to{transform:none;filter:blur(0)}} /* a flip smears, then snaps sharp: motion blur */
+/* menu date picker: a small arrow either side of the date, inside the width of the Normal button */
+#datebar{display:flex;align-items:center;justify-content:space-between;width:12.5em;margin:-.12em auto 1.02em} /* a little narrower than the Normal button (16em): the arrows sit just outside the date */
+#menu #datebar button{display:inline-block;width:auto;margin:0;padding:.15em .3em;font-size:.85em;background:none;border:0;color:var(--text)} /* beats the wide menu-card button style */
+#menu #datebar button:hover:not(:disabled){background:none;color:var(--accent)}
+#menu #datebar button:disabled{opacity:.3;background:none;color:var(--muted)}
+#dlabel{font-weight:700;line-height:1.2;font-size:.85em;white-space:nowrap}
+#dlabel small{display:block;font-weight:500;color:var(--muted)}
+
+/* ---- phones and narrow windows ---- */
+html{-webkit-text-size-adjust:100%}
+body{min-height:100dvh}
+button,input,select{touch-action:manipulation} /* no double-tap zoom on the controls */
+footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bottom))}
+@media (max-width:820px){
+  main{padding:.5em}
+  h1.top{margin:.2em}
+  h1.top svg{max-width:80vw}
+  /* everything on one screen, top to bottom: flippers in a row, map, guesses row, clues row, the answer panel, and last Back / Next.
+     The board and its two columns dissolve (display:contents) so their parts can be ordered together with the answer panel. */
+  #game{display:flex;flex-direction:column;gap:.4em}
+  #board,#lcol,#col{display:contents}
+  #menuBack{order:0;padding:.15em;min-height:34px;font-size:.75em}
+  #flap{order:1;flex:none;flex-direction:row;width:100%;min-height:0;padding:.25em .1em}
+  #flap .w,#flap .w.cur{flex:1;min-width:0;flex-wrap:nowrap;gap:.15em .3em;padding:.35em .15em;font-size:.42em;border-bottom:0;border-right:1px solid var(--border)}
+  #flap .w:last-child{border-right:0}
+  #flap .w.cur span{outline:0} /* no yellow box around the current flipper's tiles; its yellow letters are enough */
+  #flap .nm{display:none} /* too small to read here */
+  #map{order:2;flex:none;height:30dvh;min-height:190px}
+  #guesses{order:3;display:flex;align-items:stretch;gap:.35em;padding:.35em .4em;overflow:visible}
+  #cluebox{order:4;flex:none;flex-direction:row;align-items:stretch;gap:.35em;padding:.35em .4em;min-height:0;overflow:visible}
+  #f{order:5;margin:0}
+  #msg{order:7}#stats{order:5} /* the results take the answer panel's place */
+  /* the guess and clue boxes run sideways: a small label, then equal boxes that wrap their text */
+  #guesses b,#cluebox b{flex:0 0 3.2em;align-self:center;font-size:.6em;line-height:1.2;text-align:center}
+  #guesses hr{display:none}
+  #guesses div,#cluebox div{flex:1;min-width:0;margin:0;padding:.25em .2em;font-size:.68em;line-height:1.15;letter-spacing:0;display:flex;align-items:center;justify-content:center;text-align:center;overflow-wrap:anywhere}
+  /* answer panel: [back] [?] [text box] on one row, Guess + Skip / Give up full width underneath */
+  #f{gap:.6em;padding:.8em;width:100%}
+  #f input{flex:1;min-width:0;width:auto;height:3.4rem;align-self:auto}
+  #acts{flex:1 1 100%;width:100%}
+  #giveup{grid-column:1;grid-row:2} #skip{grid-column:2;grid-row:2} /* phone: Give up on the left, Skip on the right */
+  #go{height:3.4rem}
+  #skip,#giveup{font-size:.9em;padding:.65em 1em}
+  #stats{width:100%}
+}
+@media (max-width:360px){#flap .w,#flap .w.cur{font-size:.36em}} /* the smallest phones: slightly smaller flippers so all four tiles fit in a fifth of the width */
+@media (pointer:coarse){
+  button{min-height:44px}
+  #menu #datebar button{padding:.55em .8em}
+}
+#timer{margin-left:auto}
+/* a clue unlocked by a miss pops in with a brief amber glow */
+#cluebox .pop{animation:cluepop .7s cubic-bezier(.2,1.3,.4,1)}
+@keyframes cluepop{0%{transform:scale(.4);opacity:0}55%{transform:scale(1.1);opacity:1;border-color:var(--accent)}100%{transform:none;border-color:var(--border)}}
+#guesses .dir{display:inline-block;margin:0 .15em}
+/* last-guess panel: same box as the answer panel, a title on top and the four codes spread evenly across */
+#choices{display:flex;flex-wrap:wrap;justify-content:center;gap:.6em .8em;width:90%;max-width:1000px;margin:.5em auto 0;padding:.9em 1em;background:var(--amber);border:1px solid var(--amber);border-radius:var(--radius)}
+#choices[hidden]{display:none}
+#choices b{flex:1 0 100%;text-align:center;color:var(--on-accent);letter-spacing:.2em;text-transform:uppercase;font-size:1.4em;font-weight:900}
+#choices button{flex:0 0 5em;background:var(--ink-0);color:var(--amber);border:0;font-family:ui-monospace,monospace;letter-spacing:.08em;padding:.7em .3em;font-size:1.1em}
+@media (max-width:820px){#choices{order:5;width:100%;margin:0;padding:.8em}}
+/* "Airports near me" popup */
+#near,#vs,#ask,#tmo{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(22em,90vw);text-align:left}
+#near::backdrop,#vs::backdrop,#ask::backdrop,#tmo::backdrop{background:rgba(0,0,0,.6)}
+#near p,#vs p,#ask p,#tmo p{margin:0 0 .8em;text-align:center}
+#near label,#vs label{display:flex;align-items:center;justify-content:space-between;gap:.8em;margin:.5em 0}
+#near input,#vs input{width:6em;text-align:center}
+#nearErr,#vsErr{min-height:1.4em;margin:.6em 0 0;color:var(--bad);text-align:center;font-size:.9em}
+#nearBtns{display:flex;gap:.6em;justify-content:center;margin-top:.4em}
+/* results panel (desktop): grade and points on the left, the score distribution on the right, buttons along the bottom. Without a chart (practice / ZIP games): grade | points | buttons. */
+#stats:not([hidden]){display:grid;grid-template-columns:14em minmax(0,1fr);grid-template-areas:"grade chart" "result chart" "btns btns";gap:.5em 1.5em;align-items:center}
+#stats.nochart:not([hidden]){grid-template-columns:auto 1fr 15em;grid-template-areas:"grade result btns";text-align:left}
+#grade{grid-area:grade;text-align:center}#grade .letter{font-size:5rem}#grade .pct{font-size:1.3rem}
+#result{grid-area:result;text-align:center}#chart{grid-area:chart;width:100%;min-width:0;height:auto;margin:0}#endbtns{grid-area:btns;display:flex;gap:.6em}#endbtns button{flex:1}
+#statline{font-size:2rem;line-height:1.1}#quip{margin-top:.4em;color:var(--muted);font-size:1rem}
+#stats.nochart #result{text-align:left}#stats.nochart #statline{font-size:2.2rem}
+@media (max-width:820px){#stats:not([hidden]){display:block;text-align:center}#grade .letter{font-size:7rem}#endbtns{display:block}}
+/* game over: the guesses/clues column goes and the map takes its place */
+#board.over:not(.study) #col{display:none}
+#board.over:not(.study) #map{grid-column:2/4}
+/* the rows on the left are buttons */
+#flap .w.go{cursor:pointer}
+#flap .w.go:hover{background:color-mix(in srgb,var(--amber) 10%,transparent)}
+#flap .w.cur{background:color-mix(in srgb,var(--amber) 16%,transparent)} /* the round on screen */
+/* hovering a round that isn't the open one: it grows about a quarter of the way to the open round's size (.7em -> 1.05em), then eases back; the font-size transition on .w does the motion */
+#flap .w.go:not(.cur):hover{font-size:.79em}
+/* the streak line under an airport name changes color with the run */
+#flap .nm b.st3{color:var(--orange)}
+#flap .nm b.st4{color:var(--bad)}
+#devAnswers{display:block;margin-top:.5em;color:var(--muted);white-space:pre-line;font-family:ui-monospace,Consolas,monospace}
+/* menu: Zip Code and Custom game share one row; the dev tools hide behind a small toggle */
+#dev{margin-top:1em;text-align:center;color:var(--muted);font-size:.85em}
+#dev summary{cursor:pointer}
+#dev button{margin-top:.5em}
+#flap .nm i{display:block;font-style:normal;margin-top:.2em}
+#ver{font-size:.75em;color:var(--muted)}
+
+#streak{text-align:center;font-weight:700;color:var(--orange);margin:.2em 0 .4em}
+#menu #vsBtn{width:16em;padding:.7em .4em;margin:.8em auto}
+#pcol{display:none}
+/* friend games: the players panel sits under the answer box, a row of player cards */
+#board.vs~#pcol{display:flex;flex-wrap:wrap;gap:.5em;width:90%;max-width:1000px;box-sizing:border-box;margin:.5em auto 0;padding:.6em;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+#pcol b{flex:0 0 100%;color:var(--accent);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#pcol div{flex:1 1 9em;padding:.4em;margin:0;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-weight:600;overflow-wrap:anywhere}
+#pcol div.me,#lbPlayers div.me{border-color:var(--accent)}
+#pcol span{display:block;font-weight:400;color:var(--muted);font-size:.8em}
+#vsTimer{text-align:center;font:700 1.5em ui-monospace,Consolas,monospace;color:var(--accent);margin:.2em}
+#lobby{max-width:min(36em,94vw);margin:1em auto;text-align:center}
+#lobby h3{margin:.2em 0}#lobby h3 b{letter-spacing:.2em;color:var(--accent)}
+#lbPlayers div{display:flex;justify-content:space-between;gap:1em;padding:.6em .8em;margin:.4em 0;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+#lbMsg{min-height:1.5em;margin:.8em 0;color:var(--muted)}
+#lbBtns{display:flex;gap:.6em;justify-content:center}
+#lbReady.on{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+#lbLink{font-size:.85em;margin:.4em 0;max-width:100%;overflow-wrap:anywhere}
+#lbPlayers div{position:relative}#lbPlayers .star{position:absolute;left:100%;margin-left:.5em;white-space:nowrap;top:50%;transform:translateY(-50%);font-style:normal}
+/* Play a friend popup: left-aligned, a quiet box each for creating and joining, a four-box code centered in its box */
+#vs{width:min(22em,92vw);text-align:left;position:relative}
+#vs p,#vsErr{text-align:left}
+#vs p{font-size:1.1em}
+#vs label{display:block}
+#vs input,#vs select{display:block;width:100%;box-sizing:border-box;text-align:left;margin-top:.3em}
+#vs #vsName{text-transform:none;letter-spacing:normal}
+#vsCancel{position:absolute;top:.5em;right:.5em;min-height:0;padding:.2em .5em;border:0;background:none;color:var(--muted)}
+#vsErr{min-height:1.2em;margin:.6em 0 0}
+/* the popup keeps its normal size and never shows its own scroll bar (it still scrolls by wheel or touch on a very short window) */
+#vs{scrollbar-width:none}
+#vs::-webkit-scrollbar{display:none}
+#lbHead{position:relative;display:inline-block}
+#lbTitle b{cursor:pointer;user-select:none;padding:.1em .3em;border-radius:8px}
+#lbTitle b:hover{background:var(--surface-2)}
+#lbTip{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:.4em;white-space:nowrap;font-size:.85em;color:var(--ok);opacity:0;pointer-events:none}
+#lbTip.show{animation:tipfade 1.4s ease-out}
+@keyframes tipfade{0%,55%{opacity:1}100%{opacity:0}}
+#lbPlayers input.nm{background:transparent;border:1px solid transparent;border-radius:6px;color:inherit;font:inherit;padding:.1em .3em;margin:-.15em 0 -.15em -.3em;width:9em}
+#lbPlayers input.nm:hover,#lbPlayers input.nm:focus{border-color:var(--border);background:var(--surface-2)}
+#lbPlayers input.nm{text-transform:none;letter-spacing:normal;text-align:left;height:auto;box-shadow:none;padding:.1em .3em;margin:-.15em 0 -.15em -.3em}
+#ask{width:min(20em,90vw);text-align:left}#ask p{text-align:left}
+#ask label{display:block}#ask input{display:block;width:100%;box-sizing:border-box;text-align:left;text-transform:none;letter-spacing:normal;margin-top:.3em}
+#askCode{color:var(--accent);letter-spacing:.15em}
+#askErr{min-height:1.2em;margin:.5em 0 0;color:var(--bad);font-size:.9em}
+#askBtns{display:flex;gap:.6em}
+#menu #customBtn{width:16em;margin:.8em auto;padding:.7em .4em}
+
+#joinrow{display:flex;width:16em;margin:.8em auto 0}
+#joinrow input{flex:1;min-width:0;margin:0;border-radius:var(--radius) 0 0 var(--radius);text-align:center;text-transform:uppercase;letter-spacing:.2em}
+#joinrow input::placeholder{letter-spacing:normal;text-transform:none}
+#menu #joinrow button{display:inline-block;width:auto;margin:0;padding:.7em 1.2em;border-radius:0 var(--radius) var(--radius) 0}
+#joinErr{text-align:center;color:var(--bad);font-size:.85em}#joinErr:not(:empty){margin:.3em 0 0}
+#joinrow input,#joinrow button{position:relative}#joinrow input:focus{z-index:1} /* the focus ring draws over the Join button instead of being cut off by it */
+#joinrow input:focus{outline:none;border-color:var(--accent)} /* focus = the box's own border changes color, no ring outside it */
+#menu .lbl{width:16em;margin:1.3em auto -.3em;font-size:.7em;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;text-align:left}
+#menu #datebar+.lbl{margin-top:.2em} /* "Daily" sits right under the date */
+/* menu: bigger section titles, everything left-aligned to the buttons' edge */
+#menu .lbl{font-size:.95em;margin:1.4em auto -.2em;text-align:left}
+#menu #datebar+.lbl{margin-top:.2em}
+#menu button[data-m],#menu #vsBtn,#menu #nearBtn,#menu #customBtn{text-align:left;padding-left:1em}
+#joinrow input{text-align:left;padding-left:1em}
+#menu #nearBtn{width:16em;margin:.8em auto;padding:.7em .4em .7em 1em} /* same size as Custom Game */
+
+#vs #vsCreate{display:block;width:100%;margin-top:1em}
+#vs{width:min(28em,92vw)}
+#vsRow{display:flex;gap:.8em}#vsRow label{flex:1;min-width:0}
+/* feedback question, inline in the results box (and in the lobby if the game ended first) */
+@media (max-width:820px){#board.vs~#pcol{order:8;width:100%}}
+#tmo{width:min(22em,90vw);text-align:left}#tmo h3{margin:0 0 .5em}#tmo p{text-align:left;margin:0 0 1em}#tmo button{width:100%}
+/* feedback question: one line in the footer */
+#fbInline{display:flex;align-items:center;gap:.6em;flex:1 1 auto;justify-content:center;min-width:0;white-space:nowrap;overflow-x:auto;font-size:.85em}
+#fbInline[hidden]{display:none}#fbInline [hidden]{display:none!important}
+#fbInline b{font-weight:600}#fbRate,#fbWhy,#fbAir{display:inline-flex;align-items:center;gap:.4em}
+#fbInline button{padding:.25em .7em;min-height:0}
+#fbAir button{font-family:ui-monospace,Consolas,monospace}
+#fbAir button.on{border-color:var(--accent);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--accent)}
+@media (max-width:820px){#fbInline{order:9;flex-basis:100%;justify-content:flex-start}}
+#bestline{font-weight:600;color:var(--orange);margin:.2em 0}
+/* lobby spacing: the list, the one message/callout, and the buttons are always the same distance apart (0.8em) */
+#lbMsg:empty{display:none}
+#lbBtns{margin-top:.8em}
+/* lobby trivia (desktop browsers only): a compact card floating midway between the Ready/Leave buttons and the bottom of the screen */
+#trivia{overflow-y:auto;position:fixed;left:50%;transform:translateX(-50%);width:min(24em,92vw);box-sizing:border-box;margin:0;z-index:2;text-align:left;padding:.6em .8em;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-size:.9em}
+#trivia[hidden]{display:none}
+@media (pointer:coarse),(max-width:820px){#trivia{display:none!important}}
+.tvhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:.3em;font-size:.75em;text-transform:uppercase;letter-spacing:.08em}.tvhead b{color:var(--accent)}.tvhead span{color:var(--muted)}
+.tvq{margin:.1em 0 .5em;font-weight:600;line-height:1.3}
+.tvopts{display:grid;grid-template-columns:1fr 1fr;gap:.35em}
+#trivia .tvopt{display:block;width:100%;text-align:left;margin:0;padding:.35em .6em;min-height:0;font-size:.9em;line-height:1.25}
+#trivia .tvopt.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 15%,transparent)}
+#trivia .tvopt.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent)}
+#trivia .tvopt.dim{opacity:.5}
+.tvbar{display:flex;justify-content:space-between;align-items:center;gap:.8em;margin-top:.5em}.tvbar button{padding:.3em 1em;min-height:0}
+.tvres{font-weight:600;font-size:.9em}.tvres.ok{color:var(--ok)}.tvres.bad{color:var(--bad)}
+/* trivia: larger and easier to read */
+#trivia{width:min(36em,94vw);padding:.9em 1.1em;font-size:1.05em}
+.tvhead{font-size:.8em;margin-bottom:.5em}
+.tvq{font-size:1.15em;margin:.2em 0 .8em;line-height:1.35}
+.tvopts{gap:.5em}
+#trivia .tvopt{padding:.65em .9em;font-size:1em;line-height:1.3}
+.tvbar{margin-top:.8em}.tvbar button{padding:.45em 1.4em}
+.tvres{font-size:1.05em}
+.tvbar{min-height:2.6em}
+#trivia{font-size:1em;padding:.8em 1em}
+.tvq{margin:.15em 0 .6em}
+#trivia .tvopt{padding:.55em .85em}
+.tvbar{margin-top:.6em;min-height:2.4em}
+/* lobby: the status message sits under the code; the player list is as wide as the trivia card; Ready is greyed until two people are in */
+#lbMsg{margin:.8em 0 0}
+#lbPlayers{margin-top:.8em}
+#lbReady:disabled{opacity:.5}
+#trivia{scrollbar-width:none}#trivia::-webkit-scrollbar{display:none}
+/* lobby: code, message and buttons are left-aligned with the player list; Ready is wide */
+#lobby{text-align:left}
+#lbBtns{justify-content:flex-start}
+#lbReady{min-width:16em}
+#lbReady{min-width:8em}
+/* lobby vertical rhythm: every block (code, message, list, callout, buttons) is a tight box and the gap between neighbours is always 0.8em */
+#lbHead{display:block;width:fit-content}
+#lobby h3{margin:0;line-height:1.25}
+#lbMsg{margin:.8em 0 0;min-height:0;line-height:1.25}
+#lbPlayers{margin-top:.8em}
+#ver{margin-right:.8em}
+#lobbyClock{font-size:.75em;color:var(--muted);white-space:nowrap}#lobbyClock.soon{color:var(--orange)}
+/* City and state clue: locator map made of airport dots */
+.dotmap{display:block;width:100%;height:auto;margin-top:.4em}.dotmap path{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round}
+.dotmap .tg{fill:var(--accent)}.dotmap .ring{fill:none;stroke:var(--accent);stroke-width:1.5}
+@media (max-width:820px){#cluebox .dotmap{max-height:6em}}
+#lobby.hasTrivia{padding-bottom:300px}
+/* after a game: the right column shows study notes for the airport you are looking at */
+#board.over #guesses,#board.over #cluebox{display:none}
+#studybox{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);padding:.6em;background:var(--surface);text-align:left;scrollbar-width:none}
+#studybox::-webkit-scrollbar{display:none}#studybox[hidden]{display:none}
+#studybox>b{color:var(--accent);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#studybox .stcode{margin-top:.4em;font-weight:700}#studybox .stname{color:var(--muted);font-size:.85em;margin-bottom:.3em}
+#studybox .stres{font-weight:600;font-size:.85em}#studybox .stres.ok{color:var(--ok)}#studybox .stres.bad{color:var(--bad)}
+#studybox ul{margin:.5em 0 0;padding-left:1.1em;font-size:.88em;line-height:1.4}#studybox li{margin:.45em 0}
+@media (max-width:820px){#studybox{order:3;flex:none;max-height:none}}
+/* share popup */
+#shareDlg{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(26em,92vw);text-align:left}
+#shareDlg::backdrop{background:rgba(0,0,0,.6)}#shareDlg p{margin:0 0 .6em;text-align:left}
+#shImg{display:block;width:min(15em,100%);aspect-ratio:1;margin:.3em auto .8em;border-radius:10px;border:1px solid var(--border)}
+#shBtns{display:grid;grid-template-columns:1fr 1fr;gap:.5em}
+#shMsg{min-height:1.3em;margin:.6em 0;font-size:.85em;color:var(--muted)}
+#shClose{width:100%}
+/* study: mnemonic and the report button */
+#studybox{display:flex;flex-direction:column}#studybox[hidden]{display:none}
+#studybox .stmn{margin:.5em 0;padding:.45em .6em;border:1px dashed var(--accent);border-radius:8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+#studybox .stlab{display:block;font-size:.7em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+#studybox .stphrase{font-weight:600;line-height:1.35}#studybox .stphrase b{color:var(--accent);font-size:1.1em}
+#studybox .streport{margin-top:auto;padding:.4em .6em;font-size:.8em;min-height:0}
+#studybox ul{margin-bottom:.8em}
+/* report popup */
+#reportDlg{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(26em,92vw);text-align:left}
+#reportDlg::backdrop{background:rgba(0,0,0,.6)}#reportDlg p{margin:0 0 .6em;text-align:left}#rpAbout{color:var(--muted);font-size:.9em}
+#rpText{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:7em;font:inherit;padding:.6em .8em;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;text-transform:none;letter-spacing:normal;text-align:left}
+#rpMsg{min-height:1.3em;margin:.5em 0;font-size:.85em;color:var(--bad)}
+#rpBtns{display:flex;gap:.6em}#rpBtns button{flex:1}#rpDone{width:100%}
+#studybox .stwhy{margin-top:.3em;font-size:.75em;line-height:1.35;color:var(--muted)}#studybox .stmn{margin:.2em 0 .8em}#studybox ul{margin-bottom:.5em}
+
+/* a replay of the daily says so inside the answer box, under the ICAO text box (left edges lined up), in muted red */
+#gwrap{position:relative;display:flex;align-self:stretch}#gwrap input{flex:1}
+#notScored{position:absolute;top:100%;left:0;margin-top:.5em;white-space:nowrap;font-size:.8em;color:color-mix(in srgb,var(--bad) 55%,var(--muted))}#notScored[hidden]{display:none}
+#f:has(#notScored:not([hidden])){padding-bottom:2.4em}
+@media (max-width:820px){#gwrap{flex:1;min-width:0;flex-direction:column;align-self:auto}#gwrap input{flex:none}#notScored{position:static;white-space:normal;margin-top:.4em;font-size:.75em}#f:has(#notScored:not([hidden])){padding-bottom:.8em}}
+/* Okay / Cancel popup */
+#askDlg{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(22em,92vw);text-align:left}
+#askDlg::backdrop{background:rgba(0,0,0,.6)}#askDlg p{margin:0 0 1em;text-align:left}
+#askBtns{display:flex;gap:.6em}#askBtns button{flex:1}
+#askDlg p:first-child{margin-bottom:.25em;font-size:1.2rem}
+/* lobby settings (owner) / summary (everyone else) */
+#lbCfg{margin:.8rem 0 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface)}#lbCfg[hidden]{display:none}
+#lbKind{display:flex;flex-wrap:wrap;gap:.4em}
+#lbKind button{flex:1 1 auto;padding:.4em .7em;font-size:.85em;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
+#lbKind button.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent)}
+.lbOpts{display:flex;flex-wrap:wrap;gap:.6em .8em;align-items:flex-end;margin-top:.6em}.lbOpts[hidden]{display:none}
+.lbOpts label{display:flex;flex-direction:column;gap:.25em;font-size:.8em;color:var(--muted)}
+.lbOpts select,.lbOpts input{font:inherit;font-size:1.1em;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.35em .5em;text-transform:none;letter-spacing:normal;width:auto;max-width:100%}
+.lbOpts input{width:6em}.lbOpts button{padding:.45em 1em}
+#lbCfgErr{min-height:0;margin-top:.4em;font-size:.85em;color:var(--bad)}#lbCfgErr:empty{display:none}
+/* previous games in the lobby */
+#lbHist{margin:.8rem 0 0}#lbHist[hidden]{display:none}
+#lbHist>b{display:block;margin-bottom:.4em;color:var(--muted);font-size:.8em;text-transform:uppercase;letter-spacing:.08em}
+#lbHist details{margin:.4em 0;padding:.5em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:.9em}
+#lbHist summary{cursor:pointer}
+#lbHist .hcodes{margin:.4em 0;color:var(--muted);font-size:.85em;letter-spacing:.05em}
+#lbHist .hrow{display:flex;justify-content:space-between;gap:1em;padding:.2em 0}
+/* zip lobby map */
+#lbMap{margin:.8rem 0 0}#lbMap[hidden]{display:none}
+#lbMapCanvas{height:16em;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+#lbMapNote{margin-top:.4em;font-size:.85em;color:var(--muted)}
+/* the host's lobby settings as seen by everyone else: same panel, not clickable */
+#lbCfg.ro button,#lbCfg.ro select,#lbCfg.ro input{cursor:default}
+#lbCfg.ro #lbKind button:disabled{background:var(--surface-2);color:var(--muted)}
+#lbCfg.ro #lbKind button.on:disabled{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+#lbCfg.ro select:disabled,#lbCfg.ro input:disabled{color:var(--text);opacity:.8}
+#lbCfgNote{margin-top:.4em;font-size:.8em;color:var(--muted)}#lbCfgNote[hidden]{display:none}
+/* zip lobby: airports in the game, as toggles */
+#lbAir{margin:.8rem 0 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface)}#lbAir[hidden]{display:none}
+#lbAirHead{display:block;margin-bottom:.5em;font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+#lbAirList{display:flex;flex-wrap:wrap;gap:.4em}
+#lbAir button.air{display:flex;flex-direction:column;align-items:center;gap:.1em;padding:.35em .6em;min-width:5.2em;font-size:.8em;line-height:1.15;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);}
+#lbAir button.air small{font-size:.8em;font-weight:500;max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lbAir button.air.on{color:var(--on-accent);background:var(--accent);border-color:var(--accent);text-decoration:none}
+#lbAir button.air:disabled{cursor:default;opacity:1}#lbAir button.air:disabled:not(.on){color:var(--dim)}
+#lbAirNote{margin-top:.5em;font-size:.8em;color:var(--muted)}
+/* airport list: paging arrows, and a darker city name on the amber buttons */
+#lbAirTop{display:flex;justify-content:space-between;align-items:center;gap:.6em;margin-bottom:.5em}#lbAirTop #lbAirHead{margin:0}
+#lbAirNav{display:flex;align-items:center;gap:.5em;font-size:.85em;color:var(--muted)}#lbAirNav[hidden]{display:none}
+#lbAirNav button{padding:.2em .6em;font-size:.9em;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}#lbAirNav button:disabled{opacity:.4}
+#lbAir button.air.on small{color:#1a1300;font-weight:700;opacity:1}
+/* select all / deselect all, the typed airport list */
+#lbAirAll{display:flex;gap:.4em;margin-left:auto}#lbAirAll[hidden]{display:none}
+#lbAirAll button{padding:.2em .6em;font-size:.8em;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
+#lbList{margin-top:.8em;padding-top:.8em;border-top:1px solid var(--border)}#lbList[hidden]{display:none}
+#lbListHead{display:flex;flex-direction:column;gap:.2em;margin-bottom:.5em}#lbListHead[hidden]{display:none}#lbListHead small{color:var(--muted);font-size:.8em}
+#lbFindBox{position:relative}#lbFindBox[hidden]{display:none}
+#lbFind{width:100%;box-sizing:border-box;font:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:.45em .6em;text-transform:none;letter-spacing:normal}
+#lbFindRes{position:absolute;left:0;right:0;top:100%;z-index:5;margin-top:.2em;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.5)}#lbFindRes[hidden]{display:none}
+#lbFindRes .hit{padding:.45em .6em;font-size:.85em;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#lbFindRes .hit b{color:var(--accent)}
+#lbFindRes .hit.sel{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+#lbChips{display:flex;flex-wrap:wrap;gap:.4em;margin-top:.6em}
+#lbChips .chip{display:inline-flex;align-items:center;gap:.4em;padding:.3em .6em;font-size:.8em;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent)}
+#lbChips .chip small{font-weight:700;color:#1a1300;max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#lbChips .chip i{font-style:normal;opacity:.7}
+#lbChips .chip:disabled{cursor:default;opacity:1}
+#lbListBtns{display:flex;flex-wrap:wrap;gap:.4em;margin-top:.6em}#lbListBtns[hidden]{display:none}#lbListBtns button{padding:.4em .8em;font-size:.85em}
+#lbListMsg{min-height:0;margin-top:.4em;font-size:.85em;color:var(--muted)}#lbListMsg:empty{display:none}
+/* trivia: an ordinary block right under the lobby buttons (not floating), so it can never cover the lobby, however much is on the screen */
+#trivia{position:static!important;transform:none!important;left:auto!important;top:auto!important;max-height:none!important;width:100%!important;margin:.8rem 0 0!important;overflow:visible}
+#lobby.hasTrivia{padding-bottom:0}
+/* the list section (its own panel in the lobby, or inside the Custom List popup on the main menu) */
+#lbList{margin-top:.6em;padding-top:0;border-top:0}#lbList[hidden]{display:none}
+#lbListFmtRow{margin:.2em 0 .6em}
+#lbList.menu #lbListUse{display:none}
+#listDlg{position:relative;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(30em,94vw);text-align:left;overflow:auto;scrollbar-width:thin}
+#listDlg::backdrop{background:rgba(0,0,0,.6)}#listDlg>p{margin:0 0 .6em}
+#listX{position:absolute;top:.5em;right:.5em;padding:.2em .6em}
+#listErr{min-height:0;margin:.5em 0 0;font-size:.85em;color:var(--bad)}#listErr:empty{display:none}
+#listBtns{display:flex;gap:.6em;margin-top:.8em}#listBtns button{flex:1}
+/* tooltips on the lobby's game type buttons (same look as the ? help tip) */
+#lbKind button{position:relative}
+#lbKind button::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + .5em);transform:translateX(-50%);width:max-content;max-width:14em;padding:.45em .7em;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;font-size:.85rem;font-weight:400;line-height:1.3;text-align:center;box-shadow:0 4px 14px #0008;opacity:0;pointer-events:none;transition:opacity .12s;z-index:6}
+#lbKind button:hover::after,#lbKind button:focus-visible::after{opacity:1}
+#lbKind button:first-child::after{left:0;transform:none;text-align:left}
+#lbKind button:last-child::after{left:auto;right:0;transform:none;text-align:left}
+/* lobby: a visible Copy invite link button beside the code (its text turns to "Copied ✓" for a moment, so the old floating tip is not needed), and a quiet join/leave notice */
+#lbHead{display:flex;align-items:center;flex-wrap:wrap;gap:.3em .8em;width:auto}
+#lbTip{display:none}
+#lbCopy{min-height:0;padding:.3em .8em;font-size:.85em}
+#lbNote{min-height:0;margin:.5em 0 0;font-size:.85em;color:var(--accent)}#lbNote:empty{display:none}
+
+/* ===== Accessibility and data presentation pass =====
+   Numbers line up (tabular), codes are monospace capitals, controls are 44 px on touch, focus is always visible, and nothing relies on color alone. */
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0} /* visible to screen readers only */
+body{font-variant-numeric:tabular-nums}
+::placeholder{color:var(--muted);opacity:1} /* placeholders are text: full muted color (6:1), not faded */
+.code,.stcode,.hcodes,#askCode,#lbTitle b,#lbAir button.air b,#lbChips .chip b,#lbFindRes .hit b,#choices button,#fbAir button{font-family:ui-monospace,Consolas,monospace;text-transform:uppercase}
+/* text boxes and dropdowns: a border you can see (3:1 against the page), except while focused (amber) and the editable player name (it reveals its box on hover) */
+input:not([type=range]):not([type=file]):not(.nm):not(#g):not(:focus),select:not(:focus),textarea:not(:focus){border-color:var(--field)!important}
+/* focus: every control shows a ring, including the answer box and the keyboard-reachable rows */
+#f input:focus{outline:2px solid var(--accent);outline-offset:2px}
+summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#flap .w:focus-visible{outline-offset:-2px}
+#choices:focus-visible{outline-color:var(--on-accent)} /* the panel is amber, so its ring is dark */
+/* "?" opens the how-to-play dialog */
+#help{flex:none;width:2.25rem;height:2.25rem;padding:0;min-height:0;border-radius:50%;font-size:1rem;font-weight:700;color:var(--muted);border:1.5px solid var(--muted)}
+#help:hover:not(:disabled){color:var(--accent);border-color:var(--accent);background:transparent}
+/* menu: first-visit card, quiet How to play link, and Custom List lined up like its neighbours */
+#how1{width:16em;margin:0 auto .8em;padding:.7em .8em;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);text-align:left;font-size:.9rem;line-height:1.35}
+#how1b{display:flex;gap:.5em;margin-top:.6em}
+#menu #how1 button{display:inline-block;width:auto;margin:0;padding:.4em .9em;font-size:.9rem}
+#menu #howBtn{width:auto;margin:1.2em auto 0;padding:.6em 1em;background:none;border:0;color:var(--muted);font-weight:500;text-decoration:underline}
+#menu #howBtn:hover:not(:disabled){color:var(--accent);background:none}
+#menu #listBtn{width:16em;margin:.8em auto;padding:.7em .4em .7em 1em;text-align:left}
+#howDlg{position:relative;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:1.2em 1.4em;width:min(32em,94vw);text-align:left}
+#howDlg::backdrop{background:rgba(0,0,0,.6)}
+#howDlg>p{margin:0 0 .6em;font-size:1.2rem}
+#howDlg ul{margin:0 0 1em;padding-left:1.1em;line-height:1.4;font-size:.95rem}#howDlg li{margin:.45em 0}
+#howX{position:absolute;top:.5em;right:.5em;padding:.2em .6em}
+#howOk{width:100%}
+#skip,#giveup{font-size:.85em}
+/* a guess: code, hot/cold, arrow + compass point, distance; each part stays on one line */
+#guesses .gc{font-weight:700}
+#guesses .gc,#guesses .gh,#guesses .dir,#guesses .gb,#guesses .gd{white-space:nowrap}
+#flap .nm em{display:block;font-style:normal;margin-top:.3em;color:var(--text)}
+/* results: Share first, the others quieter; the chart has a visible summary; no glow on the grade */
+#share{order:-1}
+#endbtns:has(#share:not([hidden])) #replay{background:transparent;border:1px solid var(--muted);color:var(--text);font-weight:600}
+#chartbox{grid-area:chart;min-width:0}#chartbox #chart{display:block;width:100%;height:auto}
+#chartSum{margin:.4em 0 0;font-size:.85rem;color:var(--muted);text-align:center}
+#lbPlayers .wide{margin-left:auto;text-align:right}
+#lbPlayers input.nm{width:100%;max-width:9em;min-width:0}
+#lbPlayers .star{color:var(--amber)}
+#fbInline{flex-wrap:wrap;white-space:normal;overflow:visible}
+@media (max-width:820px){
+  #lbPlayers .star{position:static;transform:none;margin-left:.3em;display:inline-block}
+  #menuBack{min-height:44px;font-size:.85em}
+  #flap .w,#flap .w.cur{min-height:44px}
+  /* guesses: two by two; clues: one under another, both readable (13 to 14 px, not 11) */
+  #guesses{display:grid;grid-template-columns:1fr 1fr;gap:.35em}
+  #guesses b{grid-column:1/-1;flex:none;text-align:left;font-size:.75em}
+  #cluebox{flex-direction:column;align-items:stretch}
+  #cluebox b{flex:none;align-self:flex-start;text-align:left;font-size:.75em}
+  #guesses div,#cluebox div{display:block;font-size:.85em;line-height:1.25;padding:.45em .5em;min-height:2.4em;letter-spacing:0}
+  #cluebox div{font-size:.9em;text-align:left}
+  #skip,#giveup{padding:.65em .4em;line-height:1.15}
+  /* results first: grade, points and Share come right under the round strip; the map and the study notes follow */
+  #stats{order:1}#studybox{order:6}
+  #stats:not([hidden]),#stats.nochart:not([hidden]){display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"grade result" "btns btns" "chart chart";gap:.6em 1em;align-items:center;text-align:left;padding:.8em}
+  #grade .letter{font-size:4.5rem}#grade .pct{font-size:1.1rem}
+  #result,#stats.nochart #result{text-align:left}
+  #statline,#stats.nochart #statline{font-size:1.5rem}
+  #endbtns{display:flex;flex-wrap:wrap;gap:.5em}
+  #endbtns button{flex:1 1 40%;width:auto;margin:0}
+  #endbtns #share{flex-basis:100%}
+}
+@media (pointer:coarse){
+  main button,footer button,dialog button{min-height:44px!important} /* beats the compact buttons' min-height:0 */
+  #help{width:44px;height:44px}
+  #gear,#menu #datebar button,#lbKind button,#listX,#vsCancel,#howX{min-width:44px}
+  #vol{height:44px}
+  input:not([type=range]):not([type=file]):not(.nm),select{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+/* the game-type tooltips are hover-only; hidden they still stretched the page sideways on phones (a horizontal scroll bar in the host's lobby) */
+@media (max-width:820px),(hover:none){#lbKind button::after{display:none}}
+
+/* ===== Design pass: what each color means, header size, menu and lobby layout =====
+   Meaning of the palette: SOLID amber = the one thing to press (or the current round); amber outline + tint = "selected"; green = solved / correct;
+   red = missed / wrong / Give up; orange only in the grade scale (red, orange, green); grey = everything quiet. */
+:root{color-scheme:dark} /* scroll bars, the volume slider and any native control match the dark page (they were light) */
+/* selected is an outline and a tint, not a second solid-amber block next to the real primary button (same look the feedback airport picker already had) */
+#lbKind button.on,#lbAir button.air.on,#lbChips .chip,#lbCfg.ro #lbKind button.on:disabled{color:var(--text);background:color-mix(in srgb,var(--accent) 16%,var(--surface-2));border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+#lbAir button.air.on small,#lbChips .chip small{color:var(--muted);font-weight:500}
+#lbAir button.air.on b,#lbChips .chip b{color:var(--accent)}
+/* streaks are amber like the other "your score" bits; orange is kept for the grade scale so two near-identical hues never mean different things */
+#streak,#bestline{color:var(--accent)}
+/* logo: big only on the title screens; the lobby gets the in-game size, and starts at the top so the page does not jump as panels appear */
+main:has(#lobby:not([hidden])) h1.top svg{width:190px}
+main:has(#lobby:not([hidden])){justify-content:flex-start}
+/* menu: Daily | Friends | Practice side by side on wide screens (it was one long column that needed scrolling at 800 px tall) */
+@media (min-width:900px){
+  #mcols{display:flex;justify-content:center;align-items:flex-start;gap:0 2.5em}
+  #menu .msec{flex:none}
+  #menu .msec .lbl{margin-top:.2em}
+}
+/* a missed round must not rely on red vs green: on phones, where the round strip has no "Solved / Missed" text, it gets a check or a cross */
+@media (max-width:820px){
+  #flap .w{position:relative}
+  #flap .w.ok::after,#flap .w.no::after{position:absolute;top:2px;left:50%;transform:translateX(-50%);font:700 11px/1 system-ui,sans-serif;letter-spacing:0}
+  #flap .w.ok::after{content:"\2713";color:var(--ok)}
+  #flap .w.no::after{content:"\2717";color:var(--bad)}
+}
+/* high-contrast mode (Windows): system colors replace ours, so keep the logo readable and selected buttons visibly marked */
+@media (forced-colors:active){
+  h1.top svg rect{fill:Canvas;stroke:CanvasText}
+  h1.top svg text{fill:CanvasText}
+  #lbKind button.on,#lbAir button.air.on,#lbChips .chip,#fbAir button.on,#flap .w.cur{outline:3px solid Highlight;outline-offset:-3px}
+  button{border:1px solid ButtonText}
+}
+/* one gap from the logo to the first panel on every screen (17 px; the lobby and the game had 28 to 40) */
+#lobby{margin-top:.3rem}
+#board{margin-top:.3rem}
+
+/* friend game results: the one button fills the height of the score panel and is amber, so it is the obvious next step (tinted while waiting, solid when it works) */
+#stats.friend #endbtns{align-self:stretch;display:flex}
+#stats.friend #again{flex:1;margin:0;min-height:3.5rem;font-size:1.2rem;font-weight:700;background:var(--accent);color:var(--on-accent);border:2px solid var(--accent)}
+#stats.friend #again:disabled{background:color-mix(in srgb,var(--accent) 16%,var(--surface-2));color:var(--text);font-size:1rem}
+#stats.friend #grade{margin:0} /* so the button starts and ends level with the score and the percentage */
+/* previous games: the winner's row is amber with a crown (the crown and its "Winner" label carry the meaning, not just the color) */
+#lbHist .hrow{padding:.2em .5em;border:1px solid transparent;border-radius:6px}
+#lbHist .hrow.win{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);font-weight:600}
+#lbHist .crown{width:1.15em;height:.9em;margin-left:.4em;fill:var(--accent);vertical-align:-.05em}
+/* previous games: round buttons and the map of one player's guesses. Red = wrong guess to the next, amber = the arrow that found it; the codes and the list under the map say it in words too */
+#lbHist .rbtns,#lbHist .rwho{display:flex;flex-wrap:wrap;gap:.35em;margin:.4em 0}
+#lbHist .rbtns button,#lbHist .rwho button{padding:.3em .7em;font-size:.85em}
+#lbHist .rbtns button.on,#lbHist .rwho button.on{background:color-mix(in srgb,var(--accent) 16%,var(--surface-2));border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+#lbHist .rview{margin:.4em 0 .6em;padding:.2em .6em .6em;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.routemap{display:block;width:100%;height:auto}
+.routemap .land{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linecap:round;opacity:.45}
+.routemap line{stroke-width:1.3;stroke-linecap:round}.routemap line.miss{stroke:var(--bad)}.routemap line.hit{stroke:var(--accent);stroke-width:1.8}
+.routemap .head.miss{fill:var(--bad)}.routemap .head.hit{fill:var(--accent)}
+.routemap .stop{fill:var(--bad);stroke:var(--bg);stroke-width:.8}
+.routemap .t1{fill:var(--accent)}.routemap .t2{fill:var(--bg)}
+.routemap .halo{fill:none;stroke:var(--accent);stroke-width:1;stroke-dasharray:2.5 2}
+.routemap text{font:700 6.5px ui-monospace,Consolas,monospace;paint-order:stroke;stroke:var(--bg);stroke-width:2.2px;stroke-linejoin:round}
+.routemap .stoplab{fill:var(--text)}.routemap .tlab{fill:var(--accent)}
+.rpath{font-size:.85em;color:var(--muted)}.rpath span{color:var(--text);font-family:ui-monospace,Consolas,monospace}.rpath span.ok{color:var(--accent)}
+.rview .dotmap{margin:0}
+@media (max-width:820px){.routemap text{font-size:9px}#lbHist .rbtns{flex-wrap:nowrap}#lbHist .rbtns button{flex:1;padding:.3em 0;font-size:.78em}} /* phones: readable map labels, all five round buttons on one line */
+.rpath b{color:var(--text)}.rpath+.rpath{margin-top:.2em}
+/* All players on one map: a color per player (up to the 5 a lobby holds), only used to tell players apart; amber stays the right airport. The initial on each marker means color is not the only cue */
+.pc0{--pc:#58a6ff}.pc1{--pc:#56d364}.pc2{--pc:#bc8cff}.pc3{--pc:#ff7eb6}.pc4{--pc:#39d0d8}
+.routemap .pin{fill:var(--pc);stroke:var(--bg);stroke-width:1}
+.routemap text.pintext{font-size:5.2px;fill:var(--bg);stroke:none;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.routemap .route{display:none}.routemap .pl.on .route{display:inline}
+.routemap .pl .route line.miss{stroke:var(--pc)}.routemap .pl .route .head.miss{fill:var(--pc)}
+.routemap.focus .pl:not(.on){opacity:.15}
+.rhint{margin:.3em 0;font-size:.8em;color:var(--muted)}
+#lbHist .rview button.rkey{display:block;width:100%;margin:.25em 0 0;padding:.35em .5em;text-align:left;font-weight:400;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:6px}
+#lbHist .rview button.rkey:hover,#lbHist .rview button.rkey[aria-pressed=true]{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,transparent);filter:none}
+#lbHist .rview button.rkey[aria-pressed=true]{box-shadow:inset 0 0 0 1px var(--pc)}
+.rkey i{display:inline-block;width:1.5em;height:1.5em;margin-right:.5em;border-radius:50%;background:var(--pc);color:var(--bg);font-style:normal;font-weight:700;line-height:1.5em;text-align:center}
+@media (max-width:820px){.routemap text.pintext{font-size:5.6px}} /* beats the larger phone map labels: this text has to fit inside its marker */
+/* trivia stands apart from the lobby: a wide gap above it. After a quiet spell it glows (with reduced motion the pulse is off and the glow just holds) */
+#lobby #trivia{margin-top:3rem!important}
+#trivia.glow{border-color:var(--accent);box-shadow:0 0 18px 3px color-mix(in srgb,var(--accent) 55%,transparent);animation:trivia-glow 1.33s ease-in-out 3}
+@keyframes trivia-glow{0%,100%{box-shadow:0 0 4px 0 color-mix(in srgb,var(--accent) 25%,transparent)}50%{box-shadow:0 0 22px 5px color-mix(in srgb,var(--accent) 65%,transparent)}}
+/* trivia results: one container, a question at a time, with < and > inside it; the winner in a bar underneath. Green/red also carry ✓ and ✗ */
+.tvslider{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.5em;padding:.65em .5em .4em}
+.tvslider,.tvfinal{border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.tvfinal{padding:.65em .75em}
+.tvview{overflow:hidden}.tvstrip{display:flex;transition:transform .3s ease}
+.tvbox{flex:0 0 100%;min-width:0;box-sizing:border-box;padding:0 2px}
+.tvbox .tvq{margin:0 0 .5em;font-size:1em;line-height:1.3}
+#trivia .tvarrow{padding:.5em .6em;min-height:0;font:700 1.2em ui-monospace,Consolas,monospace}
+#trivia .tvarrow[aria-disabled=true]{opacity:.3;cursor:default}
+.tvcount{grid-column:1/-1;text-align:center;font-size:.8em;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.tvstrip{transition:none}}
+.tvpick{display:flex;justify-content:space-between;align-items:center;gap:.5em;min-height:2em;margin-top:.25em;padding:.15em .6em;border:1px solid var(--border);border-radius:7px;font-size:.9em;color:var(--muted)}
+.tvpick.ok,.tvpick.bad{color:var(--text)}.tvpick.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.tvpick.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.tvnames{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.25em;max-width:65%}
+.tvnames i{max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 .55em;border:1px solid var(--border);border-radius:99px;background:var(--surface-2);color:var(--text);font-size:.85em;font-style:normal;line-height:1.6}
+.tvnames i.me{border-color:var(--accent);color:var(--accent);font-weight:700}
+.tvwait{display:block;margin-top:.4em;font-size:.8em;color:var(--muted)}
+.tvfinal{margin-top:.6em;text-align:center}.tvfinal strong{font-size:1.15em;overflow-wrap:anywhere}
+/* the winner: a crown over a big bold amber name */
+.tvwinner{display:flex;flex-direction:column;align-items:center;gap:.15em;padding:.2em 0}
+.tvwinner .crown{width:3em;height:2.25em;fill:var(--accent)}
+.tvfinal .tvwinner strong{font-size:2.4em;font-weight:900;line-height:1.15;color:var(--accent);max-width:100%;overflow-wrap:anywhere}
+.tvwinner span{font-weight:700;font-size:1.05em}
+.tvbox .tvnames{max-width:82%}
+/* trivia winner burst: the planes are drawn over everything, never in the way of a click. .flybanner names the winner for anyone who can't see the winner bar */
+.flyover{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+.flybanner{position:fixed;top:18%;left:50%;transform:translateX(-50%);width:max-content;max-width:90vw;box-sizing:border-box;padding:.7em 1.4em;border:2px solid var(--accent);border-radius:99px;background:var(--surface);color:var(--accent);font-weight:800;text-align:center;overflow-wrap:anywhere;pointer-events:none;z-index:50}
+/* lobby player status: the right end of the row is filled green (ready), red (not ready) or yellow (still playing); the words appear to its right on hover (to its left on a phone, where there's no room) */
+#lbPlayers .dot{position:absolute;top:0;bottom:0;right:0;width:4.5em;border-radius:0 7px 7px 0}
+#lbPlayers div:has(.dot){padding-right:5.5em}
+#lbPlayers .dot.yes{background:var(--ok)}#lbPlayers .dot.no{background:var(--bad)}#lbPlayers .dot.busy{background:#ffe14d}
+#lbPlayers .dot::after{content:attr(data-tip);position:absolute;left:calc(100% + .7em);top:50%;transform:translateY(-50%);width:max-content;padding:.3em .65em;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);font-size:.8rem;line-height:1.3;opacity:0;pointer-events:none;z-index:6}
+#lbPlayers .dot:hover::after,#lbPlayers .dot:focus-visible::after{opacity:1}
+@media (max-width:820px){#lbPlayers .dot::after{left:auto;right:calc(100% + .6em)}}
+.tvfinal .tvagain{display:block;margin:.7em auto 0;padding:.5em 1.4em;min-height:0}
+.tvbar .tvwait{margin:0 0 0 auto}
+/* countdown bars (#startBar above the game choices, for the 5 seconds before a game; #tvBar above trivia). The trivia one: sits above the card (taking over the gap that separates trivia from the lobby); the amber fill drains, the time stays readable over it */
+#tvBar,#startBar{position:relative;overflow:hidden;padding:.55em .8em;border:1px solid var(--accent);border-radius:var(--radius);background:var(--surface);text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+#tvBar{margin-top:3rem}#startBar{margin-top:.8em}
+#tvBar[hidden],#startBar[hidden]{display:none}
+#tvBar i,#startBar i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 30%,transparent);transition:width .25s linear}
+#tvBar span,#startBar span{position:relative}
+#lobby #tvBar:not([hidden])+#trivia{margin-top:.5rem!important}
+@media (pointer:coarse),(max-width:820px){#tvBar{display:none}}
+#startBar i{transition:width .35s cubic-bezier(.3,1.3,.5,1)} /* one soft snap per second: quick, with a small settle */
+@media (prefers-reduced-motion:reduce){#startBar i{transition:none}}
+/* All-tab routes: one see-through arrow per player, in their color (pc0..pc4), so the map stays readable under five of them */
+.routemap .leg{fill:var(--pc);fill-opacity:.55}
+.routemap .wait{visibility:hidden}
+.routemap .pop{animation:pinpop .35s cubic-bezier(.3,1.6,.5,1);transform-box:fill-box;transform-origin:center}
+@keyframes pinpop{from{transform:scale(0)}}
+/* the winner's podium on the final results (its own full row, centered; the #pcol card styles are undone for its parts) */
+#pcol .podium{flex:0 0 100%;margin:.3em 0 .6em;padding:0;border:0;background:none}
+#pcol .podium div{flex:none;margin:0;padding:0;border:0;border-radius:0;background:none;font-weight:400;overflow-wrap:normal}
+#pcol .podium .pstage{position:relative;height:250px;max-width:560px;margin:0 auto}
+#pcol .podium .pbase{position:absolute;left:5%;right:5%;bottom:36px;height:1px;background:var(--border)}
+#pcol .podium .pcolm{position:absolute;top:0;bottom:0}
+#pcol .podium .pbar{position:absolute;left:0;right:0;bottom:36px;height:var(--h);border:1px solid var(--pc);border-bottom:0;border-radius:6px 6px 0 0;background:color-mix(in srgb,var(--pc) 18%,transparent);animation:podrise .8s cubic-bezier(.3,1.35,.5,1) var(--d) both}
+#pcol .podium .plab{position:absolute;left:0;right:0;bottom:calc(36px + var(--h) + 5px);display:flex;flex-direction:column;align-items:center;line-height:1.15;animation:podfade .3s calc(var(--d) + .6s) both}
+#pcol .podium .plab span{display:block;font-size:12px;color:var(--muted)}#pcol .podium .plab b{font-size:15px;color:var(--pc)}
+#pcol .podium .pname{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pcol .podium .win .pname{color:var(--accent);font-weight:700}
+#pcol .podium .crown{position:absolute;left:50%;width:30px;height:23px;margin-left:-15px;bottom:calc(36px + var(--h) + 46px);fill:var(--accent);animation:poddrop .7s cubic-bezier(.5,0,.7,1) var(--cd) both}
+@keyframes podrise{from{height:0}}@keyframes podfade{from{opacity:0}}
+@keyframes poddrop{0%{transform:translateY(-260px);opacity:0}10%{opacity:1}70%{transform:translateY(0)}85%{transform:translateY(-8px)}100%{transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){#pcol .podium .pbar,#pcol .podium .plab,#pcol .podium .crown{animation:none}}
+/* the name under each guessed airport on the All map */
+.routemap text.glab{font-size:5px;fill:var(--muted);pointer-events:none}
+@media (max-width:820px){.routemap text.glab{font-size:6px}}
+/* round maps: state borders under the airport dots, and small markers (guesses are rings in the player's color, the answer a solid amber dot) */
+.routemap .states{fill:none;stroke:var(--muted);stroke-linejoin:round;stroke-linecap:round;opacity:.4}
+.routemap .pin{fill:var(--bg);stroke:var(--pc);stroke-width:1.2}
+/* lobby rows start with the player's colored dot (the same color as their arrows on the maps) */
+#lbPlayers .ldot{display:inline-block;width:1.5em;height:1.5em;line-height:1.5em;margin-right:.6em;border-radius:50%;background:var(--pc);color:var(--bg);font-style:normal;font-weight:700;text-align:center;flex:none}
+/* the key under a round map: dot, name, a short route, then that round's award */
+#lbHist .rview button.rkey{display:flex;align-items:center;gap:.5em}
+.rkey i{flex:none;margin-right:0}.rkey b{flex:none;white-space:nowrap}
+.rkey .rroute{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.92em}
+.rkey .rbadge{flex:none;margin-left:auto;padding:.1em .6em;border:1px solid var(--accent);border-radius:99px;color:var(--accent);font-style:normal;font-size:.82em;white-space:nowrap}
+@media (max-width:820px){#lbHist .rview button.rkey{flex-wrap:wrap}.rkey .rroute{flex-basis:100%;order:3}}
+/* an award's meaning pops up above it on hover (on a phone, when its row is tapped) */
+.rkey .rbadge{position:relative}
+.rkey .rbadge::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + .6em);width:max-content;max-width:16em;padding:.4em .65em;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);font-size:.8rem;line-height:1.3;white-space:normal;text-align:left;box-shadow:0 4px 14px #0008;opacity:0;pointer-events:none;transition:opacity .12s;z-index:6}
+.rkey .rbadge:hover::after,.rkey:focus-visible .rbadge::after{opacity:1}
+/* the last game, under the Ready / Leave buttons (one card, no drop-down) */
+#lbHist .hgame{margin:.4em 0;padding:.6em .8em;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:.9em}
+#lbHist .hhead{font-weight:600}
+/* ---- Lobby, flat and quiet: the code is the headline, settings are underlined tabs, players are hairline rows with a status word,
+   one strong button (Ready) and plain-text secondary actions. Boxes only where something needs one (the map, trivia). */
+#lobby #lbTitle b{font-size:1.9em;letter-spacing:.14em;padding:0;border-radius:0}#lobby #lbTitle b:hover{background:none;color:var(--text)}
+#lobby #lbCopy{min-height:0;padding:0;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:400;text-decoration:underline;text-underline-offset:3px}
+#lobby #lbCopy:hover{color:var(--text);filter:none}
+#lobby #lbCfg{padding:0;border:0;border-radius:0;background:none}
+#lobby #lbKind{gap:.2em 1.2em;border-bottom:1px solid var(--border)}
+#lobby #lbKind button,#lobby #lbCfg.ro #lbKind button:disabled{flex:none;min-height:0;padding:.55em 0;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:none;box-shadow:none;color:var(--muted);font-weight:500;outline-offset:2px}
+#lobby #lbKind button:hover{color:var(--text);filter:none}
+#lobby #lbKind button.on,#lobby #lbCfg.ro #lbKind button.on:disabled{color:var(--text);background:none;border-color:transparent;border-bottom-color:var(--accent);box-shadow:none}
+#lobby #lbPlayers div{margin:0;padding:.65em .1em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;align-items:center}
+#lobby #lbPlayers div:last-child{border-bottom:0}
+#lobby #lbPlayers div.me{border-color:var(--border)}
+#lbPlayers .you{margin-left:.5em;color:var(--muted);font-size:.8em}
+#lbPlayers .pst{font-size:.85em;white-space:nowrap}#lbPlayers .pst.yes{color:var(--ok)}#lbPlayers .pst.no{color:var(--muted)}#lbPlayers .pst.busy{color:var(--accent)}
+#lobby #lbBtns{align-items:center;gap:1.2em}
+#lobby #lbLeave{min-height:0;padding:.4em 0;border:0;background:none;box-shadow:none;color:var(--muted);font-weight:400}
+#lobby #lbLeave:hover{color:var(--text);filter:none}
+/* the last game: no card, the map is the only box */
+#lobby #lbHist .hgame{margin:.4em 0 0;padding:0;border:0;background:none}
+#lobby #lbHist .hhead{font-size:1.05em}
+#lobby #lbHist .rbtns{gap:.2em 1.1em;border-bottom:1px solid var(--border)}
+#lobby #lbHist .rbtns button{min-height:0;padding:.5em 0;border:0;border-bottom:2px solid transparent;border-radius:0;margin-bottom:-1px;background:none;box-shadow:none;color:var(--muted);font-size:.9em}
+#lobby #lbHist .rbtns button.on{color:var(--text);border-bottom-color:var(--accent);background:none;box-shadow:none}
+#lobby #lbHist .rview{margin:.6em 0;padding:0;border:0;background:none}
+#lobby #lbHist .rview .routemap{border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+#lobby #lbHist .rview button.rkey{margin:0;padding:.5em .3em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none}
+#lobby #lbHist .rview button.rkey:hover,#lobby #lbHist .rview button.rkey[aria-pressed=true]{background:color-mix(in srgb,var(--pc) 10%,transparent);box-shadow:inset 3px 0 0 var(--pc)}
+#lobby #lbHist .hrow{padding:.45em .1em;border:0;border-bottom:1px solid var(--border);border-radius:0}
+#lobby #lbHist .hrow:last-child{border-bottom:0}
+#lobby #lbHist .hrow.win{background:none;color:var(--accent)}
+@media (max-width:820px){#lobby #lbKind{gap:.1em .9em}#lobby #lbHist .rbtns{flex-wrap:nowrap;gap:.6em}#lobby #lbHist .rbtns button{flex:1;font-size:.8em}}
+#lobby #lbPlayers input.nm{field-sizing:content;width:auto;min-width:3ch;max-width:12em} /* as wide as the name, so "you" sits right after it */
+#lobby #lbHist{margin-top:1.6rem}
+@media (max-width:820px){#lobby #lbKind{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0 .75em}#lobby #lbKind button{white-space:nowrap;font-size:.88em;min-width:0}} /* phones: the tabs stay on one line (and scroll sideways if a screen is very narrow) */
+/* between rounds: the guesses fade as the map pulls back out, the answer fades last; the next round's answer fades in */
+.routemap.leaving .pl,.routemap.leaving .glabs{opacity:0!important;transition:opacity .3s}
+.routemap.leaving .targets{opacity:0;transition:opacity .25s .75s}
+.routemap .targets{animation:rfade .4s} /* no fill: a held animation would block the fade-out transition */@keyframes rfade{from{opacity:0}}
+/* the round tabs' underline: one bar that slides to the round on show, with a slight overshoot */
+#lbHist .rbtns{position:relative}
+#lbHist .rrow{display:flex;flex-wrap:wrap;gap:.2em 1.1em}
+#lobby #lbHist .rbtns button.on{border-bottom-color:transparent}
+#lbHist .rbar{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--accent);transition:transform .38s cubic-bezier(.3,1.5,.5,1),width .38s cubic-bezier(.3,1.5,.5,1)}
+#lbHist .rbar[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){#lbHist .rbar{transition:none}}
+@media (max-width:820px){#lbHist .rrow{flex-wrap:nowrap;gap:.6em}#lbHist .rrow button{flex:1}}
+/* ==== Flat and quiet, across the site (the lobby's look): hairline rows instead of cards, text links for secondary actions, one solid button per screen,
+   boxes only for the map and the few things that need a frame. Placed last so it wins over the older card styles above. ==== */
+/* main menu: each choice is a row with a chevron; the section labels stay */
+#menu .msec button,#menu #vsBtn,#menu #customBtn,#menu #nearBtn,#menu #listBtn{display:block;position:relative;width:16em;margin:0 auto;padding:.8em 1.6em .8em .2em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;box-shadow:none;color:var(--text);font-weight:600;text-align:left}
+#menu .msec button::after{content:"›";position:absolute;right:.3em;top:50%;transform:translateY(-50%);font-size:1.3em;font-weight:400;color:var(--muted);transition:transform .15s,color .15s}
+#menu .msec button:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 6%,transparent);border-color:var(--border);filter:none}
+#menu .msec button:hover:not(:disabled)::after{color:var(--accent);transform:translate(3px,-50%)}
+#menu .msec button small{color:var(--muted);font-size:.85em}
+#menu .msec button.done{box-shadow:none;border-color:var(--border)}
+#menu #customBtn{color:var(--text);font-weight:600}
+#menu .msec .lbl{margin-bottom:.2em}
+/* join by code: a quiet field with Join as an amber text button */
+#menu #joinrow{margin:.2em auto .4em;border-bottom:1px solid var(--field)}
+#menu #joinrow input{border:0;border-radius:0;background:none;padding-left:.2em}
+#menu #joinrow input:focus{border:0;background:none}
+#menu #joinrow:focus-within{border-bottom-color:var(--accent)}
+#menu #joinrow button{padding:.6em .4em;border:0;border-radius:0;background:none;color:var(--accent);font-weight:700}
+#menu #joinrow button::after{content:none}
+/* the first-visit note: a line with an amber edge, not a card */
+#menu #how1{padding:.1em 0 .1em .8em;border:0;border-left:2px solid var(--accent);border-radius:0;background:none}
+#menu #how1 button{padding:.3em 0;border:0;background:none;box-shadow:none;text-decoration:underline;text-underline-offset:3px;color:var(--accent)}
+#menu #how1 #how1x{color:var(--muted)}#menu #how1b{gap:1.2em}
+/* the game: the map is the one framed thing; the airports, guesses, clues and study notes sit on the page */
+#board #menuBack{padding:.3em 0;border:0;background:none;text-align:left;color:var(--muted)}
+#board #menuBack::before{content:"‹ "}
+#board #menuBack:hover:not(:disabled){background:none;color:var(--text)}
+#board #flap{border:0;background:none}
+#board #guesses,#board #cluebox,#board #studybox{padding:.2em 0;border:0;border-radius:0;background:none}
+#board #guesses div,#board #cluebox div{margin:0;padding:.5em .2em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none}
+#board #guesses div:last-child,#board #cluebox div:last-child{border-bottom:0}
+#game #f{border:0;background:none;box-shadow:none}
+#game #f #skip,#game #f #giveup:not(.armed){padding:.2em .1em;border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+#game #f #skip:hover:not(:disabled){color:var(--text)}
+#game #f #giveup:not(.armed):hover:not(:disabled){color:var(--bad);background:none}
+#game #f #help{border-color:var(--border)}
+/* results: no card around them; Play again is the solid button, the rest are text links (a friend game keeps its big Back to Lobby) */
+#game #stats{border:0;background:none;box-shadow:none}
+#game #stats:not(.friend) #endbtns #again,#game #endbtns #share{border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+#game #stats:not(.friend) #endbtns #again:hover,#game #endbtns #share:hover{color:var(--text);filter:none}
+#board #studybox .stmn{border-style:solid;border-width:0 0 0 2px;border-radius:0}
+@media (max-width:820px){#menu .msec button,#menu #vsBtn,#menu #customBtn,#menu #nearBtn,#menu #listBtn,#menu #joinrow{width:100%}}
+#game #endbtns button{white-space:nowrap}
+#board #studybox .streport{align-self:flex-start;padding:.2em 0;border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}#board #studybox .streport:hover{color:var(--text);filter:none}
+@media (max-width:820px){#menu .msec .lbl{width:100%;margin-left:0;margin-right:0;padding-left:.2em;text-align:left}} /* phones: the section labels line up with their rows */
+/* wide screens: Friends on the left, the dailies in the middle, Practice on the right (phones keep the page order: Daily first) */
+@media (min-width:900px){#menu #msFriends{order:-1}} /* (900px: where the three columns sit side by side) */
+/* Daily is the main thing on the menu: bigger rows, brighter label, and the chevrons already amber */
+#menu #msDaily .lbl{font-size:1.1em}
+#menu #msDaily button{font-size:1.12em;padding-top:.95em;padding-bottom:.95em}
+#menu #msDaily button::after{color:var(--accent)}
+#menu #msDaily button:first-of-type{background:color-mix(in srgb,var(--accent) 7%,transparent);box-shadow:inset 2px 0 0 var(--accent);padding-left:.6em}
+/* one daily: a single big button, with a quiet link to the harder airports in Custom Game */
+#menu #msDaily button[data-m]{font-size:1.25em;padding:1.1em 1.6em 1.1em .7em}
+#menu #msDaily #harder{display:block;width:16em;margin:.5em auto 0;padding:.3em .2em;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:400;text-align:left;text-decoration:underline;text-underline-offset:3px}
+#menu #msDaily #harder::after{content:none}
+#menu #msDaily #harder:hover{background:none;color:var(--text)}
+@media (max-width:820px){#menu #msDaily #harder{width:100%}}
+/* How to play: a plain link in the middle of the footer (hidden while the footer asks how the game was; on phones it sits in the row) */
+footer #howBtn{position:absolute;left:50%;transform:translateX(-50%);min-height:0;padding:.3em .6em;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:500;text-decoration:none}
+footer #howBtn:hover:not(:disabled){color:var(--text);background:none;filter:none}
+footer:has(#fbInline:not([hidden])) #howBtn{display:none}
+@media (max-width:820px){footer #howBtn{position:static;transform:none}}
+#menu #msDaily #harder[hidden]{display:none}
+/* the one-time difficulty tour: the panel slides left, the note fades in beside it */
+#opts{position:relative}
+#custom{transition:transform .55s cubic-bezier(.3,1.25,.5,1)}
+#custom.touring{transform:translateX(-8em)}
+#hardTip{position:absolute;left:calc(100% + 2.4em);width:14em;text-align:left;opacity:0;transition:opacity .45s}
+#hardTip.on{opacity:1}
+#hardTip .tiparrow{position:absolute;left:-1.9em;top:-.05em;color:var(--bad);font-size:1.5em;font-weight:700;line-height:1;animation:tipnudge 1s ease-in-out infinite}
+@keyframes tipnudge{50%{transform:translateX(-5px)}}
+#hardTip .tiptext{margin:0;min-height:2.7em;line-height:1.35;opacity:0;transition:opacity .45s}
+#hardTip .tiptext.show{opacity:1}
+#hardTip .tipok{margin-top:.6em;padding:.45em 1.2em;animation:podfade .45s}
+#custom.touring #diff{outline:2px solid var(--bad);outline-offset:2px}
+@media (max-width:900px){#custom.touring{transform:none}#hardTip{position:static;width:auto;margin-top:.9em}#hardTip .tiparrow{position:static;display:inline-block;margin-bottom:.2em;transform:rotate(90deg);animation:none}} /* no room beside it: the note goes under the options, its arrow pointing up */
+@media (prefers-reduced-motion:reduce){#custom{transition:none}#hardTip .tiparrow{animation:none}}
+#hardTip .tiparrow{left:-2.3em;top:.62em;width:1.7em;height:3px;border-radius:2px;background:var(--bad);font-size:1em} /* a drawn arrow: a line with a head on its left, pointing at Difficulty */
+#hardTip .tiparrow::before{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);border-style:solid;border-width:7px 10px 7px 0;border-color:transparent var(--bad) transparent transparent}
+@media (max-width:900px){#hardTip .tiparrow{width:3px;height:1.4em;margin:0 0 .5em 9px;transform:none}#hardTip .tiparrow::before{left:50%;top:-7px;transform:translateX(-50%);border-width:0 7px 10px 7px;border-color:transparent transparent var(--bad) transparent}}
+@media (max-width:900px){#hardTip .tiparrow{position:relative;left:0;top:0;display:block;margin:0 0 .6em}} /* the head is drawn relative to the arrow itself, so it can't drift off */
+#menu #how1{width:320px;max-width:80vw;box-sizing:border-box;margin:1.4em auto 1.8em} /* as wide as the logo above it, with room around it */
+#round:empty{display:none} /* an empty round counter still took a flex gap, pushing the logo off-center */
+/* How to play: animated scenes. Each element's resting style is its final look; the animations only play in from a start state, so with
+   reduced motion everything simply shows finished. A scene's animations restart each time it becomes the shown one. */
+#howDlg{width:min(26em,94vw);text-align:center}
+#howSlides .hs{display:none;margin:0}
+#howSlides .hs.on{display:block;animation:podfade .35s}
+#howSlides svg{display:block;width:100%;max-width:300px;margin:0 auto;font-family:ui-monospace,Consolas,monospace}
+#howSlides figcaption{margin:.7em 0 .2em;min-height:2.6em}
+#howSlides figcaption b{display:block;font-size:1.1rem}
+#howSlides figcaption small{display:block;margin-top:.2em;color:var(--muted)}
+#howSlides .sat{fill:#253028}
+#howSlides .zoomin{transform-origin:120px 70px}
+#howSlides .on .zoomin{animation:hzoom 1.6s cubic-bezier(.2,.7,.2,1) both}
+#howSlides .aim{fill:none;stroke:var(--amber);stroke-width:3;stroke-linecap:round}
+#howSlides .on .aim{animation:hfade .4s 1.3s backwards,hpulse 1.2s 1.7s ease-in-out infinite}
+#howSlides .fld{fill:var(--bg);stroke:var(--ok);stroke-width:2}
+#howSlides .on .fld{animation:hfld .3s 1.6s backwards}
+#howSlides .k{fill:var(--text);font-size:22px;font-weight:700;text-anchor:middle}
+#howSlides .on .k1{animation:hpop .15s .4s backwards}#howSlides .on .k2{animation:hpop .15s .7s backwards}#howSlides .on .k3{animation:hpop .15s 1s backwards}#howSlides .on .k4{animation:hpop .15s 1.3s backwards}
+#howSlides .caret{fill:var(--amber);transform:translateX(100px)}
+#howSlides .on .caret{animation:hcaret 1.2s steps(4) .25s backwards,hblink .9s 1.5s step-end infinite}
+#howSlides .tick{fill:none;stroke:var(--ok);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24}
+#howSlides .on .tick{animation:htick .3s 1.7s backwards}
+#howSlides .mapbg{fill:var(--surface-2)}
+#howSlides .tgt{fill:none;stroke:var(--amber);stroke-width:2;stroke-dasharray:4 4}
+#howSlides .q{fill:var(--amber);font-size:14px;font-weight:700;text-anchor:middle}
+#howSlides .gs{fill:none;stroke:var(--orange);stroke-width:3}
+#howSlides .route{fill:none;stroke:var(--orange);stroke-width:4;stroke-linecap:round;stroke-dasharray:130}
+#howSlides .head{fill:var(--orange)}
+#howSlides .lab{font-size:12px;text-anchor:middle}#howSlides .warm{fill:var(--orange)}#howSlides .mi{fill:var(--text)}
+#howSlides .on .gs{animation:hpop .3s .2s backwards}#howSlides .on .warm{animation:hfade .3s .6s backwards}
+#howSlides .on .route{animation:hdraw 1s .9s ease-out backwards}#howSlides .on .head{animation:hfade .2s 1.85s backwards}#howSlides .on .mi{animation:hfade .3s 2.1s backwards}
+#howSlides .bar{fill:var(--border);transform-box:fill-box;transform-origin:bottom}#howSlides .b1{fill:var(--amber)}
+#howSlides .on .b1{animation:hgrow .4s .2s backwards,hb1 .5s 1.6s backwards}#howSlides .on .b2{animation:hgrow .4s .35s backwards}#howSlides .on .b3{animation:hgrow .4s .5s backwards}#howSlides .on .b4{animation:hgrow .4s .65s backwards}
+#howSlides .n{fill:var(--text);font-size:14px;font-weight:700;text-anchor:middle}#howSlides .g{fill:var(--muted);font-size:11px;text-anchor:middle}
+#howSlides .on .n{animation:hfade .3s 1s backwards}
+#howSlides .plus{fill:var(--on-accent);font-size:15px;font-weight:700;text-anchor:middle;opacity:0}
+#howSlides .on .plus{animation:hplus 1.2s 1.8s ease-out}
+@keyframes hzoom{from{transform:scale(2.4)}}
+@keyframes hfade{from{opacity:0}}
+@keyframes hpop{from{opacity:0;transform:translateY(4px)}}
+@keyframes hpulse{50%{opacity:.35}}
+@keyframes hfld{from{stroke:var(--field)}}
+@keyframes hcaret{from{transform:translateX(0)}}
+@keyframes hblink{50%{opacity:0}}
+@keyframes hdraw{from{stroke-dashoffset:130}}
+@keyframes htick{from{stroke-dashoffset:24}}
+@keyframes hgrow{from{transform:scaleY(0)}}
+@keyframes hb1{from{fill:var(--border)}}
+@keyframes hplus{0%{opacity:0;transform:translateY(6px)}25%,70%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-6px)}}
+#howNav{display:flex;align-items:center;justify-content:space-between;gap:1em;margin-top:.6em}
+#howDots{display:flex}
+#howDots button{position:relative;width:1.3em;height:1.3em;min-height:0;padding:0;border:0;background:none;box-shadow:none} /* the button is the tap target (phones make it 44px tall); the dot is drawn in its middle */
+#howDots button::before{content:"";position:absolute;left:50%;top:50%;width:.6em;height:.6em;margin:-.3em 0 0 -.3em;border-radius:50%;background:var(--border);transition:background .2s,transform .2s}
+#howDots button:hover:not(:disabled){background:none;filter:none}
+#howDots button.on::before{background:var(--amber);transform:scale(1.25)}
+#howNav #howOk{flex:0 0 auto;width:auto;min-width:7em;margin:0}
+@media (prefers-reduced-motion:reduce){#howSlides *{animation:none!important}#howSlides .plus{opacity:1}}
+/* ==== 1v1 duel: you | the airport | your opponent ==== */
+#duel{width:min(1100px,100%);margin:0 auto}
+#duTop{display:flex;align-items:center;justify-content:space-between;gap:1em;margin-bottom:.5em}
+#duTop #duBack{padding:.3em 0;border:0;background:none;box-shadow:none;color:var(--muted);font-weight:500}
+#duTop #duBack::before{content:"‹ "}
+#duTop #duBack:hover:not(:disabled){color:var(--text);background:none;filter:none}
+#duRound{color:var(--muted);font-size:.9em}
+#duTime{min-width:3em;text-align:right;font:700 1.1em ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+#duTime.low{color:var(--bad)}
+/* the round clock: drains over the minute; the three marks are when the clues unlock */
+#duClock{position:relative;height:6px;margin-bottom:1em;border-radius:3px;background:var(--surface-2);overflow:hidden}
+#duClock i{position:absolute;inset:0 auto 0 0;width:0;background:var(--amber);border-radius:3px}
+#duClock::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent calc(16.67% - 1px),var(--bg) 0 calc(16.67% + 1px),transparent 0 calc(50% - 1px),var(--bg) 0 calc(50% + 1px),transparent 0 calc(75% - 1px),var(--bg) 0 calc(75% + 1px),transparent 0)} /* marks: the state at 10 s, the city at 30 s, the name at 45 s */
+#duBoard{display:grid;grid-template-columns:minmax(9em,1fr) minmax(0,2.6fr) minmax(9em,1fr);gap:1.4em;align-items:start}
+.duSide{display:flex;flex-direction:column;align-items:center;gap:.5em;min-width:0;transition:opacity .3s}
+.duSide.off{opacity:.45}
+.duIcon{display:grid;place-items:center;width:6rem;height:6rem;border-radius:50%;background:var(--pc,var(--border));color:var(--ink-0);font-size:2.6rem;font-weight:800;line-height:1}
+.duIcon.ping{animation:duping .5s ease-out}
+@keyframes duping{40%{transform:scale(1.12);box-shadow:0 0 0 10px color-mix(in srgb,var(--pc) 30%,transparent)}}
+.duName{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.duPips{display:flex;gap:.35em}
+.duPips i{width:.75em;height:.75em;border:2px solid var(--pc,var(--border));border-radius:50%;transition:background .3s}
+.duPips i.on{background:var(--pc)}
+.duGs{width:100%;margin:.4em 0 0;padding:0;list-style:none;font-family:ui-monospace,Consolas,monospace;font-size:.85em}
+.duGs li{padding:.45em .2em;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap}
+.duGs li.new{animation:podfade .4s}
+.duGs li.ok,.duOk{color:var(--ok);font-weight:700}
+.duGs .gc{font-weight:700}
+.duGs .gh.hot{color:var(--orange)}.duGs .gh.cold{color:#7cb7ff}
+#duStage{position:relative}
+#duMap{aspect-ratio:16/10;border-radius:var(--radius);overflow:hidden;background:var(--surface-2)}
+#duWait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;border:1px dashed var(--border);border-radius:var(--radius)}
+#duWait p{margin:0;color:var(--muted)}
+#duCode{font:800 2.6em ui-monospace,Consolas,monospace;letter-spacing:.25em;color:var(--amber)}
+/* the banner over the map: the countdown, who got it, the final result */
+#duBanner{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;align-items:center;justify-content:center;gap:.2em;border-radius:var(--radius);background:color-mix(in srgb,var(--bg) 80%,transparent);text-align:center;pointer-events:none}
+#duBanner.show{display:flex;animation:podfade .3s}
+#duBanner .duBig{font:800 5em ui-monospace,Consolas,monospace;color:var(--amber);animation:hpop .3s}
+#duBanner .duWho{font-size:1.5em;font-weight:800}
+#duBanner .duWho.me{color:var(--ok)}#duBanner .duWho.opp{color:var(--bad)}
+#duBanner .duAns{font:800 2.4em ui-monospace,Consolas,monospace;letter-spacing:.12em}
+#duBanner small{color:var(--muted)}
+/* the answer box with its button attached */
+#duF{display:flex;margin:.9em auto 0;max-width:22em}
+#duF #duG{flex:1;width:auto;min-width:0;border-radius:var(--radius) 0 0 var(--radius);border-right:0}
+#duF #duGo{position:relative;margin:0;border-radius:0 var(--radius) var(--radius) 0;overflow:hidden;min-width:6.5em}
+#duF #duGo.cool::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;background:var(--ink-0);opacity:.5;transform-origin:left;animation:ducool var(--cool,3s) linear forwards}
+@keyframes ducool{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+#duMsg{min-height:1.4em;margin-top:.3em;color:var(--bad);font-size:.85em;text-align:center}
+/* the locator map: borders, then the state filled in while it zooms toward the spot, then the dot and the full name */
+#duClues{margin:.5em auto 0;max-width:26em} /* under the answer box, never over the photo */
+#duClues[hidden]{display:none}
+#duLoc{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg);overflow:hidden} /* the round maps' look */
+#duLoc .duLocAll{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linecap:round;opacity:.45} /* every airport, as in the lobby's round maps */
+#duLoc .duLocBase{fill:none;stroke:var(--muted);stroke-width:.6;stroke-linejoin:round;stroke-linecap:round;opacity:.4}
+#duLoc .duLocState{fill:var(--amber);fill-opacity:0;stroke:var(--amber);stroke-width:.8;stroke-opacity:.7;stroke-linejoin:round;transition:fill-opacity .6s}
+#duLoc .duLocState.on{fill-opacity:.1}
+#duLoc .duLocDot{fill:var(--accent);opacity:0;transition:opacity .6s} /* the answer: the round maps' solid amber dot */
+#duLoc .duLocDot.on{opacity:1}
+#duClues .duLocName{min-height:0;margin-top:.3em;font-size:.85em;line-height:1.25;text-align:center;font-weight:700;opacity:0;transition:opacity .6s}
+#duClues .duLocName.on{opacity:1}
+#duEnd{display:flex;justify-content:center;margin-top:.9em}
+@media (max-width:820px){
+  #duBoard{grid-template-columns:1fr 1fr;gap:.8em 1em}
+  #duMid{grid-column:1/-1;grid-row:2} /* phones: the two players side by side on top, the airport under them */
+  .duGs{max-height:6.6em;overflow-y:auto} /* the newest guesses (on top) stay in view */
+  .duIcon{width:3.6rem;height:3.6rem;font-size:1.6rem}
+}
+@media (prefers-reduced-motion:reduce){.duIcon.ping,.duGs li.new,#duBanner.show,#duBanner .duBig{animation:none}}
+/* ==== Duel, up to 5: points, the other players' column, the lock, the leaderboard ==== */
+.duPts{color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+#duMe .duPts{color:var(--amber);font-size:1.15em}
+#duOpps{display:flex;flex-direction:column;gap:.6em;min-width:0}
+.duOpp{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.6em;align-items:start;padding:.5em .6em;border:1px solid var(--border);border-radius:10px;transition:opacity .3s,border-color .3s}
+.duOpp.off{opacity:.45}
+.duOpp.solved{border-color:var(--ok)}
+.duOpp .duIcon{width:2.6rem;height:2.6rem;font-size:1.2rem}
+.duOppInfo{min-width:0;text-align:left}
+.duOpp .duName{font-size:.95em}
+.duOpp .duName small{color:var(--muted);font-weight:400}
+.duOpp .duPts{font-size:.85em}
+.duOpp .duGs{margin-top:.15em;font-size:.78em}
+.duOpp .duGs li{padding:.15em 0;border-bottom:0;text-align:left}
+.duNone{margin:.4em 0;color:var(--muted);text-align:center}
+/* the code hint: K _ _ _ as small tiles, letters flip in */
+#duHint{display:flex;justify-content:center;gap:.35em;margin-top:.7em}
+#duHint[hidden]{display:none}
+#duHint span{display:grid;place-items:center;width:1.9em;height:2.2em;border-radius:6px;background:var(--surface-2);font:800 1.15em ui-monospace,Consolas,monospace;color:var(--amber)}
+#duHint span.blank{background:none;border:1px dashed var(--border)}
+#duHint span.pop{animation:tileflip .35s ease-out}
+/* misses on the mini map: rings in the player's color (the round maps' guess markers), each with an arrow toward the answer */
+#duLoc .duLocGs path{fill:none;stroke:var(--pc);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+#duLoc .duLocGs circle{fill:var(--bg);stroke:var(--pc)}
+#duClues .duLocName b{display:block}
+#duClues .duLocName span{color:var(--muted);font-weight:600}
+#duDone{display:flex;flex-direction:column;align-items:center;gap:.2em;margin-top:.9em;font-size:1.05em}
+#duDone[hidden]{display:none}
+#duDone span{color:var(--muted);font-size:.9em}
+/* the lock: a second try within 3 s turns the button red with a countdown, and the box shakes */
+#duF #duGo.locked{background:var(--bad);border-color:var(--bad);color:var(--ink-0);font-variant-numeric:tabular-nums}
+#duF.shake{animation:dushake .4s}
+#duF.shake #duG{border-color:var(--bad)}
+@keyframes dushake{15%,55%{transform:translateX(-7px)}35%,75%{transform:translateX(7px)}}
+#duMsg{font-weight:700}
+#duWaitBtns{display:flex;gap:.6em;flex-wrap:wrap;justify-content:center}
+#duWaitTxt{text-align:center}
+/* the answer and who got it, over the map between rounds */
+#duBanner .duGot{display:flex;flex-wrap:wrap;justify-content:center;gap:.3em .9em;margin-top:.5em;font-weight:700}
+#duBanner .duGot i{display:inline-block;width:.6em;height:.6em;margin-right:.35em;border-radius:50%;background:var(--pc)}
+/* the leaderboard at the end */
+#duBoardDlg{width:min(36em,94vw);padding:1.2em 1.4em;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text)}
+#duBoardDlg::backdrop{background:rgba(0,0,0,.6)}
+#duBoardDlg>p{margin:0 0 .8em;font-size:1.35rem;text-align:center}
+#duRanks{margin:0 0 1.1em;padding:0;list-style:none}
+#duRanks li{display:grid;grid-template-columns:1.6em auto minmax(0,1fr) auto auto;gap:.6em;align-items:center;padding:.5em .4em;border-bottom:1px solid var(--border);animation:podfade .4s backwards}
+#duRanks li:nth-child(2){animation-delay:.12s}#duRanks li:nth-child(3){animation-delay:.24s}#duRanks li:nth-child(4){animation-delay:.36s}#duRanks li:nth-child(5){animation-delay:.48s}
+#duRanks li.win{border-radius:8px;background:color-mix(in srgb,var(--amber) 12%,transparent)}
+#duRanks .duIcon{width:2rem;height:2rem;font-size:1rem}
+#duRanks .duRank{font-weight:800;color:var(--muted);text-align:center}
+#duRanks li.win .duRank{color:var(--amber)}
+#duRanks .duRName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+#duRanks .duRName small{color:var(--muted);font-weight:400}
+#duRanks li.me .duRName{font-weight:800}
+#duRanks .duRPer{display:flex;gap:.25em;font:.72em ui-monospace,Consolas,monospace;color:var(--muted)}
+#duRanks .duRPer i{min-width:2.7em;font-style:normal;text-align:right}
+#duRanks .duRTot{min-width:3.4em;font:800 1.2em ui-monospace,Consolas,monospace;color:var(--amber);text-align:right}
+#duBoardBtns{display:flex;gap:.6em;justify-content:center}
+@media (max-width:820px){#duRanks .duRPer{display:none}#duRanks li{grid-template-columns:1.6em auto minmax(0,1fr) auto}}
+@media (prefers-reduced-motion:reduce){#duF.shake,#duRanks li{animation:none}}
+/* everyone's misses on the mini map; the five labelled airports it zooms to at 30 s */
+#duLoc .duLocGs .opp{opacity:.75}
+#duLoc .duLocNear circle{fill:var(--bg);stroke:var(--text)}
+#duLoc .duLocNear text{fill:var(--text);font-family:ui-monospace,Consolas,monospace;font-weight:700;paint-order:stroke;stroke:var(--bg);stroke-linejoin:round}
+#duLoc .duLocNear .ans circle{fill:var(--accent);stroke:var(--accent)}#duLoc .duLocNear .ans text{fill:var(--accent)}
+#duLoc .duLocNear g{animation:hfade .35s .3s backwards}
+/* reactions: small buttons under your points; the emoji floats up from the sender's icon */
+#duReact{display:flex;justify-content:center;gap:.1em}
+#duReact button{min-height:0;padding:.15em .3em;border:0;background:none;box-shadow:none;font-size:1.15em;line-height:1;transition:transform .12s}
+#duReact button:hover:not(:disabled){background:none;transform:scale(1.25);filter:none}
+#duReact button:active{transform:scale(.9)}
+.duPop{position:fixed;z-index:50;font-size:1.9rem;pointer-events:none;animation:dupop 1.6s ease-out forwards}
+@keyframes dupop{0%{transform:translate(-50%,0) scale(.4);opacity:0}15%{transform:translate(-50%,-.5em) scale(1.2);opacity:1}100%{transform:translate(-50%,-2.6em) scale(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){#duLoc .duLocNear g{animation:none}.duPop{animation-duration:.01s}}

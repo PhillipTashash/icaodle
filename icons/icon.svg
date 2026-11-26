@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ICAOdle: a target, like Class B airspace seen from above">
+  <title>ICAOdle</title>
+  <rect width="512" height="512" rx="104" fill="#0d1014"/>
+  <!-- a bullseye of alternating rings: yellow, background, yellow, background, yellow -->
+  <circle cx="256" cy="256" r="214" fill="#ffb81c"/>
+  <circle cx="256" cy="256" r="178" fill="#0d1014"/>
+  <circle cx="256" cy="256" r="114" fill="#ffb81c"/>
+  <circle cx="256" cy="256" r="78" fill="#0d1014"/>
+  <circle cx="256" cy="256" r="28" fill="#ffb81c"/>
+</svg>

@@ -1,0 +1,808 @@
+{
+ "KABQ": {
+  "t": [
+   "Three runways: a long east–west one, a northeast–southwest one, and a shorter diagonal that crosses the northeast–southwest one, so they fan out like a rough star.",
+   "Sits on a high, brown desert mesa, with the Sandia Mountains rising straight up on the east side.",
+   "Kirtland Air Force Base shares the field, so military ramps and hangars sit right beside the airline terminal.",
+   "The green ribbon of the Rio Grande valley is a few miles to the west."
+  ],
+  "m": "Kites And Balloons Quietly",
+  "w": "Albuquerque is famous for its October hot-air balloon fiesta."
+ },
+ "KALB": {
+  "t": [
+   "Two runways cross in an X, a long north–south one and a shorter east–west one.",
+   "Surrounded by woods and suburbs northwest of Albany, with no big body of water next to it.",
+   "The Hudson River and the city are to the southeast, about eight miles away."
+  ],
+  "m": "Kittens Ate Leftover Bagels",
+  "w": "Albany is in New York, and bagels are a New York classic."
+ },
+ "KATL": {
+  "t": [
+   "Five long runways, all parallel and running east–west, the airport's strongest clue.",
+   "The terminal is a long row of parallel concourses (T, A, B, C, D, E, F) stretching out like fingers between the two middle runways.",
+   "Sits just south of downtown Atlanta, hemmed in by dense highways, rental-car lots and industrial blocks."
+  ],
+  "m": "Kind Atlantans Trade Lemonade",
+  "w": "Atlantans are the people of Atlanta; the lemonade nods to sweet Georgia drinks."
+ },
+ "KAUS": {
+  "t": [
+   "Two long parallel runways running north–south, the main one over 12,000 ft.",
+   "State Highway 71 runs along the airport's north side, and the Colorado River passes just north of it.",
+   "This is the former Bergstrom Air Force Base, so the land is flat and open with wide aprons southeast of downtown Austin."
+  ],
+  "m": "Keep Austin Unusually Strange",
+  "w": "“Keep Austin Weird” is the city's famous slogan."
+ },
+ "KBDL": {
+  "t": [
+   "Two runways cross in an X, with the longer one running northeast–southwest.",
+   "Sits in Windsor Locks north of Hartford, close to the Connecticut River, which runs just east of the field.",
+   "Surrounded by flat, wooded New England land and highways, not by mountains or open water."
+  ],
+  "m": "Kettles Boil Dandelion Lemonade",
+  "w": "No local link: the silly kettle picture is just a hook for B-D-L. (Bradley is in Windsor Locks, Connecticut.)"
+ },
+ "KBHM": {
+  "t": [
+   "Two runways: a long one running northeast–southwest and a shorter north–south one that crosses it.",
+   "Sits northeast of downtown Birmingham among wooded, rolling Appalachian foothills."
+  ],
+  "m": "Kings Bring Hot Muffins",
+  "w": "No local link: hot muffins are a tasty picture for B-H-M."
+ },
+ "KBNA": {
+  "t": [
+   "Four runways: three long parallel ones running north–south, plus a longer diagonal runway cutting across them from the northwest to the southeast.",
+   "Interstate 40 runs along the airport's north side.",
+   "Sits southeast of downtown Nashville, with wooded suburbs on all sides."
+  ],
+  "m": "Kind Banjos Never Argue",
+  "w": "Nashville is Music City, home of country music and banjos."
+ },
+ "KBOI": {
+  "t": [
+   "Two long parallel runways running east-southeast to west-northwest, close together and almost the same length.",
+   "A dry, tan landscape with the Boise foothills to the north; the Boise River passes north of the field.",
+   "Gowen Field's Air National Guard ramp, with military aircraft and hangars, sits along the south side."
+  ],
+  "m": "Keep Boise Outdoors, Idaho",
+  "w": "Boise is known for its outdoors: the river, foothills and ski slopes."
+ },
+ "KBOS": {
+  "t": [
+   "Built on a peninsula of landfill poking into Boston Harbor, with water on several sides and the downtown skyline right across the water to the west.",
+   "Five runways in a pinwheel, with pairs crossing each other and several pointing straight out into the harbor.",
+   "The terminals curve in a horseshoe around a central parking area."
+  ],
+  "m": "Keen Bostonians Order Seafood",
+  "w": "Boston is famous for seafood like clam chowder and lobster."
+ },
+ "KBUF": {
+  "t": [
+   "Two runways cross in an X, the longer one running northeast–southwest.",
+   "Sits east of downtown Buffalo among dense suburbs such as Cheektowaga, with Lake Erie about ten miles to the west."
+  ],
+  "m": "Kings Bite Unbelievably Fiery",
+  "w": "Buffalo is the home of Buffalo wings."
+ },
+ "KBUR": {
+  "t": [
+   "Two runways cross at nearly a right angle, and both are short for a jet airport, under 7,000 ft.",
+   "Hemmed in by dense Los Angeles suburbs on every side, with the Verdugo Mountains rising to the northeast.",
+   "Interstate 5 runs along the airport's east side."
+  ],
+  "m": "Kameras Break Up Reality",
+  "w": "Burbank is a movie-studio town, so cameras and reality TV fit."
+ },
+ "KBWI": {
+  "t": [
+   "Three runways: a long east–west one crossed by a long northwest–southeast one, with a shorter parallel one beside it.",
+   "Sits southwest of Baltimore, between Baltimore and Washington, in a sprawl of highways, warehouses and suburbs."
+  ],
+  "m": "Kids Bake Walnut Ice-cream",
+  "w": "BWI is Baltimore/Washington International; the ice cream just gives you the W and I."
+ },
+ "KCHS": {
+  "t": [
+   "Two runways cross in an X, one running northwest–southeast and one northeast–southwest.",
+   "Joint Base Charleston shares the field, so large gray military transports (C-17s) sit on a ramp on the east side.",
+   "Flat Lowcountry land with marshes and creeks around it, and Interstate 526 passing just south."
+  ],
+  "m": "Kids Chew Hushpuppies Slowly",
+  "w": "Charleston is known for southern cooking, like hushpuppies."
+ },
+ "KCLE": {
+  "t": [
+   "Two long parallel runways running northeast–southwest, plus a shorter east–west runway.",
+   "NASA Glenn Research Center sits right next to the airport.",
+   "On the west side of Cleveland, with suburbs all around; Lake Erie is about ten miles north."
+  ],
+  "m": "Keep Cleveland's Loud Electric",
+  "w": "Cleveland is home to the Rock and Roll Hall of Fame, so think loud electric guitars."
+ },
+ "KCLT": {
+  "t": [
+   "Three parallel north–south runways, with the shortest one set farther to the west.",
+   "Interstate 85 runs just north of the airport, and the Catawba River (Lake Wylie) is a short way west.",
+   "A large hub terminal with long concourses reaching out into the field."
+  ],
+  "m": "Kart Cars Lap Tracks",
+  "w": "Charlotte is NASCAR country: cars racing laps around tracks."
+ },
+ "KCMH": {
+  "t": [
+   "Two parallel runways running east–west, one noticeably longer than the other.",
+   "Interstate 270, the outer belt loop, runs along the airport's east side.",
+   "Surrounded by flat Ohio farmland and suburbs east of downtown Columbus."
+  ],
+  "m": "Keep Calling Mom Home",
+  "w": "No local link: “call Mom home” is just easy to say and picture for C-M-H. (Columbus is in Ohio.)"
+ },
+ "KCOS": {
+  "t": [
+   "Three runways: two long parallel ones running north–south and a diagonal one running northwest–southeast.",
+   "Pikes Peak and the Rocky Mountains rise right to the west, with open plains to the east.",
+   "Peterson Space Force Base shares the field on the west side, with military hangars and aircraft."
+  ],
+  "m": "Kids Climb Over Summits",
+  "w": "Colorado Springs sits under Pikes Peak, so climbing over summits fits."
+ },
+ "KCVG": {
+  "t": [
+   "Four runways: three parallel north–south runways and a long east–west runway that crosses them.",
+   "Sits in Kentucky, about ten miles southwest of downtown Cincinnati, with the Ohio River to the north.",
+   "DHL's huge hub ramp, full of cargo planes and sorting buildings, is on the field itself."
+  ],
+  "m": "Keen Chili Vendors Grin",
+  "w": "Cincinnati is famous for its chili."
+ },
+ "KDAL": {
+  "t": [
+   "Two parallel runways running northwest–southeast, with the terminal along the east side.",
+   "A small airport tucked into the city, just northwest of downtown Dallas, ringed by streets, warehouses and neighborhoods.",
+   "Bachman Lake sits right next to the northwest corner of the field."
+  ],
+  "m": "Kowboys Drive A Lot",
+  "w": "Dallas is cowboy country, and Texas distances mean driving a lot."
+ },
+ "KDCA": {
+  "t": [
+   "Right on the Potomac River, with the river along the airport's east side and Washington, DC across the water.",
+   "Three short runways in a rough triangle: one runs north–south and two others cross it at angles.",
+   "The Pentagon is about a mile and a half to the north, and Arlington's high-rises are just beyond the airport's northwest side."
+  ],
+  "m": "Kings Dine, Congress Adjourns",
+  "w": "Washington, DC is where Congress meets, and adjourns."
+ },
+ "KDEN": {
+  "t": [
+   "Six long runways spread over an enormous flat site: four run north–south and two run east–west.",
+   "The terminal is a long central building under a white, peaked, tent-like roof, with three parallel concourses (A, B, C) lined up beside it.",
+   "Far out on open plains northeast of Denver, with nothing but fields around it and the Rocky Mountains on the western horizon."
+  ],
+  "m": "Keep Denver Elevated, Naturally",
+  "w": "Denver is the Mile High City, so it is elevated."
+ },
+ "KDFW": {
+  "t": [
+   "Seven runways: five long parallel ones running north–south and two running northwest–southeast.",
+   "The terminals are semicircular horseshoes built along a long central spine road, one after another.",
+   "Enormous: the airport covers more land than the island of Manhattan, set between Dallas and Fort Worth."
+  ],
+  "m": "Kicking Dallas, Fort Worth",
+  "w": "The words are the airport itself: Dallas and Fort Worth."
+ },
+ "KDSM": {
+  "t": [
+   "Two runways cross in an X, running northeast–southwest and northwest–southeast.",
+   "Sits southwest of downtown Des Moines in flat Iowa farmland and neighborhoods, with no big lake or mountains nearby."
+  ],
+  "m": "Kernels Dance Super Merrily",
+  "w": "Des Moines is in Iowa corn country, so dancing kernels fit."
+ },
+ "KDTW": {
+  "t": [
+   "Six runways: four long parallel ones running north-northeast to south-southwest, crossed by two east–west runways.",
+   "The main terminal is an extremely long, narrow ribbon of gates about a mile long, with a train in the middle.",
+   "Interstate 94 runs along the airport's north side, and the surroundings are flat suburbs southwest of Detroit."
+  ],
+  "m": "Kars Drive Through Winters",
+  "w": "Detroit is the Motor City: cars driving through snowy winters."
+ },
+ "KELP": {
+  "t": [
+   "Three runways: a long northeast–southwest one and two parallel east–west ones.",
+   "The Franklin Mountains rise just to the west, with desert and the border city of Ciudad Juárez across the Rio Grande to the south.",
+   "Fort Bliss's Biggs Army Airfield lies on the northeast side of the field."
+  ],
+  "m": "Keep Eating Lava Peppers",
+  "w": "El Paso is known for its spicy Tex-Mex food and chile peppers."
+ },
+ "KEWR": {
+  "t": [
+   "Three runways: two long parallel ones running northeast–southwest and a shorter east–west one that crosses them.",
+   "The New Jersey Turnpike runs along the east side, and Port Newark and Elizabeth's stacks of container ships and containers lie just beyond.",
+   "The Manhattan skyline is visible about ten miles to the northeast."
+  ],
+  "m": "Keep Evading Waiting Rooms",
+  "w": "Newark's code EWR doesn't match its name, so this is a pure memory trick: evade the waiting rooms."
+ },
+ "KFAT": {
+  "t": [
+   "Two parallel runways running northwest–southeast.",
+   "Flat San Joaquin Valley farmland, with fields and orchards in a patchwork all around.",
+   "On the northeast side of Fresno, near the suburb of Clovis, with the Sierra Nevada far in the distance."
+  ],
+  "m": "Keep Fresno's Almonds Tasty",
+  "w": "Fresno is California farm country, famous for almonds and raisins."
+ },
+ "KFLL": {
+  "t": [
+   "Two parallel runways running east–west, with the Atlantic Ocean only a couple of miles to the east.",
+   "Port Everglades, with its cruise ships and cranes, sits right next to the airport's southeast side.",
+   "A tightly packed urban grid of Dania Beach, Hollywood and Fort Lauderdale surrounds the field."
+  ],
+  "m": "Kids Float Lazily, Laughing",
+  "w": "Fort Lauderdale is a beach city, so lazy floating fits."
+ },
+ "KGEG": {
+  "t": [
+   "Two runways cross: a long northeast–southwest runway and a shorter east–west one.",
+   "Sits on a flat, forested plateau west of Spokane, with pine trees all around the airport.",
+   "Fairchild Air Force Base, with its long runway and refueling tankers, is a few miles to the west."
+  ],
+  "m": "Keep Going, Eagles Glide",
+  "w": "Spokane's odd code GEG comes from the old Geiger Field; eagles gliding just helps the letters stick."
+ },
+ "KGRR": {
+  "t": [
+   "Three runways: a long east–west one with a shorter parallel one beside it, and a north–south runway crossing them.",
+   "Interstate 96 runs along the airport's north side.",
+   "Sits southeast of downtown Grand Rapids, with farmland and wooded suburbs around it."
+  ],
+  "m": "Kayaks Glide Round Rivers",
+  "w": "Grand Rapids sits on the Grand River."
+ },
+ "KGSO": {
+  "t": [
+   "Three runways: two long parallel ones running northeast–southwest and a northwest–southeast runway that crosses them.",
+   "FedEx's hub is here, so a big cargo ramp full of FedEx jets sits beside the terminal.",
+   "Sits between Greensboro and Winston-Salem in North Carolina's rolling, wooded Piedmont."
+  ],
+  "m": "Kids Grow Sweet Okra",
+  "w": "Greensboro has “green” in its name, so growing things fit."
+ },
+ "KHOU": {
+  "t": [
+   "Three short runways forming a triangle: one runs northeast–southwest and two parallel ones run northwest–southeast.",
+   "A compact airport inside the city of Houston, with Interstate 45 (the Gulf Freeway) passing just west of it.",
+   "Surrounded by neighborhoods and industrial blocks, with no large body of water in sight."
+  ],
+  "m": "Keep Houston Orbiting, Unstoppably",
+  "w": "Houston is Space City, home of NASA, so something is always orbiting."
+ },
+ "KIAD": {
+  "t": [
+   "Four runways: three long parallel ones running north–south and a diagonal runway.",
+   "The main terminal is a long, curved building with a sweeping roof, and midfield concourses are reached by trains.",
+   "The Udvar-Hazy air and space museum, with its giant hangar, sits on the airport's southwest side."
+  ],
+  "m": "Kids Inspect Aircraft Daily",
+  "w": "IAD stands for International Airport Dulles."
+ },
+ "KIAH": {
+  "t": [
+   "Five runways: three parallel ones running east–west and two parallel ones running northwest–southeast.",
+   "The terminals (A, B, C, D, E) are arranged around a central hub and linked by a train.",
+   "Far north of downtown Houston, surrounded by thick pine woods and suburbs."
+  ],
+  "m": "Kids Inspect Astronauts' Helmets",
+  "w": "IAH stands for Intercontinental Airport Houston; astronauts nod to NASA in Houston."
+ },
+ "KIND": {
+  "t": [
+   "Three runways: two long parallel ones running northeast–southwest and a shorter one running northwest–southeast.",
+   "FedEx has a major hub here, so a large cargo ramp sits on the field next to the terminal.",
+   "Interstate 70 runs along the airport's north side, southwest of downtown Indianapolis."
+  ],
+  "m": "Kids Idolize Nimble Drivers",
+  "w": "Indianapolis hosts the Indy 500, so nimble drivers fit."
+ },
+ "KJAX": {
+  "t": [
+   "Two runways that do not cross, a long east–west one and a shorter northwest–southeast one.",
+   "Far north of downtown Jacksonville, surrounded by dense pine forest and creeks.",
+   "Interstate 95 passes close to the airport on its west side."
+  ],
+  "m": "Kangaroos Juggle Alligators, Xtreme",
+  "w": "“Jax” is Jacksonville's nickname, and Florida has alligators."
+ },
+ "KJFK": {
+  "t": [
+   "Four runways in two crossing pairs: two parallel ones running northwest–southeast and two parallel ones running northeast–southwest.",
+   "Jamaica Bay's marshes and islands wrap around the north, east and south sides, with the Atlantic beyond.",
+   "The terminals form a loop around a big central parking area, with the old swooping TWA Flight Center among them."
+  ],
+  "m": "Keep Jets Flying, Kennedy",
+  "w": "The airport is named for John F. Kennedy."
+ },
+ "KLAS": {
+  "t": [
+   "Four runways: two long parallel ones running east–west and two parallel ones running north-northeast to south-southwest.",
+   "The Las Vegas Strip, with its towers and the pyramid of the Luxor, runs right along the airport's east end.",
+   "Brown desert all around, with mountains in the distance on every side."
+  ],
+  "m": "Keep Lucking, Always Spinning",
+  "w": "Las Vegas is the gambling capital: luck and spinning slots."
+ },
+ "KLAX": {
+  "t": [
+   "Four parallel runways running east–west, in two close pairs with the terminals between them.",
+   "The Pacific Ocean is right at the west end, with beaches, dunes and the El Segundo refinery just beyond.",
+   "The terminals form a U-shaped loop around a central road, with the flying-saucer shaped Theme Building in the middle."
+  ],
+  "m": "Kangaroos Love Avocado Xylophones",
+  "w": "Avocados are a California staple; the xylophones just give you the X."
+ },
+ "KLGA": {
+  "t": [
+   "Two short runways cross in an X, both about 7,000 ft.",
+   "Water on several sides: Flushing Bay to the east and Bowery Bay to the west and north.",
+   "The Grand Central Parkway runs along the south side, and Citi Field and the Unisphere in Flushing Meadows are just southeast."
+  ],
+  "m": "Kings Land Gracefully, Anyway",
+  "w": "LaGuardia's runways end at the water, so landings need to be graceful."
+ },
+ "KLGB": {
+  "t": [
+   "Three runways: a long northwest–southeast runway crossed by two shorter parallel east–west runways.",
+   "A low-slung airport in the middle of Long Beach, with Signal Hill, a hill dotted with oil wells, just to the southwest.",
+   "Dense suburbs all around, with the Port of Long Beach cranes a few miles to the south."
+  ],
+  "m": "Kids Love Great Beaches",
+  "w": "Long Beach has great beaches."
+ },
+ "KMCI": {
+  "t": [
+   "Three runways: two parallel ones running almost north–south, and a shorter east–west runway that crosses the western one.",
+   "Far north of downtown Kansas City on flat farmland near the Missouri River.",
+   "Older imagery shows three half-circle terminals in a row; the new single terminal opened in 2023."
+  ],
+  "m": "Kids Munch Cheeseburgers Instantly",
+  "w": "MCI stands for Mid-Continent International; the cheeseburgers are just a memory hook."
+ },
+ "KMCO": {
+  "t": [
+   "Four parallel runways running north–south, two on each side of the terminal complex.",
+   "The main terminal is surrounded by four separate gate buildings (airsides), and a newer terminal sits to the south.",
+   "Flat Florida scrub and many small lakes all around, southeast of downtown Orlando."
+  ],
+  "m": "Kids Meet Cartoon Orcas",
+  "w": "MCO comes from the old McCoy Air Force Base; Orlando means Disney cartoons and SeaWorld orcas."
+ },
+ "KMDW": {
+  "t": [
+   "A compact airport in a tight city grid, covering about one square mile, with four short runways crossing each other in a tangle.",
+   "Houses and streets press right up against all four sides of the field, and the Orange Line train ends at its northeast corner.",
+   "The longest runway is only about 6,500 ft, which is short for a major airport."
+  ],
+  "m": "Keep Midway Dinky, Wonderful",
+  "w": "Midway is a small, compact airport, hence “dinky”."
+ },
+ "KMEM": {
+  "t": [
+   "Four runways: three long parallel ones running north–south and a shorter east–west runway.",
+   "FedEx's world hub dominates the field: a huge cargo ramp lined with FedEx jets and sorting buildings, far larger than the passenger terminal.",
+   "The Mississippi River is about ten miles to the west, and the Mississippi state line is a few miles south."
+  ],
+  "m": "Kings Move Elvis's Music",
+  "w": "Memphis is Elvis's hometown and a home of the blues."
+ },
+ "KMIA": {
+  "t": [
+   "Four runways: three parallel ones running east–west and a diagonal runway that crosses the longest one.",
+   "The terminal is a very long U shape with concourses (D, E, F, G, H, J) stretching along both arms.",
+   "A dense city grid surrounds it, with highways on the west side and Biscayne Bay and the downtown skyline about seven miles to the east."
+  ],
+  "m": "Keep Miami Insanely Awesome",
+  "w": "Miami is known for sun, beaches and nightlife."
+ },
+ "KMKE": {
+  "t": [
+   "Five runways laid out in a star: several pairs cross each other at different angles.",
+   "Sits south of downtown Milwaukee, with Lake Michigan about five miles to the east.",
+   "Flat, built-up suburbs on every side."
+  ],
+  "m": "Keep Milwaukee's Kegs Empty",
+  "w": "Milwaukee is famous for its beer."
+ },
+ "KMSP": {
+  "t": [
+   "Four runways: a long northeast–southwest runway crossed by two parallel northwest–southeast runways, and a short north–south one.",
+   "Sits where the Minnesota and Mississippi Rivers meet, with Fort Snelling's wooded bluffs just to the northeast.",
+   "Interstate 494 runs along the south side, and the huge Mall of America is just southeast of the field."
+  ],
+  "m": "Keep Minnesota Snowy, Please",
+  "w": "Minneapolis–Saint Paul winters are snowy."
+ },
+ "KMSY": {
+  "t": [
+   "Two runways that do not cross, a long one running east-southeast to west-northwest and a shorter north–south one.",
+   "Sits in Kenner, west of New Orleans, with Interstate 10 passing just south of the field.",
+   "Lake Pontchartrain is a few miles to the north, and the Mississippi River curves a few miles to the south."
+  ],
+  "m": "Keep Mardi-gras Swinging, Y'all",
+  "w": "New Orleans is Mardi Gras country; MSY comes from the old Moisant Stock Yards."
+ },
+ "KMYR": {
+  "t": [
+   "Just one long runway, running north–south.",
+   "Surrounded by golf courses, resorts and shopping strips of the Grand Strand, with the Atlantic beaches about three miles to the east.",
+   "Flat, low coastal land with a sprinkling of ponds and woods."
+  ],
+  "m": "Kids Mind Your Rays",
+  "w": "Myrtle Beach is a beach town, so sunscreen is the hook."
+ },
+ "KOAK": {
+  "t": [
+   "Sits right on San Francisco Bay, with water on the south and west sides and the main runway pointing out toward the bay.",
+   "Two groups of runways: one long main runway along the bay and a cluster of shorter ones to the north.",
+   "The Oakland Coliseum and arena sit just east of the field, and the cranes of the Port of Oakland are just north."
+  ],
+  "m": "Keep Oakland Athletics Kicking",
+  "w": "Oakland was home to the Athletics baseball team (the A's)."
+ },
+ "KOKC": {
+  "t": [
+   "Four runways: three long parallel ones running north–south, a diagonal one, and a short extra runway.",
+   "The FAA's Mike Monroney Aeronautical Center, a large campus of buildings, sits beside the airport.",
+   "Flat red-soil Oklahoma plains southwest of downtown Oklahoma City, with farms and fields around."
+  ],
+  "m": "Keep Oklahoma's Kowboys Cheering",
+  "w": "Oklahoma City is cowboy country."
+ },
+ "KOMA": {
+  "t": [
+   "Three runways: two parallel ones running northwest–southeast crossed by a north–south runway.",
+   "Sits on the Missouri River floodplain, with the river just east of the field and the little oxbow Carter Lake next to its northeast corner.",
+   "Downtown Omaha's skyline is about three miles to the southwest."
+  ],
+  "m": "Keep Omaha's Meat Amazing",
+  "w": "Omaha is famous for its steaks."
+ },
+ "KONT": {
+  "t": [
+   "Two parallel runways running east–west.",
+   "Hemmed in by huge warehouses and distribution centers on all sides, including UPS's big hub, with the San Gabriel Mountains looming to the north.",
+   "Interstate 10 passes north of the airport, in the flat Inland Empire east of Los Angeles."
+  ],
+  "m": "Kids Order Nachos Tonight",
+  "w": "No local link: ordering nachos tonight just spells O-N-T."
+ },
+ "KORD": {
+  "t": [
+   "Eight runways, the most of any US airport: six parallel ones running east–west and two shorter diagonals that cross them.",
+   "Interstate 190 runs straight into the middle of the airport from the east, and a tight grid of Chicago suburbs surrounds it.",
+   "Terminals 1, 2 and 3 form the central cluster around a big roadway hub."
+  ],
+  "m": "Kids Order Real Deep-dish",
+  "w": "Chicago is famous for deep-dish pizza, and ORD comes from the old Orchard Field."
+ },
+ "KORF": {
+  "t": [
+   "Two runways cross in an X, a long northeast–southwest one and a short northwest–southeast one.",
+   "Tidal creeks, inlets and the Elizabeth and Lafayette Rivers wind through the surrounding Hampton Roads neighborhoods.",
+   "The big Norfolk Naval Station piers, with gray warships, lie a few miles to the northwest."
+  ],
+  "m": "Kids Observe Rusty Frigates",
+  "w": "Norfolk is home to the world's largest naval base, with lots of Navy ships."
+ },
+ "KPBI": {
+  "t": [
+   "Three runways: a long east–west one with a short parallel one, and a northwest–southeast runway that crosses the long one.",
+   "Interstate 95 runs just west of the airport, and the Palm Beach island beaches and Lake Worth lagoon are a few miles to the east.",
+   "Flat, green Florida suburbs with golf courses all around."
+  ],
+  "m": "Keep Palm Beaches Inviting",
+  "w": "Palm Beach is known for its palm-lined beaches."
+ },
+ "KPDX": {
+  "t": [
+   "Three runways: two long parallel ones running east–west right along the river, and a shorter northeast–southwest runway that crosses them.",
+   "Sits on the south bank of the Columbia River, with Washington State on the far bank and Mount Hood visible to the east.",
+   "An Air National Guard fighter base with hangars sits on the east side of the field."
+  ],
+  "m": "Keep Portland Delightfully Xtra",
+  "w": "“Keep Portland Weird” is the city's slogan, and PDX is its nickname."
+ },
+ "KPHL": {
+  "t": [
+   "Four runways: three roughly parallel ones running east–west (one of them shorter) and one running north-northwest to south-southeast that crosses them.",
+   "Sits on the Delaware River, with the river along the airport's southeast side and the Schuylkill River meeting it nearby.",
+   "Interstate 95 runs along the north and east sides, and the sports stadiums are about four miles to the northeast."
+  ],
+  "m": "Kids Prefer Hoagies, Lots",
+  "w": "Philadelphia is a hoagie and cheesesteak town."
+ },
+ "KPHX": {
+  "t": [
+   "Three parallel runways running east–west.",
+   "Sits just east of downtown Phoenix, with the high-rises of downtown to the west and Camelback Mountain visible to the north.",
+   "The dry Salt River bed and Tempe Town Lake are just south and southeast of the field."
+  ],
+  "m": "Keep Phoenix Hot, Xtreme",
+  "w": "Phoenix is famously hot."
+ },
+ "KPIE": {
+  "t": [
+   "Two runways: a long north–south one and a shorter northeast–southwest one.",
+   "Sits on the shore of Old Tampa Bay on the Pinellas peninsula, with water along its east edge.",
+   "Dense suburbs and strip malls surround the field on the west."
+  ],
+  "m": "Kids Pour Iced Espresso",
+  "w": "The code PIE spells a dessert; iced espresso carries on the food theme."
+ },
+ "KPIT": {
+  "t": [
+   "Four runways: three long parallel ones running east–west and a diagonal one running northwest–southeast.",
+   "Far west of downtown Pittsburgh in hilly, wooded country, with a huge flat site cut out of the hills.",
+   "The older terminal's gate buildings radiate out in an X shape."
+  ],
+  "m": "Keep Pierogies Inside Tummies",
+  "w": "Pittsburgh is known for pierogies."
+ },
+ "KPNS": {
+  "t": [
+   "Two runways cross in an X, a north–south one and an east–west one, each about 7,000 ft.",
+   "Pensacola Bay is a few miles to the south, with Naval Air Station Pensacola, the Blue Angels' home, on its southern shore.",
+   "Flat, sandy Florida panhandle land with pine woods."
+  ],
+  "m": "Kids Picnic Near Sand",
+  "w": "Pensacola has white-sand beaches, so a picnic near the sand fits."
+ },
+ "KPSP": {
+  "t": [
+   "Two parallel runways running northwest–southeast, a long one and a short one.",
+   "The San Jacinto Mountains rise steeply right behind the airport to the west.",
+   "A desert valley with rows of wind turbines in the pass to the northwest."
+  ],
+  "m": "Keep Palm Springs Peaceful",
+  "w": "Palm Springs is a calm, peaceful desert resort town."
+ },
+ "KPVD": {
+  "t": [
+   "Two runways cross in an X, a long northeast–southwest one and a shorter northwest–southeast one.",
+   "Interstate 95 skirts the west side of the field, and Greenwich Bay, an arm of Narragansett Bay, lies to the east.",
+   "Dense New England suburbs of Warwick, with small lakes and woods all around."
+  ],
+  "m": "Kids Paddle Via Docks",
+  "w": "Providence is known for WaterFire on its downtown rivers, so think paddling."
+ },
+ "KPWM": {
+  "t": [
+   "Two runways cross in an X, a long east–west one and a shorter north–south one.",
+   "The Maine Turnpike runs along the airport's west side, and Casco Bay with its many islands is a few miles east.",
+   "Wooded, low rolling land at the edge of the city of Portland."
+  ],
+  "m": "Kids Pick Whole Maine-lobsters",
+  "w": "Portland, Maine is famous for its lobster."
+ },
+ "KRDU": {
+  "t": [
+   "Three runways: two parallel ones running northeast–southwest and a short one running northwest–southeast.",
+   "Umstead State Park, a big green forest, sits right next to the airport on its north side.",
+   "Interstate 40 runs along the south side, between the cities of Raleigh and Durham."
+  ],
+  "m": "Keen Researchers Discover Universe",
+  "w": "Raleigh–Durham is the Research Triangle, full of researchers and universities."
+ },
+ "KRIC": {
+  "t": [
+   "Two runways that do not cross, a long one running north-northwest to south-southeast and a shorter one running nearly north–south.",
+   "Sits east of Richmond near Sandston, with Interstate 64 passing just north of the field.",
+   "Flat, wooded Virginia land with the James River winding well to the southwest."
+  ],
+  "m": "Kings Ride In Carriages",
+  "w": "No local link: kings riding in carriages is easy to picture. Richmond also sounds like a royal name."
+ },
+ "KRNO": {
+  "t": [
+   "Three runways: two long parallel ones running north–south crossed by a shorter east–west one.",
+   "The Sierra Nevada rises just to the west, and brown desert hills lie to the east.",
+   "Sits southeast of the casinos of downtown Reno, close to the city center."
+  ],
+  "m": "Keep Rolling, Nevada Odds",
+  "w": "Reno is the “Biggest Little City” of casinos, so Nevada odds fit."
+ },
+ "KROC": {
+  "t": [
+   "Three runways: a long northeast–southwest runway, an east–west runway and a short one between them.",
+   "Sits west of downtown Rochester in flat, suburban land, with Lake Ontario about ten miles to the north."
+  ],
+  "m": "Keep Rochester Offering Cameras",
+  "w": "Rochester is the home of Kodak cameras."
+ },
+ "KRSW": {
+  "t": [
+   "Just one long runway running northeast–southwest.",
+   "Sits inland east of Fort Myers, with Interstate 75 passing just east of the field and swampy preserves and ponds around it.",
+   "The Gulf of Mexico is about a dozen miles to the west."
+  ],
+  "m": "Kids Relax, Sunbathe, Wade",
+  "w": "The airport serves Southwest Florida, where the beaches are made for sunbathing."
+ },
+ "KSAN": {
+  "t": [
+   "Just one runway, running east–west, wedged between downtown San Diego and San Diego Bay.",
+   "Skyscrapers sit right next to the approach path, and the Marine Corps Recruit Depot borders the northwest side of the field.",
+   "Interstate 5 runs along the north side, and the hills of Point Loma are just to the west."
+  ],
+  "m": "Kids Surf All Noon",
+  "w": "San Diego is a surfing city."
+ },
+ "KSAT": {
+  "t": [
+   "Three runways: a long northeast–southwest runway crossing two parallel ones running northwest–southeast.",
+   "Sits north of downtown San Antonio in dense suburbs, with U.S. Highway 281 running along its east side.",
+   "Flat Texas Hill Country foothills with a patchwork of neighborhoods and shopping centers all around."
+  ],
+  "m": "Kids Storm Alamo Tomorrow",
+  "w": "San Antonio is home to the Alamo."
+ },
+ "KSAV": {
+  "t": [
+   "Two runways cross in an X, an east–west one and a north–south one.",
+   "Interstate 95 passes just west of the airport.",
+   "Surrounded by pine forest and marshy creeks, northwest of downtown Savannah."
+  ],
+  "m": "Kids Seek Antique Verandas",
+  "w": "Savannah is known for its antique-filled historic squares and verandas."
+ },
+ "KSBD": {
+  "t": [
+   "Just one long runway, running northeast–southwest.",
+   "Surrounded by huge warehouses and a big cargo ramp, on the old Norton Air Force Base.",
+   "The San Bernardino Mountains rise to the north."
+  ],
+  "m": "Kids Stack Big Donuts",
+  "w": "McDonald's started in San Bernardino, so food is the hook."
+ },
+ "KSDF": {
+  "t": [
+   "Three runways: two long parallel ones running almost north–south and a diagonal that crosses them.",
+   "UPS's Worldport hub dominates the field, with a huge ramp full of brown-tailed cargo planes bigger than the passenger terminal.",
+   "Churchill Downs racetrack sits just north of the airport, south of downtown Louisville."
+  ],
+  "m": "Kentucky Saddles Derby Favorites",
+  "w": "Louisville is Kentucky Derby country; SDF comes from the old Standiford Field."
+ },
+ "KSEA": {
+  "t": [
+   "Three parallel runways running north–south, with the westernmost one built up on a raised fill embankment.",
+   "Sits on a ridge between Puget Sound to the west and Lake Washington to the east, with Interstate 5 along the east side.",
+   "Mount Rainier looms to the southeast on a clear day."
+  ],
+  "m": "Keep Sipping Espresso Always",
+  "w": "Seattle is coffee country."
+ },
+ "KSFB": {
+  "t": [
+   "Four runways: three parallel ones running east–west and a north–south one that crosses them.",
+   "The St. Johns River and Lake Monroe lie a few miles to the northwest.",
+   "Surrounded by Sanford's flat, green suburbs and wooded land, northeast of Orlando."
+  ],
+  "m": "Kids Sail Florida's Bays",
+  "w": "Sanford is a Florida lakeside town, so sailing is the hook."
+ },
+ "KSFO": {
+  "t": [
+   "Four runways in two crossing pairs that form a hash-mark pattern: two parallel ones running east-southeast to west-northwest and two parallel ones running north-northeast to south-southwest.",
+   "Sits right on the western shore of San Francisco Bay, with runways pointing out into the water and U.S. Highway 101 along the west side.",
+   "The terminals form a horseshoe around a central garage, with the international terminal's big sweeping roof."
+  ],
+  "m": "Keep Sourdough Fresh, Often",
+  "w": "San Francisco is famous for sourdough bread."
+ },
+ "KSJC": {
+  "t": [
+   "Two long parallel runways running northwest–southeast, both about 11,000 ft.",
+   "Right in the middle of Silicon Valley, ringed by office parks and highways, with Interstate 880 on the east side.",
+   "The colorful salt evaporation ponds of the southern bay are visible a few miles to the north."
+  ],
+  "m": "Keen Software Jockeys Code",
+  "w": "San Jose is the heart of Silicon Valley."
+ },
+ "KSLC": {
+  "t": [
+   "Three parallel runways running north–south.",
+   "The Great Salt Lake and its flat salt marshes lie to the northwest, and the Wasatch Mountains rise just east of the valley.",
+   "Interstate 80 runs along the south side, with downtown Salt Lake City about four miles east."
+  ],
+  "m": "Keen Skiers Love Cocoa",
+  "w": "Salt Lake City has great skiing, so hot cocoa fits."
+ },
+ "KSMF": {
+  "t": [
+   "Two parallel runways running north–south, each about 8,600 ft.",
+   "Sits in the flat Sacramento Valley, a patchwork of rice fields and farmland, with Interstate 5 along the east side.",
+   "About ten miles northwest of downtown Sacramento."
+  ],
+  "m": "Keep Sacramento's Market Fresh",
+  "w": "Sacramento calls itself America's Farm-to-Fork capital."
+ },
+ "KSNA": {
+  "t": [
+   "One main runway, running northeast–southwest, only about 5,700 ft, short for a jet airport, with a tiny second runway beside it.",
+   "Hemmed in by freeways: Interstate 405 along its northeast side and Highway 55 to the west.",
+   "Surrounded by Irvine's office towers and Orange County suburbs."
+  ],
+  "m": "Kids Savor Navel Apricots",
+  "w": "Santa Ana is in Orange County, citrus country, so fruit is the hook."
+ },
+ "KSRQ": {
+  "t": [
+   "Two runways cross in an X, a long northwest–southeast one and a shorter northeast–southwest one.",
+   "The grounds of the Ringling Museum and Sarasota Bay lie just southwest of the field, with barrier islands like Longboat Key beyond.",
+   "A flat grid of Florida neighborhoods and U.S. 41 runs along the west side."
+  ],
+  "m": "Kids Surf, Relax, Quietly",
+  "w": "Sarasota is a relaxed beach and arts town."
+ },
+ "KSTL": {
+  "t": [
+   "Four runways: three parallel ones running northwest–southeast and a northeast–southwest one that crosses them.",
+   "The main terminal has a row of thin concrete vaults, a 1950s design by Minoru Yamasaki.",
+   "Interstate 70 runs past the northeast side, and the Missouri River is a few miles north."
+  ],
+  "m": "Keep Strolling The Landmark",
+  "w": "St. Louis is known for the Gateway Arch landmark."
+ },
+ "KSYR": {
+  "t": [
+   "Two runways cross in an X, a long east–west one and a shorter northwest–southeast one.",
+   "Sits northeast of downtown Syracuse, with Interstate 81 along its west side.",
+   "Onondaga Lake lies about four miles to the west."
+  ],
+  "m": "Keep Shoveling Your Roof",
+  "w": "Syracuse gets huge snowfall every winter."
+ },
+ "KTPA": {
+  "t": [
+   "Three runways: two parallel ones running north–south and a shorter east–west one that crosses the shorter of them.",
+   "Sits on the northeastern shore of Tampa Bay, with water along its west side and Interstate 275 along its east side.",
+   "A central main terminal is surrounded by separate gate buildings (airsides) reached by shuttle."
+  ],
+  "m": "Kids Toss Pirate Anchors",
+  "w": "Tampa's Gasparilla festival is a pirate invasion."
+ },
+ "KTUL": {
+  "t": [
+   "Three runways: two parallel ones running north–south crossed by a shorter east–west one.",
+   "American Airlines' big maintenance base, with a large hangar complex full of silver jets, sits on the field.",
+   "The Arkansas River winds west of the airport, and Interstate 244 passes just south."
+  ],
+  "m": "Kids Twirl Unusual Lassos",
+  "w": "Tulsa is Oklahoma cowboy country."
+ },
+ "KTUS": {
+  "t": [
+   "Two runways that do not cross, a long one running northwest–southeast and a shorter one running northeast–southwest.",
+   "A desert basin ringed by mountains: the Santa Rita Mountains to the southeast, the Santa Catalinas to the northeast and the Tucson Mountains to the northwest.",
+   "The Raytheon missile plant, with its big buildings, is right next to the airport."
+  ],
+  "m": "Kids Touch Unfriendly Saguaros",
+  "w": "Tucson is surrounded by giant saguaro cactus."
+ },
+ "KTYS": {
+  "t": [
+   "Two parallel runways running northeast–southwest.",
+   "The Great Smoky Mountains rise on the southeast horizon, and the Tennessee River's Fort Loudoun Lake lies to the northwest.",
+   "Surrounded by the hills and wooded suburbs of Alcoa and Maryville, south of Knoxville."
+  ],
+  "m": "Keep Trekking Your Smokies",
+  "w": "TYS comes from McGhee Tyson Airport, and Knoxville sits by the Great Smoky Mountains."
+ }
+}
