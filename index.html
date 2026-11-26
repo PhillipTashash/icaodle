@@ -24,13 +24,12 @@
   <div id="streak" hidden></div>
   <div id="datebar"><button id="dprev" class="ghost" aria-label="Previous day" title="Earlier day">&#9664;</button><span id="dlabel"></span><button id="dnext" class="ghost" aria-label="Next day" title="Later day">&#9654;</button></div>
   <div id="mcols"><!-- three sections; side by side on wide screens so the whole menu fits without scrolling, one column on phones -->
-  <div class="msec">
+  <div class="msec" id="msDaily">
   <div class="lbl">Daily</div>
-  <button data-m="easy">Normal<small>Major airports</small></button>
-  <button data-m="medium">Hard<small>Regional airline airports</small></button>
-  <button data-m="hard">Extra Hard<small>Small local airports</small></button>
+  <button data-m="easy">Play the daily<small>Five major US airports</small></button>
+  <button type="button" id="harder" class="ghost">Want it harder? Try Custom Game</button>
   </div>
-  <div class="msec">
+  <div class="msec" id="msFriends">
   <div class="lbl">Friends</div>
   <div id="joinrow"><input id="vsCode" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Lobby code" aria-label="Lobby code"><button id="vsJoin">Join</button></div>
   <div id="joinErr" role="alert"></div>
@@ -38,9 +37,9 @@
   </div>
   <div class="msec">
   <div class="lbl">Practice</div>
-  <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
   <button id="customBtn" title="Pick a state and format, just for fun">Custom Game</button>
   <button id="listBtn" title="Build a list of airports you choose, just for fun">Custom List</button>
+  <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
   </div>
   </div>
   <button type="button" id="howBtn" class="ghost">How to play</button>
@@ -119,6 +118,9 @@
   <div id="lbHead"><h3 id="lbTitle"></h3><button type="button" id="lbCopy" class="ghost">Copy invite link</button><span id="lbTip">Copied!</span></div>
   <div id="lbMsg"></div>
   <div id="lbNote" role="status" aria-live="polite"></div>
+  <div id="lbPlayers"></div>
+  <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
+  <!-- the lobby first (who's here, Ready), then the countdown and the game settings, then the last game and the trivia -->
   <div id="startBar" role="timer" hidden><i></i><span></span></div>
   <div id="lbCfg" hidden>
     <div id="lbKind" role="group" aria-label="Game type"><button type="button" data-k="easy" data-tip="Major airports: the big hubs most people have flown through.">Normal</button><button type="button" data-k="medium" data-tip="Regional airline airports, a step down from the big hubs.">Hard</button><button type="button" data-k="hard" data-tip="Small local airports. Tough, even for frequent flyers.">Extra Hard</button><button type="button" data-k="list" data-tip="Pick the airports yourself. Five at random from your list.">List</button><button type="button" data-k="custom" data-tip="Choose a format, a state and a difficulty.">Custom</button><button type="button" data-k="zip" data-tip="Airports near a ZIP code, within the radius you pick.">Zip code</button></div>
@@ -143,8 +145,6 @@
   </div>
   <div id="lbMap" hidden><div id="lbMapCanvas"></div><div id="lbMapNote"></div></div>
   <div id="lbAir" hidden><div id="lbAirTop"><b id="lbAirHead"></b><span id="lbAirAll"><button type="button" id="lbAirSel">Select all</button><button type="button" id="lbAirNone">Deselect all</button></span><span id="lbAirNav" hidden><button type="button" id="lbAirPrev" aria-label="Previous airports">◀</button><span id="lbAirPg"></span><button type="button" id="lbAirNext" aria-label="More airports">▶</button></span></div><div id="lbAirList"></div><div id="lbAirNote"></div></div>
-  <div id="lbPlayers"></div>
-  <div id="lbBtns"><button id="lbReady">Ready</button><button id="lbLeave" class="ghost">Leave</button></div>
   <div id="lbHist" hidden></div>
   <div id="tvBar" role="timer" hidden><i></i><span></span></div>
   <div id="trivia" hidden></div>
@@ -245,7 +245,7 @@ const paintSound=()=>{const on=!SND||SND.enabled;$("mute").textContent=on?"Sound
 // Back-arrow button (left edge of the answer panel): leave to the main menu. Daily progress is saved; a practice game isn't, so that one asks first.
 let ROOM=null; // {code} for a "Play a friend" game
 let LOCAL=null; // {zip,miles} for an "Airports near me" game
-const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:ST=="LIST"?"Custom List":NAME[MODE]+dateTag(); // a Custom List game says so (not "Normal")
+const tag=()=>ROOM?`Game ${ROOM.code}`:LOCAL?`Near ${LOCAL.zip}`:ST=="LIST"?"Custom List":(ST?NAME[MODE]:"Daily")+dateTag(); // a Custom List game says so (not "Normal")
 const dateTag=()=>!PRACTICE&&DAY&&DAY!==TODAY?" · "+dayText(DAY,true):""; // e.g. "Normal · Nov 20 1/5" on an earlier day
 const menuUrl=()=>DAY&&!PRACTICE&&DAY!==TODAY?"/?day="+DAY:"/"; // finishing or leaving an earlier-day game returns to that day on the menu
 // Our own Okay / Cancel popup (instead of the browser's): ask("text") resolves true for Okay, false for Cancel.
@@ -393,7 +393,7 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
   $("diff").value=o.diff||"easy";
   // Address parameters are untrusted: only the known values get through (the server checks them again).
   const goOk=["easy","medium","hard"].includes(p.get("go"))||(p.get("go")=="all"&&!p.get("re")),fmtOk=p.get("fmt")=="city"?"city":"map",stOk=/^[A-Z]{2,3}$/.test(p.get("st")||"")?p.get("st"):"",reOk=Number.isInteger(+p.get("re"))&&+p.get("re")>0&&+p.get("re")<=TODAY;
-  if(goOk){if(p.get("re")&&reOk)PICK=+p.get("re");start(p.get("go"),fmtOk,stOk,undefined,!!p.get("re")&&reOk)}
+  if(goOk){if(p.get("re")&&reOk)PICK=+p.get("re");start(!stOk&&p.get("go")!="all"?"easy":p.get("go"),fmtOk,stOk,undefined,!!p.get("re")&&reOk)} // a daily link is always the one daily now
   if(p.get("near"))$("nearGo").click();
   if(p.get("list")&&Array.isArray(LISTSAVED.codes)&&LISTSAVED.codes.length)playList(LISTSAVED.codes.filter(CODE_OK),LISTSAVED.fmt=="city"?"city":"map",()=>{}); // Play again from a Custom List game
   if(p.get("join")){setCode(p.get("join"));try{$("vsName").value=localStorage.vsName||""}catch{}
@@ -402,6 +402,7 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
       if((seat||p.get("auto"))&&$("vsName").value)vsGo({action:"join",code:getCode()}); // coming back to your seat (or auto=1, the reload that starts a rematch): straight back in
       else openAsk()})}}); // a new visitor to an invite link picks a name first
 document.querySelectorAll("#menu button[data-m]").forEach(b=>b.onclick=()=>start(b.dataset.m,"map","")); // daily: map, all states
+$("harder").onclick=()=>{$("diff").value="medium";$("customBtn").click()}; // Hard and Extra Hard used to be dailies: they're Custom Game difficulties now
 $("customBtn").onclick=()=>{snd("open");$("menu").hidden=true;$("custom").hidden=false};
 $("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidden=false};
 $("customGo").onclick=()=>{try{localStorage.icaoOpts=JSON.stringify({fmt:$("fmt").value,st:$("st").value,diff:$("diff").value})}catch{}start($("diff").value,$("fmt").value,$("st").value||"ALL")}; // a custom game is never the daily set: no state = random airports from any state

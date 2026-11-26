@@ -796,3 +796,60 @@ main:has(#lobby:not([hidden])){justify-content:flex-start}
 #lbHist .rbar[hidden]{display:none}
 @media (prefers-reduced-motion:reduce){#lbHist .rbar{transition:none}}
 @media (max-width:820px){#lbHist .rrow{flex-wrap:nowrap;gap:.6em}#lbHist .rrow button{flex:1}}
+/* ==== Flat and quiet, across the site (the lobby's look): hairline rows instead of cards, text links for secondary actions, one solid button per screen,
+   boxes only for the map and the few things that need a frame. Placed last so it wins over the older card styles above. ==== */
+/* main menu: each choice is a row with a chevron; the section labels stay */
+#menu .msec button,#menu #vsBtn,#menu #customBtn,#menu #nearBtn,#menu #listBtn{display:block;position:relative;width:16em;margin:0 auto;padding:.8em 1.6em .8em .2em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none;box-shadow:none;color:var(--text);font-weight:600;text-align:left}
+#menu .msec button::after{content:"›";position:absolute;right:.3em;top:50%;transform:translateY(-50%);font-size:1.3em;font-weight:400;color:var(--muted);transition:transform .15s,color .15s}
+#menu .msec button:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 6%,transparent);border-color:var(--border);filter:none}
+#menu .msec button:hover:not(:disabled)::after{color:var(--accent);transform:translate(3px,-50%)}
+#menu .msec button small{color:var(--muted);font-size:.85em}
+#menu .msec button.done{box-shadow:none;border-color:var(--border)}
+#menu #customBtn{color:var(--text);font-weight:600}
+#menu .msec .lbl{margin-bottom:.2em}
+/* join by code: a quiet field with Join as an amber text button */
+#menu #joinrow{margin:.2em auto .4em;border-bottom:1px solid var(--field)}
+#menu #joinrow input{border:0;border-radius:0;background:none;padding-left:.2em}
+#menu #joinrow input:focus{border:0;background:none}
+#menu #joinrow:focus-within{border-bottom-color:var(--accent)}
+#menu #joinrow button{padding:.6em .4em;border:0;border-radius:0;background:none;color:var(--accent);font-weight:700}
+#menu #joinrow button::after{content:none}
+/* the first-visit note: a line with an amber edge, not a card */
+#menu #how1{padding:.1em 0 .1em .8em;border:0;border-left:2px solid var(--accent);border-radius:0;background:none}
+#menu #how1 button{padding:.3em 0;border:0;background:none;box-shadow:none;text-decoration:underline;text-underline-offset:3px;color:var(--accent)}
+#menu #how1 #how1x{color:var(--muted)}#menu #how1b{gap:1.2em}
+/* the game: the map is the one framed thing; the airports, guesses, clues and study notes sit on the page */
+#board #menuBack{padding:.3em 0;border:0;background:none;text-align:left;color:var(--muted)}
+#board #menuBack::before{content:"‹ "}
+#board #menuBack:hover:not(:disabled){background:none;color:var(--text)}
+#board #flap{border:0;background:none}
+#board #guesses,#board #cluebox,#board #studybox{padding:.2em 0;border:0;border-radius:0;background:none}
+#board #guesses div,#board #cluebox div{margin:0;padding:.5em .2em;border:0;border-bottom:1px solid var(--border);border-radius:0;background:none}
+#board #guesses div:last-child,#board #cluebox div:last-child{border-bottom:0}
+#game #f{border:0;background:none;box-shadow:none}
+#game #f #skip,#game #f #giveup:not(.armed){padding:.2em .1em;border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+#game #f #skip:hover:not(:disabled){color:var(--text)}
+#game #f #giveup:not(.armed):hover:not(:disabled){color:var(--bad);background:none}
+#game #f #help{border-color:var(--border)}
+/* results: no card around them; Play again is the solid button, the rest are text links (a friend game keeps its big Back to Lobby) */
+#game #stats{border:0;background:none;box-shadow:none}
+#game #stats:not(.friend) #endbtns #again,#game #endbtns #share{border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+#game #stats:not(.friend) #endbtns #again:hover,#game #endbtns #share:hover{color:var(--text);filter:none}
+#board #studybox .stmn{border-style:solid;border-width:0 0 0 2px;border-radius:0}
+@media (max-width:820px){#menu .msec button,#menu #vsBtn,#menu #customBtn,#menu #nearBtn,#menu #listBtn,#menu #joinrow{width:100%}}
+#game #endbtns button{white-space:nowrap}
+#board #studybox .streport{align-self:flex-start;padding:.2em 0;border:0;background:none;box-shadow:none;color:var(--muted);text-decoration:underline;text-underline-offset:3px}#board #studybox .streport:hover{color:var(--text);filter:none}
+@media (max-width:820px){#menu .msec .lbl{width:100%;margin-left:0;margin-right:0;padding-left:.2em;text-align:left}} /* phones: the section labels line up with their rows */
+/* wide screens: Friends on the left, the dailies in the middle, Practice on the right (phones keep the page order: Daily first) */
+@media (min-width:900px){#menu #msFriends{order:-1}} /* (900px: where the three columns sit side by side) */
+/* Daily is the main thing on the menu: bigger rows, brighter label, and the chevrons already amber */
+#menu #msDaily .lbl{font-size:1.1em}
+#menu #msDaily button{font-size:1.12em;padding-top:.95em;padding-bottom:.95em}
+#menu #msDaily button::after{color:var(--accent)}
+#menu #msDaily button:first-of-type{background:color-mix(in srgb,var(--accent) 7%,transparent);box-shadow:inset 2px 0 0 var(--accent);padding-left:.6em}
+/* one daily: a single big button, with a quiet link to the harder airports in Custom Game */
+#menu #msDaily button[data-m]{font-size:1.25em;padding:1.1em 1.6em 1.1em .7em}
+#menu #msDaily #harder{display:block;width:16em;margin:.5em auto 0;padding:.3em .2em;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:400;text-align:left;text-decoration:underline;text-underline-offset:3px}
+#menu #msDaily #harder::after{content:none}
+#menu #msDaily #harder:hover{background:none;color:var(--text)}
+@media (max-width:820px){#menu #msDaily #harder{width:100%}}
