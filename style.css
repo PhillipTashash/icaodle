@@ -948,7 +948,7 @@ footer:has(#fbInline:not([hidden])) #howBtn{display:none}
 /* the round clock: drains over the minute; the three marks are when the clues unlock */
 #duClock{position:relative;height:6px;margin-bottom:1em;border-radius:3px;background:var(--surface-2);overflow:hidden}
 #duClock i{position:absolute;inset:0 auto 0 0;width:0;background:var(--amber);border-radius:3px}
-#duClock::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent calc(16.67% - 1px),var(--bg) 0 calc(16.67% + 1px),transparent 0 calc(75% - 1px),var(--bg) 0 calc(75% + 1px),transparent 0)} /* marks: the state at 10 s, the name at 45 s */
+#duClock::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent calc(16.67% - 1px),var(--bg) 0 calc(16.67% + 1px),transparent 0 calc(50% - 1px),var(--bg) 0 calc(50% + 1px),transparent 0 calc(75% - 1px),var(--bg) 0 calc(75% + 1px),transparent 0)} /* marks: the state at 10 s, the city at 30 s, the name at 45 s */
 #duBoard{display:grid;grid-template-columns:minmax(9em,1fr) minmax(0,2.6fr) minmax(9em,1fr);gap:1.4em;align-items:start}
 .duSide{display:flex;flex-direction:column;align-items:center;gap:.5em;min-width:0;transition:opacity .3s}
 .duSide.off{opacity:.45}
@@ -986,14 +986,14 @@ footer:has(#fbInline:not([hidden])) #howBtn{display:none}
 @keyframes ducool{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 #duMsg{min-height:1.4em;margin-top:.3em;color:var(--bad);font-size:.85em;text-align:center}
 /* the locator map: borders, then the state filled in while it zooms toward the spot, then the dot and the full name */
-#duClues{margin:.5em auto 0;max-width:20em} /* under the answer box, never over the photo */
+#duClues{margin:.5em auto 0;max-width:26em} /* under the answer box, never over the photo */
 #duClues[hidden]{display:none}
-#duLoc{display:block;width:100%;height:auto;border-radius:8px;background:var(--surface-2);overflow:hidden}
-#duLoc .duLocAll{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-linecap:round;opacity:.45} /* every airport, as in the lobby's round maps */
-#duLoc .duLocBase{fill:none;stroke:var(--field);stroke-width:.5;vector-effect:non-scaling-stroke}
-#duLoc .duLocState{fill:var(--amber);fill-opacity:0;stroke:var(--amber);stroke-width:1;vector-effect:non-scaling-stroke;transition:fill-opacity .6s}
-#duLoc .duLocState.on{fill-opacity:.22}
-#duLoc .duLocDot{fill:var(--bad);opacity:0;transition:opacity .6s}
+#duLoc{display:block;width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg);overflow:hidden} /* the round maps' look */
+#duLoc .duLocAll{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linecap:round;opacity:.45} /* every airport, as in the lobby's round maps */
+#duLoc .duLocBase{fill:none;stroke:var(--muted);stroke-width:.6;stroke-linejoin:round;stroke-linecap:round;opacity:.4}
+#duLoc .duLocState{fill:var(--amber);fill-opacity:0;stroke:var(--amber);stroke-width:.8;stroke-opacity:.7;stroke-linejoin:round;transition:fill-opacity .6s}
+#duLoc .duLocState.on{fill-opacity:.1}
+#duLoc .duLocDot{fill:var(--accent);opacity:0;transition:opacity .6s} /* the answer: the round maps' solid amber dot */
 #duLoc .duLocDot.on{opacity:1}
 #duClues .duLocName{min-height:0;margin-top:.3em;font-size:.85em;line-height:1.25;text-align:center;font-weight:700;opacity:0;transition:opacity .6s}
 #duClues .duLocName.on{opacity:1}
@@ -1005,3 +1005,77 @@ footer:has(#fbInline:not([hidden])) #howBtn{display:none}
   .duIcon{width:3.6rem;height:3.6rem;font-size:1.6rem}
 }
 @media (prefers-reduced-motion:reduce){.duIcon.ping,.duGs li.new,#duBanner.show,#duBanner .duBig{animation:none}}
+/* ==== Duel, up to 5: points, the other players' column, the lock, the leaderboard ==== */
+.duPts{color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+#duMe .duPts{color:var(--amber);font-size:1.15em}
+#duOpps{display:flex;flex-direction:column;gap:.6em;min-width:0}
+.duOpp{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.6em;align-items:start;padding:.5em .6em;border:1px solid var(--border);border-radius:10px;transition:opacity .3s,border-color .3s}
+.duOpp.off{opacity:.45}
+.duOpp.solved{border-color:var(--ok)}
+.duOpp .duIcon{width:2.6rem;height:2.6rem;font-size:1.2rem}
+.duOppInfo{min-width:0;text-align:left}
+.duOpp .duName{font-size:.95em}
+.duOpp .duName small{color:var(--muted);font-weight:400}
+.duOpp .duPts{font-size:.85em}
+.duOpp .duGs{margin-top:.15em;font-size:.78em}
+.duOpp .duGs li{padding:.15em 0;border-bottom:0;text-align:left}
+.duNone{margin:.4em 0;color:var(--muted);text-align:center}
+/* the code hint: K _ _ _ as small tiles, letters flip in */
+#duHint{display:flex;justify-content:center;gap:.35em;margin-top:.7em}
+#duHint[hidden]{display:none}
+#duHint span{display:grid;place-items:center;width:1.9em;height:2.2em;border-radius:6px;background:var(--surface-2);font:800 1.15em ui-monospace,Consolas,monospace;color:var(--amber)}
+#duHint span.blank{background:none;border:1px dashed var(--border)}
+#duHint span.pop{animation:tileflip .35s ease-out}
+/* misses on the mini map: rings in the player's color (the round maps' guess markers), each with an arrow toward the answer */
+#duLoc .duLocGs path{fill:none;stroke:var(--pc);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+#duLoc .duLocGs circle{fill:var(--bg);stroke:var(--pc)}
+#duClues .duLocName b{display:block}
+#duClues .duLocName span{color:var(--muted);font-weight:600}
+#duDone{display:flex;flex-direction:column;align-items:center;gap:.2em;margin-top:.9em;font-size:1.05em}
+#duDone[hidden]{display:none}
+#duDone span{color:var(--muted);font-size:.9em}
+/* the lock: a second try within 3 s turns the button red with a countdown, and the box shakes */
+#duF #duGo.locked{background:var(--bad);border-color:var(--bad);color:var(--ink-0);font-variant-numeric:tabular-nums}
+#duF.shake{animation:dushake .4s}
+#duF.shake #duG{border-color:var(--bad)}
+@keyframes dushake{15%,55%{transform:translateX(-7px)}35%,75%{transform:translateX(7px)}}
+#duMsg{font-weight:700}
+#duWaitBtns{display:flex;gap:.6em;flex-wrap:wrap;justify-content:center}
+#duWaitTxt{text-align:center}
+/* the answer and who got it, over the map between rounds */
+#duBanner .duGot{display:flex;flex-wrap:wrap;justify-content:center;gap:.3em .9em;margin-top:.5em;font-weight:700}
+#duBanner .duGot i{display:inline-block;width:.6em;height:.6em;margin-right:.35em;border-radius:50%;background:var(--pc)}
+/* the leaderboard at the end */
+#duBoardDlg{width:min(36em,94vw);padding:1.2em 1.4em;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text)}
+#duBoardDlg::backdrop{background:rgba(0,0,0,.6)}
+#duBoardDlg>p{margin:0 0 .8em;font-size:1.35rem;text-align:center}
+#duRanks{margin:0 0 1.1em;padding:0;list-style:none}
+#duRanks li{display:grid;grid-template-columns:1.6em auto minmax(0,1fr) auto auto;gap:.6em;align-items:center;padding:.5em .4em;border-bottom:1px solid var(--border);animation:podfade .4s backwards}
+#duRanks li:nth-child(2){animation-delay:.12s}#duRanks li:nth-child(3){animation-delay:.24s}#duRanks li:nth-child(4){animation-delay:.36s}#duRanks li:nth-child(5){animation-delay:.48s}
+#duRanks li.win{border-radius:8px;background:color-mix(in srgb,var(--amber) 12%,transparent)}
+#duRanks .duIcon{width:2rem;height:2rem;font-size:1rem}
+#duRanks .duRank{font-weight:800;color:var(--muted);text-align:center}
+#duRanks li.win .duRank{color:var(--amber)}
+#duRanks .duRName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+#duRanks .duRName small{color:var(--muted);font-weight:400}
+#duRanks li.me .duRName{font-weight:800}
+#duRanks .duRPer{display:flex;gap:.25em;font:.72em ui-monospace,Consolas,monospace;color:var(--muted)}
+#duRanks .duRPer i{min-width:2.7em;font-style:normal;text-align:right}
+#duRanks .duRTot{min-width:3.4em;font:800 1.2em ui-monospace,Consolas,monospace;color:var(--amber);text-align:right}
+#duBoardBtns{display:flex;gap:.6em;justify-content:center}
+@media (max-width:820px){#duRanks .duRPer{display:none}#duRanks li{grid-template-columns:1.6em auto minmax(0,1fr) auto}}
+@media (prefers-reduced-motion:reduce){#duF.shake,#duRanks li{animation:none}}
+/* everyone's misses on the mini map; the five labelled airports it zooms to at 30 s */
+#duLoc .duLocGs .opp{opacity:.75}
+#duLoc .duLocNear circle{fill:var(--bg);stroke:var(--text)}
+#duLoc .duLocNear text{fill:var(--text);font-family:ui-monospace,Consolas,monospace;font-weight:700;paint-order:stroke;stroke:var(--bg);stroke-linejoin:round}
+#duLoc .duLocNear .ans circle{fill:var(--accent);stroke:var(--accent)}#duLoc .duLocNear .ans text{fill:var(--accent)}
+#duLoc .duLocNear g{animation:hfade .35s .3s backwards}
+/* reactions: small buttons under your points; the emoji floats up from the sender's icon */
+#duReact{display:flex;justify-content:center;gap:.1em}
+#duReact button{min-height:0;padding:.15em .3em;border:0;background:none;box-shadow:none;font-size:1.15em;line-height:1;transition:transform .12s}
+#duReact button:hover:not(:disabled){background:none;transform:scale(1.25);filter:none}
+#duReact button:active{transform:scale(.9)}
+.duPop{position:fixed;z-index:50;font-size:1.9rem;pointer-events:none;animation:dupop 1.6s ease-out forwards}
+@keyframes dupop{0%{transform:translate(-50%,0) scale(.4);opacity:0}15%{transform:translate(-50%,-.5em) scale(1.2);opacity:1}100%{transform:translate(-50%,-2.6em) scale(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){#duLoc .duLocNear g{animation:none}.duPop{animation-duration:.01s}}

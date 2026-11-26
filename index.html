@@ -34,7 +34,7 @@
   <div id="joinrow"><input id="vsCode" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Lobby code" aria-label="Lobby code"><button id="vsJoin">Join</button></div>
   <div id="joinErr" role="alert"></div>
   <button id="vsBtn" title="Same five airports as a friend, with a 4-letter join code">Start Lobby</button>
-  <button id="duelBtn" title="Head to head with one friend: the first right answer takes the point, first to 5 wins">1v1 Duel</button>
+  <button id="duelBtn" title="Up to 5 players race to name the same airport: the faster you get it, the more points">Duel<small>Up to 5 players</small></button>
   </div>
   <div class="msec">
   <div class="lbl">Practice</div>
@@ -180,24 +180,30 @@
   </div>
   <div><button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button></div>
 </div>
-<!-- 1v1 duel: you on the left, the airport in the middle, your opponent on the right; each side lists that player's guesses -->
+<!-- Duel (up to 5): you on the left, the airport in the middle, everyone else down the right; each lists that player's guesses this round -->
 <div id="duel" hidden>
   <div id="duTop"><button id="duBack" type="button">Main Menu</button><span id="duRound"></span><span id="duTime"></span></div>
   <div id="duClock" aria-hidden="true"><i></i></div>
   <div id="duBoard">
-    <div class="duSide" id="duMe"><div class="duIcon" aria-hidden="true"></div><div class="duName"></div><div class="duPips"></div><ol class="duGs" aria-label="Your guesses"></ol></div>
+    <div class="duSide" id="duMe"><div class="duIcon" aria-hidden="true"></div><div class="duName"></div><div class="duPts"></div><div id="duReact" role="group" aria-label="Send a reaction"></div><ol class="duGs" aria-label="Your guesses"></ol></div>
     <div id="duMid">
       <div id="duStage"><div id="duMap" role="region" aria-label="Satellite map of the mystery airport"></div>
-        <div id="duWait" hidden><p>Waiting for your opponent</p><div id="duCode"></div><button id="duCopy" type="button">Copy invite link</button></div>
+        <div id="duWait" hidden><p id="duWaitTxt"></p><div id="duCode"></div><div id="duWaitBtns"><button id="duCopy" type="button" class="ghost">Copy invite link</button><button id="duStart" type="button">Start</button></div></div>
         <div id="duBanner" role="status" aria-live="polite"></div></div>
+      <div id="duHint" role="img"></div>
       <form id="duF"><input id="duG" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ICAO" aria-label="Airport code, with or without the K, for example KLAX or LAX"><button id="duGo">Submit</button></form>
+      <div id="duDone" hidden></div>
       <div id="duMsg" role="alert"></div>
-      <div id="duClues"><svg id="duLoc" viewBox="0 0 240 144" aria-hidden="true"><path class="duLocAll"/><path class="duLocBase"/><path class="duLocState"/><circle class="duLocDot" r="2.2"/></svg><div class="duLocName"></div></div>
-      <div id="duEnd" hidden><button id="duAgain" type="button">Rematch</button></div>
+      <div id="duClues"><svg id="duLoc" viewBox="0 0 240 144" aria-hidden="true"><path class="duLocAll"/><path class="duLocBase"/><path class="duLocState"/><g class="duLocNear"></g><g class="duLocGs"></g><circle class="duLocDot" r="2.2"/></svg><div class="duLocName"></div></div>
     </div>
-    <div class="duSide" id="duOpp"><div class="duIcon" aria-hidden="true"></div><div class="duName"></div><div class="duPips"></div><ol class="duGs" aria-label="Your opponent's guesses"></ol></div>
+    <div id="duOpps" aria-label="The other players"></div>
   </div>
 </div>
+<dialog id="duBoardDlg" aria-labelledby="duBoardTitle">
+  <p><b id="duBoardTitle">Final standings</b></p>
+  <ol id="duRanks"></ol>
+  <div id="duBoardBtns"><button id="duAgain" type="button">Play again</button><button id="duMenu" type="button" class="ghost">Main Menu</button></div>
+</dialog>
 <div id="game" hidden>
   <div id="vsTimer" hidden></div>
   <div id="board"><div id="lcol"><button id="menuBack" type="button" title="Back to the main menu">Main Menu</button><div id="flap"></div>
@@ -515,7 +521,7 @@ async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr
   try{localStorage.vsName=name}catch{}
   vsErr("Working…");VSBUSY=true;try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){if(e&&e.duel){VSBUSY=false;return duelGo({action:"join",code:o.code})}if(e&&e.status==404&&o.action=="join")history.replaceState(null,"","/"); /* that lobby is gone: don't leave its link in the address bar */ const m=(e&&e.error)||"Couldn't reach the server. Try again.";vsErr(m);if(!VS.open&&!$("ask").open)ask(m,"Okay","Couldn't join",true)}VSBUSY=false} // a rematch rejoin (auto=1) has no popup open: say why it failed instead of sitting silently on the menu
 $("vsCreate").onclick=()=>DUNEW?duelGo({action:"create"}):vsGo({action:"create",code:null});
-$("duelBtn").onclick=()=>{$("vsBtn").onclick();DUNEW=true;$("vsTitle").textContent="Start a 1v1 duel"};
+$("duelBtn").onclick=()=>{$("vsBtn").onclick();DUNEW=true;$("vsTitle").textContent="Start a duel"};
 $("vsJoin").onclick=()=>{if(getCode().length!=4)return $("joinErr").textContent="Enter the 4-letter code.";openAsk()};
 function openAsk(){let n="";try{n=localStorage.vsName||""}catch{}$("askName").value=n||fakeName();$("askCode").textContent=getCode();vsErr("");$("ask").showModal();$("askName").select()}
 // The lobby code field on the menu: letters only, uppercase. Join asks for a name in the small popup, then joins.
@@ -563,8 +569,8 @@ $("lbLeave").onclick=async()=>{await vsLeave();location.href="/"};
 addEventListener("pagehide",()=>{if(ROOM&&(!INGAME||FINAL)&&VSD&&VSD.phase!="playing")navigator.sendBeacon("/api/room",JSON.stringify({id:vsId(),code:ROOM.code,action:"away"}))}); // "away", not "leave": a reload is back before the seat goes
 function enterLobby(d){holdSeat(vsId());history.replaceState(null,"","/?join="+encodeURIComponent(d.code)); // the address bar is the invite link, and reloading it brings you back
   $("menu").hidden=$("custom").hidden=true;$("lobby").hidden=false;sky.stop();snd("open");vsHandle(d);pollLoop()}
-// ==== 1v1 duel (the rules and abuse guards are described in server.js). The server checks every guess; this page shows what it says. ====
-let DUNEW=false,DUEL=null,DUD=null,DMAP=null,DUT=0,DUEND=0,DUC="",DUK="",DUSEEN={n:-1,mine:0,theirs:0,state:false,name:false},DUSAYT=0,COOLING=0,DURAF=0,DUSEC=-1,DULN=-1,DULV=null;
+// ==== Duel, up to 5 players (the rules and abuse guards are described in server.js). The server checks every guess; this page shows what it says. ====
+let DUNEW=false,DUEL=null,DUD=null,DMAP=null,DUT=0,DUEND=0,DUC="",DUK="",DUSEEN={n:-1,mine:0,g:{},solved:{},state:false,name:false},DUSAYT=0,COOLEND=0,DURAF=0,DUSEC=-1,DULN=-1,DUBOARD="",DUHINT="";
 const duPost=o=>fetch("/api/duel",{method:"POST",body:JSON.stringify({id:vsId(),code:DUEL&&DUEL.code,...o})}).then(async r=>{const d=await r.json();if(!r.ok){d.status=r.status;throw d}return d});
 async function duelGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");if(VSBUSY)return;
   try{localStorage.vsName=name}catch{}
@@ -578,85 +584,166 @@ function enterDuel(d){DUEL={code:d.code};holdSeat(vsId()); // the seat lets a re
   $("menu").hidden=$("custom").hidden=true;$("duel").hidden=false;sky.stop();snd("open");
   if(!DOTS)fetch("/api/dots?v=3").then(r=>r.json()).then(d=>DOTS=d).catch(()=>{}); // the locator map's borders and per-state shapes
   duShow(d);duLoop();duTick()}
-// Checks in about once a second during a round (so the other player's guesses show up quickly), a little slower otherwise.
+// Checks in about once a second during a round (so everyone's guesses show up quickly), a little slower otherwise.
 function duLoop(){clearTimeout(DUT);if(!DUEL)return;DUT=setTimeout(async()=>{await duPoll();duLoop()},DUD&&DUD.phase=="round"?700:1200)}
 async function duPoll(){if(!DUEL)return;try{duShow(await duPost({action:"sync"}))}catch(e){if(e&&(e.status==404||e.status==410))duGone(e.error)}}
-function duGone(m){DUEL=null;seatDrop();history.replaceState(null,"","/");$("tmoTitle").textContent="Duel over";$("tmoText").textContent=m||"That duel is over.";$("tmo").showModal()}
+function duGone(m){DUEL=null;seatDrop();history.replaceState(null,"","/");$("duBoardDlg").open&&$("duBoardDlg").close();$("tmoTitle").textContent="Duel over";$("tmoText").textContent=m||"That duel is over.";$("tmo").showModal()}
 const duSay=m=>{$("duMsg").textContent=m;clearTimeout(DUSAYT);DUSAYT=setTimeout(()=>$("duMsg").textContent="",2600)};
-// The clock bar and the countdown run from the time the server gave, between check-ins.
-function duTick(){cancelAnimationFrame(DURAF);if(!DUEL)return;const d=DUD,left=Math.max(0,DUEND-performance.now());
-  if(d&&d.phase=="round"){$("duClock").firstChild.style.width=(left/d.rms*100)+"%";const s=Math.ceil(left/1000);$("duTime").textContent="0:"+String(s).padStart(2,"0");$("duTime").classList.toggle("low",s<=10)}
+// Every frame: the clock bar, the time and what the airport is worth, the countdown, the lock on the Submit button, and the locator zoom.
+function duTick(){cancelAnimationFrame(DURAF);if(!DUEL)return;const d=DUD,now=performance.now(),left=Math.max(0,DUEND-now);
+  if(d&&d.phase=="round"){$("duClock").firstChild.style.width=(left/d.rms*100)+"%";const s=Math.ceil(left/1000);$("duTime").textContent="0:"+String(s).padStart(2,"0");$("duTime").classList.toggle("low",s<=10);
+}
   else{$("duTime").textContent="";if(d&&d.phase!="pause")$("duClock").firstChild.style.width="0"}
   if(d&&d.phase=="cd"){const s=Math.max(1,Math.ceil(left/1000));if(s!=DUSEC){DUSEC=s;$("duBanner").innerHTML=`<span class="duBig">${s}</span>`;snd("tick")}}
-  if(d&&d.round&&DULV)duZoom(d,left);
+  duPaint(d,now);
   DURAF=requestAnimationFrame(duTick)}
-// One frame of the locator zoom: how far the round is between stateAt and zoomEnd picks the viewBox. The airport dots and the answer dot are resized
-// with it, so they stay the same size on screen while the map zooms.
-function duZoom(d,left){const el=d.phase=="round"?d.rms-left:d.round.el,t=Math.min(1,Math.max(0,(el-d.stateAt)/(d.zoomEnd-d.stateAt))),e=t<.5?2*t*t:1-(-2*t+2)**2/2;
-  const [a,b]=DULV,v=a.map((x,i)=>x+(b[i]-x)*(matchMedia("(prefers-reduced-motion: reduce)").matches?1:e)),k=v[2]/240,box=$("duClues");
-  box.querySelector("#duLoc").setAttribute("viewBox",v.map(n=>n.toFixed(2)).join(" "));box.querySelector(".duLocAll").style.strokeWidth=(1.5*k).toFixed(3);box.querySelector(".duLocDot").setAttribute("r",(2.4*k).toFixed(3))}
+// The lock on the Submit button (red, with the seconds left). Drawn every frame, and also on every check-in.
+function duPaint(d,now){
+  const b=$("duGo"),lock=COOLEND-now;
+  if(lock>0){b.classList.add("locked");b.innerHTML=`<span aria-hidden="true">🔒</span> ${(lock/1000).toFixed(1)}s`;b.setAttribute("aria-label","Locked for "+Math.ceil(lock/1000)+" seconds")}
+  else if(b.classList.contains("locked")){b.classList.remove("locked");b.textContent="Submit";b.removeAttribute("aria-label")}}
+// The mini map's markers: every miss as a dot with a short arrow toward the answer (yours bigger, orange if hot and blue if cold; everyone else's
+// smaller, in their color). The map isn't to scale (a degree of longitude is drawn narrower than a degree of latitude, and narrower still in real
+// miles further north), so the true bearing is turned into the map's own direction; and the arrow stops short of the airport when the guess was close.
+const duXY=(D,lat,lon)=>[(lon-D.lon0)/(D.lon1-D.lon0)*D.w,(D.lat1-lat)/(D.lat1-D.lat0)*D.h];
+function duMiss(D,x,cls,big,k){const [px,py]=duXY(D,x.lat,x.lon),rad=x.deg*Math.PI/180,cl=Math.cos(x.lat*Math.PI/180),sx=D.w/(D.lon1-D.lon0),sy=D.h/(D.lat1-D.lat0);
+  const ex0=Math.sin(rad)*x.mi/69/cl*sx,ey0=-Math.cos(rad)*x.mi/69*sy,far=Math.hypot(ex0,ey0)||1,ux=ex0/far,uy=ey0/far; // where the answer is from here, on the map
+  const L=Math.min((big?18:12)*k,far*.75),h=Math.min((big?5:3.6)*k,L*.45),ex=px+ux*L,ey=py+uy*L,a=Math.atan2(uy,ux),f=n=>n.toFixed(3);
+  const hd=[a+2.6,a-2.6].map(t=>`${f(ex+Math.cos(t)*h)} ${f(ey+Math.sin(t)*h)}`);
+  return `<g class="${cls}"><path d="M${f(px)} ${f(py)}L${f(ex)} ${f(ey)}M${hd[0]}L${f(ex)} ${f(ey)}L${hd[1]}"/><circle cx="${f(px)}" cy="${f(py)}" r="${f((big?3.2:2.6)*k)}" stroke-width="${f((big?1.4:1.2)*k)}"/></g>`}
+function duLocGs(d){const D=DOTS,g=$("duClues").querySelector(".duLocGs");if(!D||!g||!d)return;const k=DUVK,ps=d.players||[];
+  const theirs=ps.filter(p=>!p.me).flatMap(p=>(p.guesses||[]).filter(x=>x.lat!=null).map(x=>duMiss(D,{mi:4000,...x},"opp pc"+p.c,false,k))),
+    me=ps.find(p=>p.me)||{},mine=(me.guesses||[]).filter(x=>!x.ok&&x.lat!=null).map(x=>duMiss(D,x,"mine pc"+(me.c??0),true,k));
+  g.innerHTML=theirs.join("")+mine.join("")}
+// The mini map's view. Sizes (dots, rings, labels, the answer dot) are set from the zoom so they stay the same on screen. Sizes below are in on-screen units
+// of the whole-country map: DUF is the label size, DUR the airport ring.
+let DUVB=null,DUVT=null,DUVK=1;const DUF=11,DUR=2.6;
+function duView(v){const D=DOTS,box=$("duClues"),k=v[2]/D.w,f=n=>(n*k).toFixed(4);DUVB=v;DUVK=k;$("duLoc").setAttribute("viewBox",v.map(n=>n.toFixed(3)).join(" "));
+  box.querySelector(".duLocAll").style.strokeWidth=f(1.4);box.querySelector(".duLocBase").style.strokeWidth=f(.6);box.querySelector(".duLocState").style.strokeWidth=f(.8);
+  const dot=box.querySelector(".duLocDot");dot.setAttribute("r",f(2.6));
+  box.querySelectorAll(".duLocNear circle").forEach(e=>{e.setAttribute("r",f(DUR));e.setAttribute("stroke-width",f(1.2))});
+  box.querySelectorAll(".duLocNear text").forEach(e=>{const o=e.dataset.o,a=o=="left"?"end":o=="right"?"start":"middle",dx=o=="right"?DUR+1.8:o=="left"?-(DUR+1.8):0,dy=o=="above"?-(DUR+1.8):o=="below"?DUR+1.8+DUF*.8:DUF*.35;
+    e.setAttribute("font-size",f(DUF));e.setAttribute("dx",f(dx));e.setAttribute("dy",f(dy));e.setAttribute("text-anchor",a);e.setAttribute("stroke-width",f(2.6))})}
+// Zooms from where the map is to the target view: an even zoom (each step the same factor) eased in and out, the center sliding with it.
+function duSnap(to){const from=DUVB.slice(),t0=performance.now(),T=matchMedia("(prefers-reduced-motion: reduce)").matches?0:1500;DUVT=to;
+  const at=t=>{const e=easeIO(t),w=Math.exp(Math.log(from[2])+(Math.log(to[2])-Math.log(from[2]))*e),h=w*from[3]/from[2],cx=from[0]+from[2]/2+((to[0]+to[2]/2)-(from[0]+from[2]/2))*e,cy=from[1]+from[3]/2+((to[1]+to[3]/2)-(from[1]+from[3]/2))*e;return [cx-w/2,cy-h/2,w,h]};
+  const step=now=>{if(DUVT!==to)return;const t=T?Math.min(1,(now-t0)/T):1;duView(at(t));duLocGs(DUD);if(t<1)requestAnimationFrame(step)};requestAnimationFrame(step);
+  setTimeout(()=>{if(DUVT===to){duView(to);duLocGs(DUD)}},T+250)} // lands even if animation frames are paused
+// Where each airport's label goes: the first of right, left, above and below that doesn't cover another label or ring (worked out at the final zoom).
+function duPlace(pts,k){const taken=pts.map(q=>[q[1]/k-DUR-1,q[2]/k-DUR-1,q[1]/k+DUR+1,q[2]/k+DUR+1]),free=b=>!taken.some(o=>b[0]<o[2]&&b[2]>o[0]&&b[1]<o[3]&&b[3]>o[1]);
+  return pts.map(q=>{const x=q[1]/k,y=q[2]/k,w=q[0].length*DUF*.62,h=DUF,g=DUR+1.8;
+    const box={right:[x+g,y-h*.45,x+g+w,y+h*.45],left:[x-g-w,y-h*.45,x-g,y+h*.45],above:[x-w/2,y-g-h,x+w/2,y-g],below:[x-w/2,y+g,x+w/2,y+g+h]};
+    for(const o of ["right","left","above","below"])if(free(box[o])){taken.push(box[o]);return o}
+    return "right"})}
 async function duMap(d){const r=d.round;if(!r)return;
   if(!DMAP){try{await loadMaps()}catch{$("duMap").textContent="The map couldn't load.";return}
-    DMAP||=new google.maps.Map($("duMap"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:r.lat,lng:r.lon},zoom:r.z});DUC=DUK=""}
-  const B=.03,clue=r.state!=null,ck=d.n+d.phase,kk=d.n+":"+clue; // like the normal game: once the state is known you may zoom out and the map gains road names
-  if(kk!=DUK){DUK=kk;DMAP.setOptions({minZoom:clue?10:r.z-1,maxZoom:Math.min(20,r.z+3),restriction:{latLngBounds:{north:r.lat+B,south:r.lat-B,east:r.lon+B,west:r.lon-B}}});DMAP.setMapTypeId(clue?"hybrid":"satellite")}
-  if(ck!=DUC){DUC=ck;DMAP.setCenter({lat:r.lat,lng:r.lon});if(d.phase=="round")DMAP.setZoom(r.z)}} // a new round, and the reveal (the true spot)
-// The locator map under the answer box: the USA with its state borders and every airport as a small dot; once the state is named it fills in and the
-// map zooms until zoomEnd to fit that whole state; at nameAt the airport's full name fades in with a dot on it. Built once per round.
-function duLocator(d){const r=d.round,box=$("duClues"),svg=$("duLoc"),st=box.querySelector(".duLocState"),dot=box.querySelector(".duLocDot"),nm=box.querySelector(".duLocName");
+    DMAP||=new google.maps.Map($("duMap"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]},{featureType:"administrative.locality",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:r.lat,lng:r.lon},zoom:r.z-1});DUC=DUK=""}
+  // easier than the normal game: labelled (road and town names, never the airport's own) and a step further out from the start; once the state is known you may zoom out more
+  const B=.03,clue=r.state!=null,ck=d.n+d.phase,kk=d.n+":"+clue;
+  if(kk!=DUK){DUK=kk;DMAP.setOptions({minZoom:clue?10:r.z-2,maxZoom:Math.min(20,r.z+3),restriction:{latLngBounds:{north:r.lat+B,south:r.lat-B,east:r.lon+B,west:r.lon-B}}});DMAP.setMapTypeId("hybrid")}
+  if(ck!=DUC){DUC=ck;DMAP.setCenter({lat:r.lat,lng:r.lon});if(d.phase=="round")DMAP.setZoom(r.z-1)}} // a new round, and the reveal (the true spot)
+// The locator map under the answer box: the whole USA with its state borders and every airport as a small dot, plus everyone's misses with arrows
+// toward the answer. Once the state is named it fills in; at cityAt the city appears under the map and the map snaps in to five airports around it
+// (the answer and its four nearest), each labelled with its code; at nameAt the airport's full name appears with a dot on it. Built once per round.
+function duLocator(d){const r=d.round,box=$("duClues"),st=box.querySelector(".duLocState"),dot=box.querySelector(".duLocDot"),nm=box.querySelector(".duLocName"),nr=box.querySelector(".duLocNear");
   box.hidden=!r;if(!r||!DOTS)return;const D=DOTS;
-  if(DULN!=d.n){DULN=d.n;DULV=null;box.querySelector(".duLocAll").setAttribute("d",D.d||"");box.querySelector(".duLocAll").style.strokeWidth="";box.querySelector(".duLocBase").setAttribute("d",D.b||"");
-    svg.setAttribute("viewBox",`0 0 ${D.w} ${D.h}`);st.setAttribute("d","");st.classList.remove("on");dot.classList.remove("on");dot.setAttribute("r","2.4");nm.classList.remove("on");nm.textContent=""}
-  if(r.state&&!st.classList.contains("on")){st.setAttribute("d",(D.states||{})[r.state]||"");st.classList.add("on");
-    const bb=st.getBBox(),pad=Math.max(bb.width,bb.height)*.12+2,A=D.w/D.h;let w=bb.width+2*pad,h=bb.height+2*pad;if(w/h>A)h=w/A;else w=h*A; // the state's box, padded, at the map's shape
-    if(bb.width)DULV=[[0,0,D.w,D.h],[bb.x+bb.width/2-w/2,bb.y+bb.height/2-h/2,w,h]]}
-  if(r.name&&!nm.classList.contains("on")){dot.setAttribute("cx",((r.lon-D.lon0)/(D.lon1-D.lon0)*D.w).toFixed(2));dot.setAttribute("cy",((D.lat1-r.lat)/(D.lat1-D.lat0)*D.h).toFixed(2));dot.classList.add("on");nm.textContent=r.name;nm.classList.add("on")}
-  if(DULV)duZoom(d,d.left||0)} // also on every check-in, in case animation frames are paused
+  if(DULN!=d.n){DULN=d.n;DUVT=null;box.querySelector(".duLocAll").setAttribute("d",D.d||"");box.querySelector(".duLocBase").setAttribute("d",D.b||"");nr.innerHTML="";
+    st.setAttribute("d","");st.classList.remove("on");dot.classList.remove("on");nm.classList.remove("on");nm.textContent="";nm.dataset.k="";duView([0,0,D.w,D.h])}
+  if(r.state&&!st.classList.contains("on")){st.setAttribute("d",(D.states||{})[r.state]||"");st.classList.add("on")}
+  if(r.near&&!DUVT){const pts=r.near.map(a=>[a[0],...duXY(D,a[1],a[2])]),xs=pts.map(q=>q[1]),ys=pts.map(q=>q[2]),A=D.w/D.h;
+    let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);const pad=Math.max(x1-x0,y1-y0)*.3+.6;x0-=pad*1.6;x1+=pad*1.6;y0-=pad;y1+=pad; // room around for the labels
+    let w=x1-x0,h=y1-y0;if(w/h>A){const n=w/A;y0-=(n-h)/2;h=n}else{const n=h*A;x0-=(n-w)/2;w=n}
+    const spots=duPlace(pts,w/D.w);
+    nr.innerHTML=pts.map((q,i)=>`<g data-code="${esc(q[0])}"><circle cx="${q[1].toFixed(3)}" cy="${q[2].toFixed(3)}"/><text x="${q[1].toFixed(3)}" y="${q[2].toFixed(3)}" data-o="${spots[i]}">${esc(q[0])}</text></g>`).join("");
+    duView(DUVB);duSnap([x0,y0,w,h])}
+  const nk=r.name?"n":r.city?"c":""; // under the map: "Denver, CO" once the city is given, then the airport's full name on top of it
+  if(nk&&nm.dataset.k!=nk){nm.dataset.k=nk;nm.innerHTML=(r.name?`<b>${esc(r.name)}</b>`:"")+`<span>${esc(r.city)}, ${esc(r.state)}</span>`;nm.classList.remove("on");void nm.offsetWidth;nm.classList.add("on")}
+  if(r.name&&!dot.classList.contains("on")){const [x,y]=duXY(D,r.lat,r.lon);dot.setAttribute("cx",x.toFixed(3));dot.setAttribute("cy",y.toFixed(3));dot.classList.add("on");
+    if(r.near){const ans=r.near.slice().sort((a,b)=>Math.hypot(a[1]-r.lat,a[2]-r.lon)-Math.hypot(b[1]-r.lat,b[2]-r.lon))[0];const g=nr.querySelector(`[data-code="${ans[0]}"]`);if(g)g.classList.add("ans")}}
+  duLocGs(d)}
+// The code, one letter at a time (K _ _ _, then a letter at each of the times the server gives). A newly shown letter makes a ding.
+function duHelp(d,same,on){const r=d.round,h=r&&r.hint||"";
+  if(h!=DUHINT){const was=DUHINT;DUHINT=h;$("duHint").innerHTML=[...h].map((ch,i)=>`<span class="${ch=="_"?"blank":""}${same&&was[i]=="_"&&ch!="_"?" pop":""}">${ch=="_"?"":esc(ch)}</span>`).join("");
+    $("duHint").setAttribute("aria-label","Code: "+[...h].map(ch=>ch=="_"?"blank":ch).join(" "));if(same&&was&&on&&was!=h)snd("minute")}
+}
 const duMine=g=>g.ok?`<span class="gc">${esc(g.code)}</span> <span class="duOk">✓</span>`:guessHTML(`${g.code} ${g.heat}↑${g.deg} ${g.mi} mi`),
-  duTheirs=g=>g.ok?`<span class="gc">${esc(g.code)}</span> <span class="duOk">✓</span>`:`<span class="gc">${esc(g.code)}</span> <span class="gh ${g.heat=="hot"?"hot":"cold"}">${g.heat=="hot"?"hot":"cold"}</span>`;
-function duShow(d){const prev=DUD;DUD=d;DUEND=performance.now()+(d.left||0);const r=d.round,me=d.me,op=d.opp,same=!!r&&DUSEEN.n==d.n;
-  const side=(el,p,list,fmt,fresh)=>{el.className="duSide pc"+(p?p.c:9)+(p&&p.online===false?" off":"");
-    el.querySelector(".duIcon").textContent=p?initial(p):"?";el.querySelector(".duName").textContent=p?p.name:"Waiting…";
-    el.querySelector(".duPips").innerHTML=Array.from({length:d.to},(_,i)=>`<i class="${p&&i<p.score?"on":""}"></i>`).join("");el.querySelector(".duPips").setAttribute("aria-label",(p?p.score:0)+" of "+d.to+" points");
-    el.querySelector(".duGs").innerHTML=(list||[]).map((g,i)=>`<li class="${g.ok?"ok":""}${fresh&&i==list.length-1?" new":""}">${fmt(g)}</li>`).reverse().join("")}; // newest on top
-  const mine=r?r.mine:[],theirs=r?r.theirs:[];
-  side($("duMe"),me,mine,duMine,same&&mine.length>DUSEEN.mine);side($("duOpp"),op,theirs,duTheirs,same&&theirs.length>DUSEEN.theirs);
-  if(same&&theirs.length>DUSEEN.theirs&&!theirs[theirs.length-1].ok){SND&&SND.lobby("opp");const ic=$("duOpp").querySelector(".duIcon");ic.classList.remove("ping");void ic.offsetWidth;ic.classList.add("ping")} // they guessed: a sound, and their icon pulses
-  if(same&&((r.state&&!DUSEEN.state)||(r.name&&!DUSEEN.name)))snd("minute"); // a ding when the state, then the name, is revealed
-  $("duRound").textContent=d.n?`Round ${d.n} · first to ${d.to}`:`First to ${d.to}`;
+  duTheirs=g=>`<span class="gc">${esc(g.code)}</span> <span class="gh ${g.heat=="hot"?"hot":"cold"}">${g.heat=="hot"?"hot":"cold"}</span>`;
+const duIcon=p=>`<div class="duIcon" aria-hidden="true">${esc(initial(p))}</div>`;
+// Reactions: a fixed set (the server only takes their number), each pops up over the sender's icon on every screen.
+const DUREACT=["👏","😂","😱","🔥","👍"];let DURX=-1;
+$("duReact").innerHTML=DUREACT.map((e,i)=>`<button type="button" data-e="${i}" aria-label="Send ${["applause","laughing","shocked","fire","thumbs up"][i]}">${e}</button>`).join("");
+$("duReact").onclick=e=>{const b=e.target.closest("button");if(!b||!DUEL)return;duPost({action:"react",e:+b.dataset.e}).then(duShow).catch(er=>{if(er&&er.view)duShow(er.view)})};
+function duPops(d){const list=d.reacts||[],top=Math.max(0,...list.map(r=>r.n));if(DURX<0){DURX=top;return} // joining (or reloading) doesn't replay old ones
+  for(const r of list.filter(r=>r.n>DURX)){const ic=r.c==d.me.c?$("duMe").querySelector(".duIcon"):$("duOpps").querySelector(`.pc${r.c} .duIcon`);if(!ic)continue;
+    const b=ic.getBoundingClientRect(),s=document.createElement("span");s.className="duPop";s.textContent=DUREACT[r.e]||"";s.style.left=(b.left+b.width/2)+"px";s.style.top=b.top+"px";document.body.append(s);setTimeout(()=>s.remove(),1700)}
+  DURX=Math.max(DURX,top)}
+// Shakes the answer box and shows how long the lock has left (a second try within 3 s of a guess).
+function duLocked(ms){COOLEND=Math.max(COOLEND,performance.now()+ms);const f=$("duF");f.classList.remove("shake");void f.offsetWidth;f.classList.add("shake");duSay(`Locked: you can guess again in ${(ms/1000).toFixed(1)}s`);snd("wrong");duPaint(DUD,performance.now())}
+function duShow(d){const prev=DUD;DUD=d;DUEND=performance.now()+(d.left||0);const r=d.round,me=d.me,meP=d.players.find(p=>p.me)||{},others=d.players.filter(p=>!p.me),same=!!r&&DUSEEN.n==d.n,live=d.phase=="round";
+  // you, on the left
+  const mel=$("duMe"),mine=meP.guesses||[];mel.className="duSide pc"+me.c;mel.querySelector(".duIcon").textContent=initial(me);mel.querySelector(".duName").textContent=me.name+(d.host?" · host":"");
+  mel.querySelector(".duPts").textContent=me.total+" pts";
+  mel.querySelector(".duGs").innerHTML=mine.map((g,i)=>`<li class="${g.ok?"ok":""}${same&&mine.length>DUSEEN.mine&&i==mine.length-1?" new":""}">${duMine(g)}</li>`).reverse().join("");
+  // everyone else, down the right: their points, whether they've got it (never what they typed for it), and their misses this round
+  const fresh={},got={};
+  $("duOpps").innerHTML=others.length?others.map(p=>{const n=(p.guesses||[]).length,isNew=same&&n>(DUSEEN.g[p.c]||0),nowGot=same&&p.solved!=null&&!DUSEEN.solved[p.c];if(isNew)fresh[p.c]=1;if(nowGot)got[p.c]=1;
+    return `<div class="duOpp pc${p.c}${p.online?"":" off"}${p.solved!=null?" solved":""}">${duIcon(p)}<div class="duOppInfo"><div class="duName">${esc(p.name)}${p.host?" <small>host</small>":""}</div><div class="duPts">${p.total} pts${p.solved!=null?` <b class="duOk">✓ +${p.solved}</b>`:p.gone?" · left":""}</div>
+      <ol class="duGs">${(p.guesses||[]).slice(-3).map((g,i,a)=>`<li class="${isNew&&i==a.length-1?"new":""}">${duTheirs(g)}</li>`).reverse().join("")}</ol></div></div>`}).join(""):`<p class="duNone">${d.phase=="wait"?"Nobody else yet":"No one else"}</p>`;
+  for(const c in fresh){SND&&SND.lobby("opp");const ic=$("duOpps").querySelector(`.pc${c} .duIcon`);ic&&ic.classList.add("ping")} // someone guessed: a sound, and their icon pulses
+  for(const c in got){SND&&SND.lobby("ready");const ic=$("duOpps").querySelector(`.pc${c} .duIcon`);ic&&ic.classList.add("ping")} // someone got it
+  if(same&&((r.state&&!DUSEEN.state)||(r.city&&!DUSEEN.city)||(r.name&&!DUSEEN.name))&&live)snd("minute"); // a ding when the state, the city, then the name is revealed
+  $("duRound").textContent=d.n&&d.phase!="wait"?`Round ${Math.min(d.n,d.rounds)} of ${d.rounds}`:`${d.players.length} of ${d.max} players`;
   duLocator(d);
-  DUSEEN={n:r?d.n:-1,mine:mine.length,theirs:theirs.length,state:!!(r&&r.state),name:!!(r&&r.name)};
-  $("duWait").hidden=d.phase!="wait";$("duCode").textContent=d.code;$("duMap").style.visibility=r?"":"hidden";
-  const live=d.phase=="round";$("duG").disabled=!live;if(!COOLING)$("duGo").disabled=!live;
-  if(live&&me.wait>0&&!COOLING){const b=$("duGo");b.disabled=true;b.style.setProperty("--cool",me.wait+"ms");b.classList.remove("cool");void b.offsetWidth;b.classList.add("cool");COOLING=setTimeout(()=>{COOLING=0;b.classList.remove("cool");b.disabled=!DUD||DUD.phase!="round"},me.wait)} // one guess every 3 seconds: the button refills
+  DUSEEN={n:r?d.n:-1,mine:mine.length,g:Object.fromEntries(others.map(p=>[p.c,(p.guesses||[]).length])),solved:Object.fromEntries(others.map(p=>[p.c,p.solved!=null])),state:!!(r&&r.state),city:!!(r&&r.city),name:!!(r&&r.name)};
+  // the waiting room: the code to share and, for the host, Start (2 or more)
+  $("duWait").hidden=d.phase!="wait";$("duCode").textContent=d.code;$("duMap").style.visibility=r&&d.phase!="wait"?"":"hidden";
+  $("duWaitTxt").textContent=d.host?(d.players.length<2?"Share the code. You need at least 2 players.":`${d.players.length} players in. Start when everyone's here.`):"Waiting for the host to start";
+  $("duStart").hidden=!d.host;$("duStart").disabled=d.players.length<2;
+  // the answer box, or "you got it" once you have
+  const done=live&&me.solved!=null;$("duF").hidden=!live||done;$("duDone").hidden=!done;$("duHint").hidden=!live||done;
+  duHelp(d,same,live&&!done);
+  if(done){const left=others.filter(p=>p.solved==null&&!p.gone).length;$("duDone").innerHTML=`<b class="duOk">✓ You got it! +${me.solved}</b><span>${left?`Waiting for ${left} other${left>1?"s":""}…`:""}</span>`}
+  $("duG").disabled=!live;
+  if(me.wait>0)COOLEND=Math.max(COOLEND,performance.now()+me.wait);duPaint(d,performance.now());
   if(d.phase!="cd")DUSEC=-1;
-  const rv=d.reveal,who=rv&&(rv.win=="me"?"You got it!":rv.win=="opp"?`${op?op.name:"They"} got it`:"Time's up");
-  if(d.phase=="pause"&&rv)$("duBanner").innerHTML=`<span class="duWho ${rv.win}">${esc(who)}</span><span class="duAns">${esc(rv.code)}</span><small>${esc(rv.city)}, ${esc(rv.st)}</small>`;
-  else if(d.phase=="over"){const s=d.res,t=s.win=="me"?(s.why=="left"?`You win. ${op?op.name:"They"} left.`:"You win!"):s.win=="opp"?(s.why=="left"?"You left, so it's theirs.":`${op?op.name:"They"} wins`):"It's a draw";
-    $("duBanner").innerHTML=`<span class="duWho ${s.win}">${esc(t)}</span><span class="duAns">${me.score} – ${op?op.score:0}</span>${rv?`<small>Last one: ${esc(rv.code)}, ${esc(rv.city)}</small>`:""}`}
+  // the banner over the map: the countdown, then the answer and who got it
+  const rv=d.reveal;
+  if(d.phase=="pause"&&rv)$("duBanner").innerHTML=`<span class="duAns">${esc(rv.code)}</span><small>${esc(rv.name)} · ${esc(rv.city)}, ${esc(rv.st)}</small><span class="duGot">${rv.got.length?rv.got.map(g=>`<span class="pc${g.c}"><i></i>${esc(g.me?"You":g.name)} +${g.pts}</span>`).join(""):"Nobody got it"}</span>`;
+  else if(d.phase=="over")$("duBanner").innerHTML=`<span class="duWho">Game over</span>`;
   else if(d.phase!="cd")$("duBanner").innerHTML="";
   $("duBanner").className=d.phase=="pause"||d.phase=="over"?"show "+d.phase:d.phase=="cd"?"show cd":"";
-  $("duF").hidden=d.phase=="over"||d.phase=="wait";$("duEnd").hidden=d.phase!="over"||!op||op.online===false;
-  if(d.phase=="over")$("duAgain").textContent=d.again.me?`Waiting for ${op?op.name:"them"}…`:d.again.opp?`${op.name} wants a rematch: Rematch`:"Rematch";$("duAgain").disabled=!!d.again.me;
-  if(prev&&prev.phase!=d.phase){ // the sounds of the match
+  // the end: a popup with the leaderboard (once per game)
+  const key=d.phase=="over"&&d.board?d.board.map(p=>p.name+p.total).join():"";
+  if(d.phase=="over"&&d.board&&key!=DUBOARD){DUBOARD=key;duShowBoard(d,prev&&prev.phase!="over")}
+  if(d.phase!="over"&&$("duBoardDlg").open){$("duBoardDlg").close();DUBOARD=""}
+  if(d.phase=="over")$("duAgain").textContent=d.host?"Play again":"Waiting for the host…",$("duAgain").disabled=!d.host;
+  if(prev&&prev.phase!=d.phase){ // the sounds of the game
     if(d.phase=="round"){snd("go");$("duG").focus({preventScroll:true})}
-    if(d.phase=="pause"&&rv)snd(rv.win=="me"?"streak1":"lost");
-    if(d.phase=="over"){const w=d.res.win;w=="me"?snd("streak5"):w=="opp"?snd("triviaLoser"):snd("endGame");if(w=="me")confetti(3,4)}
-    if(d.phase=="cd"&&prev.phase=="wait")SND&&SND.lobby("join")}
-  duMap(d)}
-$("duF").onsubmit=async e=>{e.preventDefault();if(!DUD||DUD.phase!="round"||COOLING)return;
+    if(d.phase=="pause"&&rv&&!rv.got.some(g=>g.me))snd("lost");
+    if(d.phase=="cd"&&(prev.phase=="wait"||prev.phase=="over"))SND&&SND.lobby("join")}
+  duPops(d);duMap(d)}
+function duShowBoard(d,fresh){const b=d.board,top=b[0]?b[0].total:0;
+  $("duRanks").innerHTML=b.map((p,i)=>`<li class="pc${p.c}${p.me?" me":""}${p.total==top&&top>0?" win":""}"><span class="duRank">${i+1}</span>${duIcon(p)}<span class="duRName">${esc(p.name)}${p.me?" <small>you</small>":""}${p.gone?" <small>left</small>":""}</span><span class="duRPer">${p.per.map(v=>`<i>${v}</i>`).join("")}</span><b class="duRTot">${p.total}</b></li>`).join("");
+  $("duBoardTitle").textContent=b[0]&&b[0].me&&top>0?"You win!":b[0]&&top>0?`${b[0].name} wins!`:"Final standings";
+  if(!$("duBoardDlg").open)$("duBoardDlg").showModal();
+  if(fresh){const won=b[0]&&b[0].me&&top>0;won?(snd("streak5"),confetti(3,4)):snd("triviaLoser")}}
+$("duF").onsubmit=async e=>{e.preventDefault();if(!DUD||DUD.phase!="round")return;
+  const lock=COOLEND-performance.now();if(lock>0)return duLocked(lock); // within 3 s of your last guess: show the lock instead of sending
   let g=$("duG").value.trim().toUpperCase();if(!g)return;if(g.length==3)g="K"+g;
   if(!/^K[A-Z]{3}$/.test(g))return duSay("Type an airport code, like KLAX or LAX.");
   $("duG").value="";
-  try{const d=await duPost({action:"guess",g}),last=d.round&&d.round.mine.slice(-1)[0];if(last&&last.code==g&&!last.ok)snd("wrong");duShow(d)}
-  catch(er){if(er&&er.view)duShow(er.view);if(er&&er.status==429&&!$("duG").value)$("duG").value=g;duSay((er&&er.error)||"Couldn't send that. Try again.")}
+  try{const d=await duPost({action:"guess",g}),mineNow=(d.players.find(p=>p.me)||{}).guesses||[],last=mineNow.slice(-1)[0];if(last&&last.code==g)snd(last.ok?"streak1":"wrong");if(last&&last.ok)confetti(1,2);duShow(d)}
+  catch(er){if(er&&er.view)duShow(er.view);if(er&&er.status==429){if(!$("duG").value)$("duG").value=g;return duLocked(er.wait||1000)}duSay((er&&er.error)||"Couldn't send that. Try again.")}
   $("duG").focus()};
 $("duG").oninput=()=>{const t=$("duG");t.value=t.value.replace(/[^a-z]/gi,"").toUpperCase()};
 $("duCopy").onclick=async()=>{const l=location.origin+"/?join="+DUEL.code;try{await navigator.clipboard.writeText(l);$("duCopy").textContent="Copied ✓";setTimeout(()=>$("duCopy").textContent="Copy invite link",1800)}catch{prompt("Copy this link:",l)}};
-$("duAgain").onclick=()=>duPost({action:"again"}).then(duShow).catch(()=>{});
-// Leaving mid-match gives the match to the other player, so it asks first.
-$("duBack").onclick=async()=>{if(DUD&&["cd","round","pause"].includes(DUD.phase)&&!await ask("Leaving now gives the match to your opponent.","Leave","Leave the duel?"))return;
-  const code=DUEL&&DUEL.code;DUEL=null;seatDrop();try{await fetch("/api/duel",{method:"POST",keepalive:true,body:JSON.stringify({id:vsId(),code,action:"leave"})})}catch{}location.href="/"};
+const duStart=()=>duPost({action:"start"}).then(duShow).catch(e=>{if(e&&e.view)duShow(e.view);duSay((e&&e.error)||"Couldn't start.")});
+$("duStart").onclick=duStart;$("duAgain").onclick=duStart;
+// Leaving takes you out of the game (and off its leaderboard), so mid-game it asks first.
+async function duLeave(){if(DUD&&["cd","round","pause"].includes(DUD.phase)&&!await ask("You'll drop out of this game and off its leaderboard.","Leave","Leave the duel?"))return;
+  const code=DUEL&&DUEL.code;DUEL=null;seatDrop();try{await fetch("/api/duel",{method:"POST",keepalive:true,body:JSON.stringify({id:vsId(),code,action:"leave"})})}catch{}location.href="/"}
+$("duBack").onclick=duLeave;$("duMenu").onclick=()=>{$("duBoardDlg").close();duLeave()};
+$("duBoardDlg").oncancel=e=>e.preventDefault(); // Escape doesn't hide the standings; the buttons do
 addEventListener("visibilitychange",()=>{if(!document.hidden&&DUEL)duPoll()});
 // Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
 // plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
