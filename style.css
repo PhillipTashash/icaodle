@@ -853,3 +853,27 @@ main:has(#lobby:not([hidden])){justify-content:flex-start}
 #menu #msDaily #harder::after{content:none}
 #menu #msDaily #harder:hover{background:none;color:var(--text)}
 @media (max-width:820px){#menu #msDaily #harder{width:100%}}
+/* How to play: a plain link in the middle of the footer (hidden while the footer asks how the game was; on phones it sits in the row) */
+footer #howBtn{position:absolute;left:50%;transform:translateX(-50%);min-height:0;padding:.3em .6em;border:0;background:none;box-shadow:none;color:var(--muted);font-size:.85em;font-weight:500;text-decoration:none}
+footer #howBtn:hover:not(:disabled){color:var(--text);background:none;filter:none}
+footer:has(#fbInline:not([hidden])) #howBtn{display:none}
+@media (max-width:820px){footer #howBtn{position:static;transform:none}}
+#menu #msDaily #harder[hidden]{display:none}
+/* the one-time difficulty tour: the panel slides left, the note fades in beside it */
+#opts{position:relative}
+#custom{transition:transform .55s cubic-bezier(.3,1.25,.5,1)}
+#custom.touring{transform:translateX(-8em)}
+#hardTip{position:absolute;left:calc(100% + 2.4em);width:14em;text-align:left;opacity:0;transition:opacity .45s}
+#hardTip.on{opacity:1}
+#hardTip .tiparrow{position:absolute;left:-1.9em;top:-.05em;color:var(--bad);font-size:1.5em;font-weight:700;line-height:1;animation:tipnudge 1s ease-in-out infinite}
+@keyframes tipnudge{50%{transform:translateX(-5px)}}
+#hardTip .tiptext{margin:0;min-height:2.7em;line-height:1.35;opacity:0;transition:opacity .45s}
+#hardTip .tiptext.show{opacity:1}
+#hardTip .tipok{margin-top:.6em;padding:.45em 1.2em;animation:podfade .45s}
+#custom.touring #diff{outline:2px solid var(--bad);outline-offset:2px}
+@media (max-width:900px){#custom.touring{transform:none}#hardTip{position:static;width:auto;margin-top:.9em}#hardTip .tiparrow{position:static;display:inline-block;margin-bottom:.2em;transform:rotate(90deg);animation:none}} /* no room beside it: the note goes under the options, its arrow pointing up */
+@media (prefers-reduced-motion:reduce){#custom{transition:none}#hardTip .tiparrow{animation:none}}
+#hardTip .tiparrow{left:-2.3em;top:.62em;width:1.7em;height:3px;border-radius:2px;background:var(--bad);font-size:1em} /* a drawn arrow: a line with a head on its left, pointing at Difficulty */
+#hardTip .tiparrow::before{content:"";position:absolute;left:-7px;top:50%;transform:translateY(-50%);border-style:solid;border-width:7px 10px 7px 0;border-color:transparent var(--bad) transparent transparent}
+@media (max-width:900px){#hardTip .tiparrow{width:3px;height:1.4em;margin:0 0 .5em 9px;transform:none}#hardTip .tiparrow::before{left:50%;top:-7px;transform:translateX(-50%);border-width:0 7px 10px 7px;border-color:transparent transparent var(--bad) transparent}}
+@media (max-width:900px){#hardTip .tiparrow{position:relative;left:0;top:0;display:block;margin:0 0 .6em}} /* the head is drawn relative to the arrow itself, so it can't drift off */

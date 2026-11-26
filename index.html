@@ -42,7 +42,6 @@
   <button id="nearBtn" title="Airports near where you live">Zip Code Game</button>
   </div>
   </div>
-  <button type="button" id="howBtn" class="ghost">How to play</button>
 </div>
 <dialog id="howDlg" aria-labelledby="howTitle">
   <button id="howX" class="ghost" aria-label="Close" title="Close">✕</button>
@@ -176,7 +175,7 @@
 </div>
 <details id="dev" hidden><summary>Dev</summary><button id="devOne" type="button">Dev: complete this round</button> <button id="devAll" type="button">Dev: complete all</button> <button id="devWin" type="button">Dev: pick trivia winner</button> <button id="reset">Dev: reset all stats</button><small id="devAnswers"></small></details>
 </main>
-<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button class="ghost" data-r="fun">Fun</button><button class="ghost" data-r="meh">Meh</button><button class="ghost" data-r="hard">Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
+<footer><div id="soundctl"><button id="gear" class="ghost" aria-label="Settings" aria-expanded="false" title="Settings">⚙</button><div id="settings"><button id="fx" class="ghost" title="Turn particles (confetti and the menu planes) on or off"></button><button id="mute" class="ghost" title="Turn sounds on or off"></button><input id="vol" type="range" min="0" max="1" step="0.05" value="0.2" aria-label="Volume"></div></div><span id="ver" title="Game version">v__VERSION__</span><button type="button" id="howBtn" class="ghost">How to play</button><span id="lobbyClock" hidden></span><div id="fbInline" hidden><b id="fbTitle">How was this game?</b><span id="fbRate"><button class="ghost" data-r="fun">Fun</button><button class="ghost" data-r="meh">Meh</button><button class="ghost" data-r="hard">Too hard</button></span><span id="fbWhy" hidden><span id="fbAir"></span><button id="fbSend">Send</button></span></div><div id="timer"></div></footer>
 <script>
 if(location.hostname=="localhost"){$reset=document.getElementById("reset");document.getElementById("dev").hidden=false;
   $reset.onclick=async()=>{if(!await ask("Wipe all stats and local progress?"))return;
@@ -402,10 +401,39 @@ fetch("/api/states").then(r=>r.json()).then(list=>{
       if((seat||p.get("auto"))&&$("vsName").value)vsGo({action:"join",code:getCode()}); // coming back to your seat (or auto=1, the reload that starts a rematch): straight back in
       else openAsk()})}}); // a new visitor to an invite link picks a name first
 document.querySelectorAll("#menu button[data-m]").forEach(b=>b.onclick=()=>start(b.dataset.m,"map","")); // daily: map, all states
-$("harder").onclick=()=>{$("diff").value="medium";$("customBtn").click()}; // Hard and Extra Hard used to be dailies: they're Custom Game difficulties now
+// "Want it harder?" (Hard and Extra Hard used to be dailies; they're Custom Game difficulties now) opens Custom Game on Hard. After that it's gone for good,
+// and the first time it also shows the difficulty tour (hardTip).
+const remember=k=>{try{localStorage[k]=1}catch{}},remembered=k=>{try{return !!localStorage[k]}catch{return true}};
+$("harder").hidden=remembered("icaoHarder");
+$("harder").onclick=()=>{remember("icaoHarder");$("harder").hidden=true;$("diff").value="medium";$("customBtn").click();if(!remembered("icaoHardTip"))hardTip()};
+// The difficulty tour, once: the Custom Game panel slides left, a note to its right with a red arrow at Difficulty explains each level in turn
+// (each line fades in, stays long enough to read, fades out), and the last one has a Got it button that fades the note away and slides the panel back.
+let TIPT=[];
+// Lines the tour's arrow up with the Difficulty box: beside the panel (wide screens), the arrow at the box's middle height; under the Difficulty row (narrow
+// screens), the arrow pointing up at the box's middle. Runs again when the window is resized, which can switch between the two mid-tour.
+function placeTip(){
+  const box=$("hardTip");if(!box)return;
+  const sel=$("diff"),lab=sel.closest("label"),ar=box.querySelector(".tiparrow");
+  if(matchMedia("(max-width:900px)").matches){if(box.previousElementSibling!==lab)lab.after(box);box.style.top="";ar.style.marginLeft="0";
+    const s=sel.getBoundingClientRect(),b=box.getBoundingClientRect();ar.style.marginLeft=Math.max(0,s.left+s.width/2-b.left-ar.offsetWidth/2)+"px"}
+  else{if($("opts").lastElementChild!==box)$("opts").append(box);ar.style.marginLeft="";
+    const o=$("opts").getBoundingClientRect(),s=sel.getBoundingClientRect();box.style.top=(s.top-o.top+s.height/2-(ar.offsetTop+ar.offsetHeight/2))+"px"}}
+addEventListener("resize",()=>requestAnimationFrame(placeTip));
+function endTip(){TIPT.forEach(clearTimeout);TIPT=[];const t=$("hardTip");if(!t)return;t.classList.remove("on");$("custom").classList.remove("touring");setTimeout(()=>t.remove(),500)}
+function hardTip(){
+  remember("icaoHardTip");endTip();
+  const lines=["The difficulty decides what kind of airports you'll see.","Normal: large airports, the big hubs most people fly through.","Hard: medium-sized airports, the regional airline stops.","Extra Hard: small local airports. Good luck!"];
+  const txt=mk("p",{className:"tiptext"}),ok=mk("button",{type:"button",className:"tipok",textContent:"Got it",hidden:true,onclick:endTip});
+  const box=mk("div",{id:"hardTip",role:"status","aria-live":"polite"},mk("span",{className:"tiparrow","aria-hidden":"true"}),txt,ok);
+  $("opts").append(box);placeTip();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{$("custom").classList.add("touring");box.classList.add("on")}));
+  let at=700; // after the slide
+  lines.forEach((line,i)=>{const last=i==lines.length-1,read=1400+line.split(" ").length*280; // time to read: a base plus about 0.28 s a word
+    TIPT.push(setTimeout(()=>{txt.textContent=line;txt.classList.add("show");if(last)ok.hidden=false},at));
+    if(!last){at+=read;TIPT.push(setTimeout(()=>txt.classList.remove("show"),at));at+=500}})}
 $("customBtn").onclick=()=>{snd("open");$("menu").hidden=true;$("custom").hidden=false};
-$("customBack").onclick=()=>{snd("back");$("custom").hidden=true;$("menu").hidden=false};
-$("customGo").onclick=()=>{try{localStorage.icaoOpts=JSON.stringify({fmt:$("fmt").value,st:$("st").value,diff:$("diff").value})}catch{}start($("diff").value,$("fmt").value,$("st").value||"ALL")}; // a custom game is never the daily set: no state = random airports from any state
+$("customBack").onclick=()=>{endTip();snd("back");$("custom").hidden=true;$("menu").hidden=false};
+$("customGo").onclick=()=>{endTip();try{localStorage.icaoOpts=JSON.stringify({fmt:$("fmt").value,st:$("st").value,diff:$("diff").value})}catch{}start($("diff").value,$("fmt").value,$("st").value||"ALL")}; // a custom game is never the daily set: no state = random airports from any state
 // Airports near me: a popup asks for a ZIP and a radius, the server finds the airports (up to 5) and the game starts like a practice game.
 const NEAR=$("near");
 try{const o=JSON.parse(localStorage.icaoNear);$("zip").value=o.zip||"";$("miles").value=o.miles||"50"}catch{$("miles").value="50"}
