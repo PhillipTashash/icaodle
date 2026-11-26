@@ -134,7 +134,11 @@ const DOT = { w: 240, h: 144, lon0: -125, lon1: -66.5, lat0: 24.5, lat1: 49.5 };
 DOT.d = [...new Set([...ALL.values()].filter(a => a[3] >= DOT.lat0 && a[3] <= DOT.lat1 && a[4] >= DOT.lon0 && a[4] <= DOT.lon1)
   .map(a => Math.round((a[4] - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w) + " " + Math.round((DOT.lat1 - a[3]) / (DOT.lat1 - DOT.lat0) * DOT.h)))].map(p => "M" + p + "h0").join("");
 // DOT.b: the lower-48 state borders and coastline (states.json, made by build-states.js), as one SVG path on the same grid; empty if the file is missing.
-try { DOT.b = JSON.parse(fs.readFileSync("states.json", "utf8")).map(l => "M" + l.map(([lon, lat]) => ((lon - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w).toFixed(1) + " " + ((DOT.lat1 - lat) / (DOT.lat1 - DOT.lat0) * DOT.h).toFixed(1)).join("L")).join(""); } catch { DOT.b = ""; }
+const dotProj = ([lon, lat]) => ((lon - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w).toFixed(1) + " " + ((DOT.lat1 - lat) / (DOT.lat1 - DOT.lat0) * DOT.h).toFixed(1);
+try { DOT.b = JSON.parse(fs.readFileSync("states.json", "utf8")).map(l => "M" + l.map(dotProj).join("L")).join(""); } catch { DOT.b = ""; }
+// DOT.states: each lower-48 state (plus DC) as its own closed SVG path (state-shapes.json, made by build-state-shapes.js), so the 1v1 duel's locator
+// map can fill in just the one the mystery airport is in. Unlike DOT.b (shared borders, each line kept once), these overlap at their shared edges.
+try { DOT.states = Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync("state-shapes.json", "utf8"))).map(([code, rings]) => [code, rings.map(r => "M" + r.map(dotProj).join("L") + "Z").join("")])); } catch { DOT.states = {}; }
 // The airports a custom game can pick from in a state: the chosen difficulty's own airports there, plus the next difficulty's only if there are fewer than five.
 const tiersOf = mode => mode === "all" ? [["easy", "medium", "hard"].flatMap(t => AIR[t])] : ORDER[mode].map(t => AIR[t]); // "all" (lobby custom games): every difficulty together, no preference
 const candidates = (mode, st) => { const out = []; for (const list of tiersOf(mode)) { out.push(...list.filter(a => a[2] === st)); if (out.length >= PER) break; } return out; };
@@ -181,7 +185,7 @@ function limited(req, route, max) {
   }
   return ++h.n > max;
 }
-const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c)) return c; } };
+const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c) && !duels.has(c)) return c; } }; // lobbies and duels share the code space
 // A host-typed airport list: an array of at most 100 airport codes, every one of which must be a real airport we know (anything else is dropped, never stored). Returns undefined for no list.
 const cleanList = l => { if (!Array.isArray(l)) return undefined; const out = []; for (const x of l.slice(0, 100)) { const c = typeof x === "string" ? x.trim().toUpperCase() : ""; if (/^[A-Z0-9]{3,4}$/.test(c) && ALL.has(c) && !out.includes(c)) out.push(c); } return out.length ? out : undefined; };
 const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000, HOST_QUIET_MS = 90000, MIN_ROUND_MS = 1200; // a guess can't be legitimately typed and checked faster than this
@@ -223,6 +227,58 @@ function roomTick(r) {
     if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), ...roundMap(r, ps), players: ps.map(q => ({ c: q.c ?? 0, name: q.name, total: q.total, right: q.right, streak: q.streak || 0, fin: q.fin ?? null, log: q.log || [] })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
   }
 }
+// ==== 1v1 duels: two players, one airport at a time, the first right answer takes the point, first to DUEL_WIN wins the match. ====
+// Unlike a lobby game, the server checks every guess and the answer never leaves it before the round is over, because here one player's right
+// answer costs the other the point. A round lasts DUEL_RMS, with a locator map that fills in over time: at DUEL_STATE_AT the state the airport is
+// in gets named (so the page can highlight it and start zooming its outline map toward the spot); at DUEL_NAME_AT the airport's full name is given,
+// uncensored (no blanked-out words, unlike the single-player clues) alongside the dot on the map. Nobody scores if the time runs out.
+// Both see each other's guesses (code and hot/cold; your own also get direction and distance).
+// Abuse guards: one guess per DUEL_GAP per player (no brute force, no flooding the other screen); only real airport codes are accepted or shown (so the
+// visible guesses can't be used to write messages); the map gets the airport's position nudged by a few hundred meters (an exact-coordinate lookup finds
+// nothing); a player who stops checking in for DUEL_GONE, or leaves, forfeits the match; a third person can't join; a match ends after DUEL_CAP rounds
+// even if nobody reaches DUEL_WIN (two idle players can't keep it alive forever). Duels never touch the daily scores or stats.
+// Ceiling: the satellite picture itself shows the place, so a scripted browser could still look the airport up from the map. Nothing short of not
+// showing the map stops that.
+const duels = new Map(), DUEL_WIN = 5, DUEL_CAP = 15, DUEL_RMS = 60000, DUEL_STATE_AT = 10000, DUEL_ZOOM_END = 40000, DUEL_NAME_AT = 45000, DUEL_GAP = 3000, DUEL_PAUSE = 5000, DUEL_CD = 3000, DUEL_GONE = 20000, DUEL_IDLE = 15 * 60000;
+function duelRound(d, now) {
+  let pool = AIR.easy.filter(a => !d.used.has(a[0])); if (!pool.length) { d.used.clear(); pool = AIR.easy.slice(); }
+  const a = pool[Math.floor(Math.random() * pool.length)], j = () => (Math.random() * 2 - 1) * 0.004; // about +-400 m: still well inside the map's view
+  d.used.add(a[0]); Object.assign(d, { phase: "round", t: now, n: d.n + 1, a, jit: [a[3] + j(), a[4] + j()], g: [], win: null, el: null });
+}
+const duelOther = (d, id) => d.order.find(k => k !== id);
+function duelOver(d, now, win, why) { Object.assign(d, { phase: "over", t: now, res: { win, why } }); d.again.clear(); }
+function duelTick(d) {
+  const now = Date.now(), live = ["cd", "round", "pause"].includes(d.phase);
+  for (const k of d.order.slice()) if (now - d.players[k].seen > DUEL_GONE) { // stopped checking in (closed the page, lost the connection)
+    if (live) { duelOver(d, now, duelOther(d, k) || "", "left"); d.players[k].gone = true; }
+    else if (d.phase === "wait" || d.phase === "over") { delete d.players[k]; d.order = d.order.filter(x => x !== k); }
+  }
+  if (d.phase === "cd" && now - d.t >= DUEL_CD) duelRound(d, now);
+  if (d.phase === "round" && now - d.t >= DUEL_RMS) Object.assign(d, { phase: "pause", t: now, win: "", el: DUEL_RMS }); // time's up: nobody scores
+  if (d.phase === "pause" && now - d.t >= DUEL_PAUSE) {
+    const top = Math.max(0, ...d.order.map(k => d.players[k].score)), lead = d.order.filter(k => d.players[k].score === top);
+    if (top >= DUEL_WIN) duelOver(d, now, lead[0], "score");
+    else if (d.n >= DUEL_CAP) duelOver(d, now, lead.length === 1 ? lead[0] : "", "cap"); // a tie after the last round is a draw ("")
+    else duelRound(d, now);
+  }
+}
+// What one player sees. The answer (and its true position) only once the round is over.
+function duelView(d, id) {
+  const now = Date.now(), me = d.players[id], ok = duelOther(d, id), op = ok && d.players[ok], who = k => k === id ? "me" : k === ok ? "opp" : "none";
+  const out = { duel: true, code: d.code, phase: d.phase, n: d.n, cap: DUEL_CAP, to: DUEL_WIN, rms: DUEL_RMS, stateAt: DUEL_STATE_AT, zoomEnd: DUEL_ZOOM_END, nameAt: DUEL_NAME_AT,
+    left: d.phase === "cd" ? DUEL_CD - (now - d.t) : d.phase === "round" ? DUEL_RMS - (now - d.t) : d.phase === "pause" ? DUEL_PAUSE - (now - d.t) : null,
+    me: { name: me.name, c: me.c, score: me.score, wait: Math.max(0, me.last + DUEL_GAP - now) },
+    opp: op ? { name: op.name, c: op.c, score: op.score, online: now - op.seen < 6000 && !op.gone } : null,
+    again: { me: d.again.has(id), opp: !!ok && d.again.has(ok) } };
+  if (d.a && (d.phase === "round" || d.phase === "pause" || d.phase === "over")) {
+    const el = d.phase === "round" ? now - d.t : d.el ?? DUEL_RMS, a = d.a, open = d.phase !== "round";
+    out.round = { lat: open ? a[3] : d.jit[0], lon: open ? a[4] : d.jit[1], z: a[5], el, state: el >= DUEL_STATE_AT ? a[2] : null, name: el >= DUEL_NAME_AT ? a[6] : null,
+      mine: d.g.filter(x => x.who === id).map(({ code, ok, heat, deg, mi }) => ({ code, ok, heat, deg, mi })), theirs: d.g.filter(x => x.who === ok).map(({ code, ok, heat }) => ({ code, ok, heat })) };
+    if (open) out.reveal = { code: a[0], city: a[1], st: a[2], name: a[6], win: who(d.win) };
+  }
+  if (d.phase === "over") out.res = { win: d.res.win === "" ? "draw" : who(d.res.win), why: d.res.why };
+  return out;
+}
 const zips = new Map();
 async function zipPoint(zip) {
   if (zips.has(zip)) return zips.get(zip);
@@ -248,7 +304,8 @@ const TYPES = { html: "text/html", css: "text/css", js: "text/javascript", mjs: 
 // A file that is missing on disk answers 404 instead of crashing the server.
 const serve = (res, f, cache = "no-cache") => { let body; try { body = fs.readFileSync(f); } catch { res.writeHead(404, { "content-type": "text/plain" }); return res.end("Not found"); } res.writeHead(200, { "content-type": TYPES[f.split(".").pop()] || "application/octet-stream", "cache-control": cache }); res.end(body); };
 // Every 30 seconds: let lobbies tidy themselves (players who left are dropped) and delete lobbies nobody is in.
-setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length || (r.closed && now - r.closed.at > 300000)) rooms.delete(k); } }, 30000).unref();
+setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) { roomTick(r); if (!Object.keys(r.players).length || (r.closed && now - r.closed.at > 300000)) rooms.delete(k); }
+  for (const [k, d] of duels) { duelTick(d); if (!d.order.length || now - d.act > DUEL_IDLE) duels.delete(k); } }, 30000).unref(); // duels too: empty ones, and ones nobody has done anything in for 15 minutes
 // An unexpected throw in a handler (sync, in a promise, or in a request-body callback) answers 500 instead of leaving the request hanging; it is still logged.
 const fail = (res, e) => { console.error("request failed:", e); try { if (!res.headersSent) { res.writeHead(500, { "content-type": "application/json", "cache-control": "no-store" }); res.end('{"error":"server error"}'); } else res.end(); } catch {} };
 const safe = (res, fn) => async (...a) => { try { await fn(...a); } catch (e) { fail(res, e); } };
@@ -376,9 +433,9 @@ function handle(req, res) {
         if (limited(req, "roomnew", 20)) return json({ error: "Slow down a little." }, 429); // one address can't fill all the lobby slots
         if (!name) return json({ error: "Enter your name." }, 400);
         for (const [k, v] of rooms) if (now - v.at > 864e5) rooms.delete(k);
-        if (rooms.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
+        if (rooms.size + duels.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
         code = roomCode(); rooms.set(code, r = { mode: "easy", cfg: { kind: "easy", mode: "easy", fmt: "map", st: "" }, owner: p.id, airports: randomSet("easy", "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now, trivia: newTrivia() });
-      } else if (!(r = rooms.get(code))) return json({ error: "No game with that code." }, 404);
+      } else if (!(r = rooms.get(code))) return duels.has(code) ? json({ error: "That code is a 1v1 duel.", duel: true }, 404) : json({ error: "No game with that code." }, 404);
       roomTick(r); // also notices a lobby that has timed out
       if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: r.closed.why === "host" ? "The host left." : "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
       if (p.action === "leave") { // leaving takes you off the list at once (an empty game is deleted)
@@ -448,6 +505,55 @@ function handle(req, res) {
       json({ code, day: day(), mode: r.mode, cfg: r.cfg, empty: !r.airports.length, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
         trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ c: q.c ?? 0, fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, viewing: !!q.viewing, wins: q.wins || 0, me: k === p.id })) });
+    }));
+  }
+  if (req.method === "POST" && u.pathname === "/api/duel") { // action: create {name} | join {code, name} | sync {code} | guess {code, g} | again {code} | leave {code}
+    if (limited(req, "duel", 400)) return json({ error: "Slow down a little." }, 429); // a duel page checks in about once a second
+    let b = ""; req.on("data", c => (b += c, b.length > 1e3 && req.destroy()));
+    return req.on("end", safe(res, () => {
+      let p; try { p = JSON.parse(b); } catch { return json({ error: "bad json" }, 400); }
+      if (!p || typeof p !== "object" || !validId(p.id)) return json({ error: "bad request" }, 400);
+      const now = Date.now(), name = cleanName(p.name), id = p.id; let d, code = String(p.code || "").toUpperCase().slice(0, 4);
+      if (p.action === "create") {
+        if (limited(req, "roomnew", 20)) return json({ error: "Slow down a little." }, 429); // shared with lobbies: one address can't fill the slots
+        if (!name) return json({ error: "Enter your name." }, 400);
+        if (rooms.size + duels.size >= MAX_ROOMS) return json({ error: "Too many games right now. Try again in a bit." }, 503);
+        code = roomCode(); duels.set(code, d = { code, at: now, act: now, players: Object.create(null), order: [], phase: "wait", t: now, n: 0, a: null, g: [], win: null, used: new Set(), again: new Set() });
+      } else if (!(d = duels.get(code))) return json({ error: "That duel is over." }, 404);
+      duelTick(d);
+      if (p.action === "leave") {
+        if (id in d.players) { d.act = now; if (["cd", "round", "pause"].includes(d.phase)) duelOver(d, now, duelOther(d, id) || "", "left"); delete d.players[id]; d.order = d.order.filter(k => k !== id); }
+        if (!d.order.length) duels.delete(code);
+        return json({ left: true });
+      }
+      let me = d.players[id];
+      if (!me) {
+        if (p.action !== "create" && p.action !== "join") return json({ error: "You're not in that duel." }, 410);
+        if (!name) return json({ error: "Enter your name." }, 400);
+        if (d.order.length >= 2) return json({ error: "That duel already has two players." }, 409);
+        if (d.phase !== "wait") return json({ error: "That duel already started." }, 409);
+        me = d.players[id] = { name, c: d.order.length ? (d.players[d.order[0]].c === 0 ? 1 : 0) : 0, score: 0, last: 0, seen: now }; d.order.push(id); d.act = now;
+        if (d.order.length === 2) Object.assign(d, { phase: "cd", t: now }); // the second player is in: the countdown starts
+      }
+      me.seen = now; me.gone = false;
+      if (p.action === "guess") {
+        if (d.phase !== "round") return json({ error: "Not right now.", view: duelView(d, id) }, 409);
+        let g = String(p.g || "").trim().toUpperCase().slice(0, 4); if (g.length === 3) g = "K" + g;
+        if (!/^K[A-Z]{3}$/.test(g)) return json({ error: "Type an airport code, like KLAX or LAX." }, 400);
+        if (!ALL.has(g)) return json({ error: g + " isn't an airport we know." }, 400); // not counted, not shown, no wait
+        if (now - me.last < DUEL_GAP) return json({ error: "Wait a moment.", wait: me.last + DUEL_GAP - now }, 429);
+        if (d.g.some(x => x.who === id && x.code === g)) return json({ error: "You already tried " + g + "." }, 400);
+        me.last = now; d.act = now;
+        const a = d.a, b2 = ALL.get(g);
+        if (g === a[0]) { const el = now - d.t; me.score++; d.g.push({ who: id, code: g, ok: true }); Object.assign(d, { phase: "pause", t: now, win: id, el }); } // el: how far the round got (the clues stay as they were)
+        else { const mi = dist(b2[3], b2[4], a[3], a[4]); d.g.push({ who: id, code: g, ok: false, heat: mi <= 500 ? "hot" : "cold", deg: Math.round(bearing(b2[3], b2[4], a[3], a[4])) % 360, mi: Math.round(mi) }); }
+      }
+      if (p.action === "again" && d.phase === "over" && d.order.length === 2) { // rematch: both press it
+        d.again.add(id); d.act = now;
+        if (d.order.every(k => d.again.has(k))) { for (const k of d.order) Object.assign(d.players[k], { score: 0, last: 0 }); Object.assign(d, { phase: "cd", t: now, n: 0, a: null, g: [], win: null, res: null }); d.again.clear(); }
+      }
+      duelTick(d);
+      json(duelView(d, id));
     }));
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.

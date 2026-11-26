@@ -112,6 +112,7 @@ export function createSound({ createUISFX, storage = null, AudioContextCtor = nu
     // the lobby: someone joins (two notes up), leaves (two notes down), readies up (a high tick) or stops being ready (a lower one)
     lobby(kind) { if (!ok()) return; const t = ctx.currentTime; try {
       if (kind === "join") { tone(660, t, 0.16, 0.005, 0.18, "triangle"); tone(990, t + 0.09, 0.14, 0.005, 0.22, "triangle"); }
+      else if (kind === "opp") { tone(520, t, 0.13, 0.004, 0.09, "square"); tone(390, t + 0.07, 0.11, 0.004, 0.12, "square"); } // the duel opponent submitted a guess
       else if (kind === "leave") { tone(880, t, 0.13, 0.005, 0.16, "triangle"); tone(590, t + 0.09, 0.12, 0.005, 0.2, "triangle"); }
       else tone(kind === "ready" ? 1320 : 700, t, 0.14, 0.003, 0.08); } catch {} },
   };

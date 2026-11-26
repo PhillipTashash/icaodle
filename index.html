@@ -34,6 +34,7 @@
   <div id="joinrow"><input id="vsCode" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Lobby code" aria-label="Lobby code"><button id="vsJoin">Join</button></div>
   <div id="joinErr" role="alert"></div>
   <button id="vsBtn" title="Same five airports as a friend, with a 4-letter join code">Start Lobby</button>
+  <button id="duelBtn" title="Head to head with one friend: the first right answer takes the point, first to 5 wins">1v1 Duel</button>
   </div>
   <div class="msec">
   <div class="lbl">Practice</div>
@@ -178,6 +179,24 @@
     <small class="note">Custom games are practice: 5 random airports, <b>not</b> part of the daily set or the global scores.</small>
   </div>
   <div><button id="customGo">Start</button> <button id="customBack" class="ghost">Back</button></div>
+</div>
+<!-- 1v1 duel: you on the left, the airport in the middle, your opponent on the right; each side lists that player's guesses -->
+<div id="duel" hidden>
+  <div id="duTop"><button id="duBack" type="button">Main Menu</button><span id="duRound"></span><span id="duTime"></span></div>
+  <div id="duClock" aria-hidden="true"><i></i></div>
+  <div id="duBoard">
+    <div class="duSide" id="duMe"><div class="duIcon" aria-hidden="true"></div><div class="duName"></div><div class="duPips"></div><ol class="duGs" aria-label="Your guesses"></ol></div>
+    <div id="duMid">
+      <div id="duStage"><div id="duMap" role="region" aria-label="Satellite map of the mystery airport"></div>
+        <div id="duWait" hidden><p>Waiting for your opponent</p><div id="duCode"></div><button id="duCopy" type="button">Copy invite link</button></div>
+        <div id="duBanner" role="status" aria-live="polite"></div></div>
+      <form id="duF"><input id="duG" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ICAO" aria-label="Airport code, with or without the K, for example KLAX or LAX"><button id="duGo">Submit</button></form>
+      <div id="duMsg" role="alert"></div>
+      <div id="duClues"><svg id="duLoc" viewBox="0 0 240 144" aria-hidden="true"><path class="duLocAll"/><path class="duLocBase"/><path class="duLocState"/><circle class="duLocDot" r="2.2"/></svg><div class="duLocName"></div></div>
+      <div id="duEnd" hidden><button id="duAgain" type="button">Rematch</button></div>
+    </div>
+    <div class="duSide" id="duOpp"><div class="duIcon" aria-hidden="true"></div><div class="duName"></div><div class="duPips"></div><ol class="duGs" aria-label="Your opponent's guesses"></ol></div>
+  </div>
 </div>
 <div id="game" hidden>
   <div id="vsTimer" hidden></div>
@@ -489,13 +508,14 @@ const vsPost=o=>fetch("/api/room",{method:"POST",body:JSON.stringify({id:vsId(),
 let GA,FINAL=false,PREVN=null,PREVC="",noteT=0,HIST=[],HN=-1,HISTKEY="",CLOSEEND=0,TV=null,TVD=null,tvIdx=0,tvId="",tvSig="",LATEEND=0,lastSec=Infinity,lastTick=-1,INGAME=false,PLAYED=false,VSD=null,ENDS=0,CDEND=0;
 const FAKE=["Maverick","Goose","Iceman","Viper","Jester","Sully","Amelia","Orville","Wilbur","Pilot Pete","Captain Sky","Cloud Nine","Tailwind","Cessna Sue","Mile High Mo","Runway Ray"]; // a starting name so nobody has to type one
 const fakeName=()=>FAKE[Math.floor(Math.random()*FAKE.length)];
-$("vsBtn").onclick=()=>{let n;do n=fakeName();while(n==$("vsName").value);$("vsName").value=n; /* a new random name each time (never the one just shown); type over it to use your own */ snd("open");vsErr("");VS.showModal();$("vsName").select()};
+$("vsBtn").onclick=()=>{DUNEW=false;$("vsTitle").textContent="Start a lobby";let n;do n=fakeName();while(n==$("vsName").value);$("vsName").value=n; /* a new random name each time (never the one just shown); type over it to use your own */ snd("open");vsErr("");VS.showModal();$("vsName").select()};
 $("vsCancel").onclick=()=>{snd("back");VS.close()};
 let VSBUSY=false; // a double click must not create two lobbies (or start two poll loops)
 async function vsGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");if(VSBUSY)return;
   try{localStorage.vsName=name}catch{}
-  vsErr("Working…");VSBUSY=true;try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){if(e&&e.status==404&&o.action=="join")history.replaceState(null,"","/"); /* that lobby is gone: don't leave its link in the address bar */ const m=(e&&e.error)||"Couldn't reach the server. Try again.";vsErr(m);if(!VS.open&&!$("ask").open)ask(m,"Okay","Couldn't join",true)}VSBUSY=false} // a rematch rejoin (auto=1) has no popup open: say why it failed instead of sitting silently on the menu
-$("vsCreate").onclick=()=>vsGo({action:"create",code:null});
+  vsErr("Working…");VSBUSY=true;try{const d=await vsPost({...o,name});VS.close();$("ask").close();ROOM={code:d.code};enterLobby(d)}catch(e){if(e&&e.duel){VSBUSY=false;return duelGo({action:"join",code:o.code})}if(e&&e.status==404&&o.action=="join")history.replaceState(null,"","/"); /* that lobby is gone: don't leave its link in the address bar */ const m=(e&&e.error)||"Couldn't reach the server. Try again.";vsErr(m);if(!VS.open&&!$("ask").open)ask(m,"Okay","Couldn't join",true)}VSBUSY=false} // a rematch rejoin (auto=1) has no popup open: say why it failed instead of sitting silently on the menu
+$("vsCreate").onclick=()=>DUNEW?duelGo({action:"create"}):vsGo({action:"create",code:null});
+$("duelBtn").onclick=()=>{$("vsBtn").onclick();DUNEW=true;$("vsTitle").textContent="Start a 1v1 duel"};
 $("vsJoin").onclick=()=>{if(getCode().length!=4)return $("joinErr").textContent="Enter the 4-letter code.";openAsk()};
 function openAsk(){let n="";try{n=localStorage.vsName||""}catch{}$("askName").value=n||fakeName();$("askCode").textContent=getCode();vsErr("");$("ask").showModal();$("askName").select()}
 // The lobby code field on the menu: letters only, uppercase. Join asks for a name in the small popup, then joins.
@@ -543,6 +563,101 @@ $("lbLeave").onclick=async()=>{await vsLeave();location.href="/"};
 addEventListener("pagehide",()=>{if(ROOM&&(!INGAME||FINAL)&&VSD&&VSD.phase!="playing")navigator.sendBeacon("/api/room",JSON.stringify({id:vsId(),code:ROOM.code,action:"away"}))}); // "away", not "leave": a reload is back before the seat goes
 function enterLobby(d){holdSeat(vsId());history.replaceState(null,"","/?join="+encodeURIComponent(d.code)); // the address bar is the invite link, and reloading it brings you back
   $("menu").hidden=$("custom").hidden=true;$("lobby").hidden=false;sky.stop();snd("open");vsHandle(d);pollLoop()}
+// ==== 1v1 duel (the rules and abuse guards are described in server.js). The server checks every guess; this page shows what it says. ====
+let DUNEW=false,DUEL=null,DUD=null,DMAP=null,DUT=0,DUEND=0,DUC="",DUK="",DUSEEN={n:-1,mine:0,theirs:0,state:false,name:false},DUSAYT=0,COOLING=0,DURAF=0,DUSEC=-1,DULN=-1,DULV=null;
+const duPost=o=>fetch("/api/duel",{method:"POST",body:JSON.stringify({id:vsId(),code:DUEL&&DUEL.code,...o})}).then(async r=>{const d=await r.json();if(!r.ok){d.status=r.status;throw d}return d});
+async function duelGo(o){const name=$("vsName").value.trim();if(!name)return vsErr("Enter your name.");if(VSBUSY)return;
+  try{localStorage.vsName=name}catch{}
+  vsErr("Working…");VSBUSY=true;
+  try{const d=await duPost({...o,name,code:o.code||null});VS.close();$("ask").close();enterDuel(d)}
+  catch(e){if(e&&e.status==404)history.replaceState(null,"","/");const m=(e&&e.error)||"Couldn't reach the server. Try again.";vsErr(m);if(!VS.open&&!$("ask").open)ask(m,"Okay","Couldn't join",true)}
+  VSBUSY=false}
+function enterDuel(d){DUEL={code:d.code};holdSeat(vsId()); // the seat lets a reload come straight back in (the address is the invite link)
+  try{const all=seats();all[vsId()]={code:d.code,name:d.me.name,at:Date.now()};localStorage.icaoSeats=JSON.stringify(all)}catch{}
+  history.replaceState(null,"","/?join="+encodeURIComponent(d.code));
+  $("menu").hidden=$("custom").hidden=true;$("duel").hidden=false;sky.stop();snd("open");
+  if(!DOTS)fetch("/api/dots?v=3").then(r=>r.json()).then(d=>DOTS=d).catch(()=>{}); // the locator map's borders and per-state shapes
+  duShow(d);duLoop();duTick()}
+// Checks in about once a second during a round (so the other player's guesses show up quickly), a little slower otherwise.
+function duLoop(){clearTimeout(DUT);if(!DUEL)return;DUT=setTimeout(async()=>{await duPoll();duLoop()},DUD&&DUD.phase=="round"?700:1200)}
+async function duPoll(){if(!DUEL)return;try{duShow(await duPost({action:"sync"}))}catch(e){if(e&&(e.status==404||e.status==410))duGone(e.error)}}
+function duGone(m){DUEL=null;seatDrop();history.replaceState(null,"","/");$("tmoTitle").textContent="Duel over";$("tmoText").textContent=m||"That duel is over.";$("tmo").showModal()}
+const duSay=m=>{$("duMsg").textContent=m;clearTimeout(DUSAYT);DUSAYT=setTimeout(()=>$("duMsg").textContent="",2600)};
+// The clock bar and the countdown run from the time the server gave, between check-ins.
+function duTick(){cancelAnimationFrame(DURAF);if(!DUEL)return;const d=DUD,left=Math.max(0,DUEND-performance.now());
+  if(d&&d.phase=="round"){$("duClock").firstChild.style.width=(left/d.rms*100)+"%";const s=Math.ceil(left/1000);$("duTime").textContent="0:"+String(s).padStart(2,"0");$("duTime").classList.toggle("low",s<=10)}
+  else{$("duTime").textContent="";if(d&&d.phase!="pause")$("duClock").firstChild.style.width="0"}
+  if(d&&d.phase=="cd"){const s=Math.max(1,Math.ceil(left/1000));if(s!=DUSEC){DUSEC=s;$("duBanner").innerHTML=`<span class="duBig">${s}</span>`;snd("tick")}}
+  if(d&&d.round&&DULV)duZoom(d,left);
+  DURAF=requestAnimationFrame(duTick)}
+// One frame of the locator zoom: how far the round is between stateAt and zoomEnd picks the viewBox. The airport dots and the answer dot are resized
+// with it, so they stay the same size on screen while the map zooms.
+function duZoom(d,left){const el=d.phase=="round"?d.rms-left:d.round.el,t=Math.min(1,Math.max(0,(el-d.stateAt)/(d.zoomEnd-d.stateAt))),e=t<.5?2*t*t:1-(-2*t+2)**2/2;
+  const [a,b]=DULV,v=a.map((x,i)=>x+(b[i]-x)*(matchMedia("(prefers-reduced-motion: reduce)").matches?1:e)),k=v[2]/240,box=$("duClues");
+  box.querySelector("#duLoc").setAttribute("viewBox",v.map(n=>n.toFixed(2)).join(" "));box.querySelector(".duLocAll").style.strokeWidth=(1.5*k).toFixed(3);box.querySelector(".duLocDot").setAttribute("r",(2.4*k).toFixed(3))}
+async function duMap(d){const r=d.round;if(!r)return;
+  if(!DMAP){try{await loadMaps()}catch{$("duMap").textContent="The map couldn't load.";return}
+    DMAP||=new google.maps.Map($("duMap"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:r.lat,lng:r.lon},zoom:r.z});DUC=DUK=""}
+  const B=.03,clue=r.state!=null,ck=d.n+d.phase,kk=d.n+":"+clue; // like the normal game: once the state is known you may zoom out and the map gains road names
+  if(kk!=DUK){DUK=kk;DMAP.setOptions({minZoom:clue?10:r.z-1,maxZoom:Math.min(20,r.z+3),restriction:{latLngBounds:{north:r.lat+B,south:r.lat-B,east:r.lon+B,west:r.lon-B}}});DMAP.setMapTypeId(clue?"hybrid":"satellite")}
+  if(ck!=DUC){DUC=ck;DMAP.setCenter({lat:r.lat,lng:r.lon});if(d.phase=="round")DMAP.setZoom(r.z)}} // a new round, and the reveal (the true spot)
+// The locator map under the answer box: the USA with its state borders and every airport as a small dot; once the state is named it fills in and the
+// map zooms until zoomEnd to fit that whole state; at nameAt the airport's full name fades in with a dot on it. Built once per round.
+function duLocator(d){const r=d.round,box=$("duClues"),svg=$("duLoc"),st=box.querySelector(".duLocState"),dot=box.querySelector(".duLocDot"),nm=box.querySelector(".duLocName");
+  box.hidden=!r;if(!r||!DOTS)return;const D=DOTS;
+  if(DULN!=d.n){DULN=d.n;DULV=null;box.querySelector(".duLocAll").setAttribute("d",D.d||"");box.querySelector(".duLocAll").style.strokeWidth="";box.querySelector(".duLocBase").setAttribute("d",D.b||"");
+    svg.setAttribute("viewBox",`0 0 ${D.w} ${D.h}`);st.setAttribute("d","");st.classList.remove("on");dot.classList.remove("on");dot.setAttribute("r","2.4");nm.classList.remove("on");nm.textContent=""}
+  if(r.state&&!st.classList.contains("on")){st.setAttribute("d",(D.states||{})[r.state]||"");st.classList.add("on");
+    const bb=st.getBBox(),pad=Math.max(bb.width,bb.height)*.12+2,A=D.w/D.h;let w=bb.width+2*pad,h=bb.height+2*pad;if(w/h>A)h=w/A;else w=h*A; // the state's box, padded, at the map's shape
+    if(bb.width)DULV=[[0,0,D.w,D.h],[bb.x+bb.width/2-w/2,bb.y+bb.height/2-h/2,w,h]]}
+  if(r.name&&!nm.classList.contains("on")){dot.setAttribute("cx",((r.lon-D.lon0)/(D.lon1-D.lon0)*D.w).toFixed(2));dot.setAttribute("cy",((D.lat1-r.lat)/(D.lat1-D.lat0)*D.h).toFixed(2));dot.classList.add("on");nm.textContent=r.name;nm.classList.add("on")}
+  if(DULV)duZoom(d,d.left||0)} // also on every check-in, in case animation frames are paused
+const duMine=g=>g.ok?`<span class="gc">${esc(g.code)}</span> <span class="duOk">✓</span>`:guessHTML(`${g.code} ${g.heat}↑${g.deg} ${g.mi} mi`),
+  duTheirs=g=>g.ok?`<span class="gc">${esc(g.code)}</span> <span class="duOk">✓</span>`:`<span class="gc">${esc(g.code)}</span> <span class="gh ${g.heat=="hot"?"hot":"cold"}">${g.heat=="hot"?"hot":"cold"}</span>`;
+function duShow(d){const prev=DUD;DUD=d;DUEND=performance.now()+(d.left||0);const r=d.round,me=d.me,op=d.opp,same=!!r&&DUSEEN.n==d.n;
+  const side=(el,p,list,fmt,fresh)=>{el.className="duSide pc"+(p?p.c:9)+(p&&p.online===false?" off":"");
+    el.querySelector(".duIcon").textContent=p?initial(p):"?";el.querySelector(".duName").textContent=p?p.name:"Waiting…";
+    el.querySelector(".duPips").innerHTML=Array.from({length:d.to},(_,i)=>`<i class="${p&&i<p.score?"on":""}"></i>`).join("");el.querySelector(".duPips").setAttribute("aria-label",(p?p.score:0)+" of "+d.to+" points");
+    el.querySelector(".duGs").innerHTML=(list||[]).map((g,i)=>`<li class="${g.ok?"ok":""}${fresh&&i==list.length-1?" new":""}">${fmt(g)}</li>`).reverse().join("")}; // newest on top
+  const mine=r?r.mine:[],theirs=r?r.theirs:[];
+  side($("duMe"),me,mine,duMine,same&&mine.length>DUSEEN.mine);side($("duOpp"),op,theirs,duTheirs,same&&theirs.length>DUSEEN.theirs);
+  if(same&&theirs.length>DUSEEN.theirs&&!theirs[theirs.length-1].ok){SND&&SND.lobby("opp");const ic=$("duOpp").querySelector(".duIcon");ic.classList.remove("ping");void ic.offsetWidth;ic.classList.add("ping")} // they guessed: a sound, and their icon pulses
+  if(same&&((r.state&&!DUSEEN.state)||(r.name&&!DUSEEN.name)))snd("minute"); // a ding when the state, then the name, is revealed
+  $("duRound").textContent=d.n?`Round ${d.n} · first to ${d.to}`:`First to ${d.to}`;
+  duLocator(d);
+  DUSEEN={n:r?d.n:-1,mine:mine.length,theirs:theirs.length,state:!!(r&&r.state),name:!!(r&&r.name)};
+  $("duWait").hidden=d.phase!="wait";$("duCode").textContent=d.code;$("duMap").style.visibility=r?"":"hidden";
+  const live=d.phase=="round";$("duG").disabled=!live;if(!COOLING)$("duGo").disabled=!live;
+  if(live&&me.wait>0&&!COOLING){const b=$("duGo");b.disabled=true;b.style.setProperty("--cool",me.wait+"ms");b.classList.remove("cool");void b.offsetWidth;b.classList.add("cool");COOLING=setTimeout(()=>{COOLING=0;b.classList.remove("cool");b.disabled=!DUD||DUD.phase!="round"},me.wait)} // one guess every 3 seconds: the button refills
+  if(d.phase!="cd")DUSEC=-1;
+  const rv=d.reveal,who=rv&&(rv.win=="me"?"You got it!":rv.win=="opp"?`${op?op.name:"They"} got it`:"Time's up");
+  if(d.phase=="pause"&&rv)$("duBanner").innerHTML=`<span class="duWho ${rv.win}">${esc(who)}</span><span class="duAns">${esc(rv.code)}</span><small>${esc(rv.city)}, ${esc(rv.st)}</small>`;
+  else if(d.phase=="over"){const s=d.res,t=s.win=="me"?(s.why=="left"?`You win. ${op?op.name:"They"} left.`:"You win!"):s.win=="opp"?(s.why=="left"?"You left, so it's theirs.":`${op?op.name:"They"} wins`):"It's a draw";
+    $("duBanner").innerHTML=`<span class="duWho ${s.win}">${esc(t)}</span><span class="duAns">${me.score} – ${op?op.score:0}</span>${rv?`<small>Last one: ${esc(rv.code)}, ${esc(rv.city)}</small>`:""}`}
+  else if(d.phase!="cd")$("duBanner").innerHTML="";
+  $("duBanner").className=d.phase=="pause"||d.phase=="over"?"show "+d.phase:d.phase=="cd"?"show cd":"";
+  $("duF").hidden=d.phase=="over"||d.phase=="wait";$("duEnd").hidden=d.phase!="over"||!op||op.online===false;
+  if(d.phase=="over")$("duAgain").textContent=d.again.me?`Waiting for ${op?op.name:"them"}…`:d.again.opp?`${op.name} wants a rematch: Rematch`:"Rematch";$("duAgain").disabled=!!d.again.me;
+  if(prev&&prev.phase!=d.phase){ // the sounds of the match
+    if(d.phase=="round"){snd("go");$("duG").focus({preventScroll:true})}
+    if(d.phase=="pause"&&rv)snd(rv.win=="me"?"streak1":"lost");
+    if(d.phase=="over"){const w=d.res.win;w=="me"?snd("streak5"):w=="opp"?snd("triviaLoser"):snd("endGame");if(w=="me")confetti(3,4)}
+    if(d.phase=="cd"&&prev.phase=="wait")SND&&SND.lobby("join")}
+  duMap(d)}
+$("duF").onsubmit=async e=>{e.preventDefault();if(!DUD||DUD.phase!="round"||COOLING)return;
+  let g=$("duG").value.trim().toUpperCase();if(!g)return;if(g.length==3)g="K"+g;
+  if(!/^K[A-Z]{3}$/.test(g))return duSay("Type an airport code, like KLAX or LAX.");
+  $("duG").value="";
+  try{const d=await duPost({action:"guess",g}),last=d.round&&d.round.mine.slice(-1)[0];if(last&&last.code==g&&!last.ok)snd("wrong");duShow(d)}
+  catch(er){if(er&&er.view)duShow(er.view);if(er&&er.status==429&&!$("duG").value)$("duG").value=g;duSay((er&&er.error)||"Couldn't send that. Try again.")}
+  $("duG").focus()};
+$("duG").oninput=()=>{const t=$("duG");t.value=t.value.replace(/[^a-z]/gi,"").toUpperCase()};
+$("duCopy").onclick=async()=>{const l=location.origin+"/?join="+DUEL.code;try{await navigator.clipboard.writeText(l);$("duCopy").textContent="Copied ✓";setTimeout(()=>$("duCopy").textContent="Copy invite link",1800)}catch{prompt("Copy this link:",l)}};
+$("duAgain").onclick=()=>duPost({action:"again"}).then(duShow).catch(()=>{});
+// Leaving mid-match gives the match to the other player, so it asks first.
+$("duBack").onclick=async()=>{if(DUD&&["cd","round","pause"].includes(DUD.phase)&&!await ask("Leaving now gives the match to your opponent.","Leave","Leave the duel?"))return;
+  const code=DUEL&&DUEL.code;DUEL=null;seatDrop();try{await fetch("/api/duel",{method:"POST",keepalive:true,body:JSON.stringify({id:vsId(),code,action:"leave"})})}catch{}location.href="/"};
+addEventListener("visibilitychange",()=>{if(!document.hidden&&DUEL)duPoll()});
 // Polling is deliberately gentle (hundreds of players at once should be cheap): every 2 s in the lobby, every 3 s in a game, never while the tab is hidden,
 // plus an immediate check at the moments that matter: pressing Ready, finishing, and the countdown reaching zero.
 // Gentle polling: every 2 s in the lobby, every 3 s in a game (a background tab is throttled by the browser but keeps checking, so it still gets put into the game when it starts).
@@ -829,7 +944,7 @@ function roundMaps(g,auto){
     if(focused>=0)row.children[focused].focus({preventScroll:true});
     requestAnimationFrame(()=>{const b=row.children[open];under1.hidden=!b;if(b){under1.style.width=b.offsetWidth+"px";under1.style.transform="translateX("+b.offsetLeft+"px)"}}); // the underline slides (with a snap) to the round on show
     view.hidden=open<0;if(open<0)return;
-    if(!DOTS)try{DOTS=await fetch("/api/dots?v=2").then(r=>r.json())}catch{return view.replaceChildren(mk("p",{textContent:"Couldn't load the map. Press the round again."}))}
+    if(!DOTS)try{DOTS=await fetch("/api/dots?v=3").then(r=>r.json())}catch{return view.replaceChildren(mk("p",{textContent:"Couldn't load the map. Press the round again."}))}
     if(open<0)return;
     const shown=g.players;
     const words=p=>{const r=routeInfo(g,p,open);return[...(r.log.length?r.log.flatMap((c,k)=>[...(k?[" → "]:[]),mk("span",{className:r.right.includes(c)?"ok":"",textContent:c=="skip"?"Skipped":c+(r.right.includes(c)?" ✓":"")})]):["No guesses"]),r.first?" · Solved on the first try ★":r.solved?"":" · Missed, the answer was "+r.right.join(" or ")]};
@@ -1152,7 +1267,7 @@ SAVE=PRACTICE?null:`icaodle${DAY}${MODE}${FMT=="city"?"-city":""}`; // practice 
   $("menu").hidden=$("custom").hidden=true;$("game").hidden=false;
   sky.stop(); // the menu background only runs on the menu
   today.slice(0,S.i).forEach((a,r)=>[...a[0]].forEach((ch,i)=>$("flap").children[r].children[i].textContent=ch));S.scores.forEach((_,r)=>{paint(r);nameOf(r)}); // restore finished rounds after a refresh
-  if(FMT=="city"){$("map").classList.add("txt");$("map").style.padding="";$("map").setAttribute("aria-label","City and state of the mystery airport");if(!DOTS)fetch("/api/dots?v=2").then(r=>r.json()).then(d=>{DOTS=d;if(S&&S.i<PER)side()}).catch(()=>{})} // no map in this format: the city and state are the whole prompt
+  if(FMT=="city"){$("map").classList.add("txt");$("map").style.padding="";$("map").setAttribute("aria-label","City and state of the mystery airport");if(!DOTS)fetch("/api/dots?v=3").then(r=>r.json()).then(d=>{DOTS=d;if(S&&S.i<PER)side()}).catch(()=>{})} // no map in this format: the city and state are the whole prompt
   else{try{await loadMaps()}catch{return mapFail("The map couldn't load.")} // Google Maps blocked or offline: offer the text format instead of a dead end
     map=new google.maps.Map($("map"),{mapTypeId:"satellite",disableDefaultUI:true,zoomControl:true,styles:[{elementType:"labels",stylers:[{visibility:"off"}]},{featureType:"road",elementType:"labels",stylers:[{visibility:"on"}]}],gestureHandling:matchMedia("(pointer:coarse)").matches?"cooperative":"greedy",center:{lat:39,lng:-98},zoom:4})}
   show();focusInput()}

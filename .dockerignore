@@ -9,6 +9,7 @@ shares
 test
 build-airports.js
 build-states.js
+build-state-shapes.js
 *.md
 !sounds/README.md
 Dockerfile
