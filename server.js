@@ -133,6 +133,8 @@ function nearMajor(a) {
 const DOT = { w: 240, h: 144, lon0: -125, lon1: -66.5, lat0: 24.5, lat1: 49.5 };
 DOT.d = [...new Set([...ALL.values()].filter(a => a[3] >= DOT.lat0 && a[3] <= DOT.lat1 && a[4] >= DOT.lon0 && a[4] <= DOT.lon1)
   .map(a => Math.round((a[4] - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w) + " " + Math.round((DOT.lat1 - a[3]) / (DOT.lat1 - DOT.lat0) * DOT.h)))].map(p => "M" + p + "h0").join("");
+// DOT.b: the lower-48 state borders and coastline (states.json, made by build-states.js), as one SVG path on the same grid; empty if the file is missing.
+try { DOT.b = JSON.parse(fs.readFileSync("states.json", "utf8")).map(l => "M" + l.map(([lon, lat]) => ((lon - DOT.lon0) / (DOT.lon1 - DOT.lon0) * DOT.w).toFixed(1) + " " + ((DOT.lat1 - lat) / (DOT.lat1 - DOT.lat0) * DOT.h).toFixed(1)).join("L")).join(""); } catch { DOT.b = ""; }
 // The airports a custom game can pick from in a state: the chosen difficulty's own airports there, plus the next difficulty's only if there are fewer than five.
 const tiersOf = mode => mode === "all" ? [["easy", "medium", "hard"].flatMap(t => AIR[t])] : ORDER[mode].map(t => AIR[t]); // "all" (lobby custom games): every difficulty together, no preference
 const candidates = (mode, st) => { const out = []; for (const list of tiersOf(mode)) { out.push(...list.filter(a => a[2] === st)); if (out.length >= PER) break; } return out; };

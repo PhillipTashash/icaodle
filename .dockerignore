@@ -8,6 +8,7 @@ reports.jsonl
 shares
 test
 build-airports.js
+build-states.js
 *.md
 !sounds/README.md
 Dockerfile
