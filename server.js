@@ -3,12 +3,12 @@ const http = require("http"), fs = require("fs");
 const SHARES = process.env.SHARES_DIR || "shares", REPORTS = process.env.REPORTS_FILE || "reports.jsonl", FEEDBACK = process.env.FEEDBACK_FILE || "feedback.jsonl", FILE = process.env.DATA_FILE || "data.json", MODES = ["easy", "medium", "hard"], PER = 5;
 try { for (const l of fs.readFileSync(".env", "utf8").split(/\r?\n/)) { const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/); if (m) process.env[m[1]] ??= m[2]; } } catch {}
 const AIR = JSON.parse(fs.readFileSync("airports.json"));
-// Lobby trivia: trivia.json is a list of [question, correct answer, three wrong answers, Wikipedia article about the answer]. Each lobby run gets 5 random ones,
+// Lobby trivia: trivia.json is a list of [question, correct answer, three wrong answers, Wikipedia article about the answer]. Each lobby run gets 6 random ones,
 // with the answer positions shuffled; the answer key stays on the server and is only revealed to a player question by question, as they answer.
 // Study tips: learn.json maps an airport code to a few "how to recognise it" notes (runway layout, nearby water or mountains, roads, terminal shape). Only the Normal airports have them.
 let LEARN = {}; try { LEARN = JSON.parse(fs.readFileSync("learn.json", "utf8")); } catch {}
 let TRIVIA = []; try { TRIVIA = JSON.parse(fs.readFileSync("trivia.json", "utf8")); } catch {}
-const TQ = 5;
+const TQ = 6;
 function newTrivia() {
   if (TRIVIA.length < TQ) return null;
   const pool = TRIVIA.slice(), qs = [];
@@ -17,14 +17,41 @@ function newTrivia() {
     for (let i = 3; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } // Fisher–Yates
     qs.push({ q, o, a: o.indexOf(c), w });
   }
-  return { id: Math.random().toString(36).slice(2, 8), qs, ans: Object.create(null) };
+  return { id: Math.random().toString(36).slice(2, 8), qs, ans: Object.create(null), due: 0, final: null, again: new Set() };
 }
-// What one player may see of the trivia: the questions (once), their own answers with the key for those, and everyone's right/wrong only after they have finished all five.
+// Who can play this lobby's trivia: pages that show it (not phones), plus anyone who has answered. Watchers who joined during a game don't count.
+const triviaPlayers = r => Object.entries(r.players).filter(([k, q]) => !q.late && (q.tvOk || (r.trivia.ans[k] || []).some(v => v != null)));
+const triviaDone = (t, k) => t.qs.every((_, i) => (t.ans[k] || [])[i] != null);
+// Play again is open once the winner is locked, or when there is nobody to compete with (so a lone player is never stuck).
+const voteOpen = (r, can) => !!r.trivia.final || (can.length < 2 && can.some(([k]) => triviaDone(r.trivia, k)));
+// The winner is locked when everyone who can play has finished, or TV_MS after the first one finished (with at least two able to play), whichever comes first.
+// Only those who finished by then can win, it takes two of them and at least one right answer, and it never changes afterwards.
+// Then half of the trivia players (rounded up) voting to play again deals new questions.
+const TV_MS = 60 * 1000;
+function triviaTick(r, now) {
+  const t = r.trivia; if (!t) return;
+  const can = triviaPlayers(r), fin = can.filter(([k]) => triviaDone(t, k));
+  if (!t.final) {
+    if (!t.due && can.length > 1 && fin.length) t.due = now + TV_MS;
+    if ((can.length > 1 && fin.length === can.length) || (t.due && now >= t.due)) {
+      const score = k => t.qs.filter((x, i) => t.ans[k][i] === x.a).length, top = Math.max(0, ...fin.map(([k]) => score(k)));
+      const best = fin.length > 1 && top > 0 ? fin.filter(([k]) => score(k) === top) : [];
+      t.final = { in: new Set(fin.map(([k]) => k)), win: new Set(best.map(([k]) => k)), names: best.map(([, q]) => q.name) };
+    }
+  }
+  if (voteOpen(r, can)) { const yes = can.filter(([k]) => t.again.has(k)).length; if (yes && yes >= Math.ceil(can.length / 2)) r.trivia = newTrivia(); }
+}
+// What one player may see of the trivia: the questions (once), their own answers with the key for those, and everyone's right/wrong only after they have finished all of them.
+// The locked winner's name goes to everyone, also phones and players who never answered.
 function triviaFor(r, id, tv) {
   const t = r.trivia; if (!t) return undefined;
-  const mine = t.ans[id] || [], out = { id: t.id, mine: t.qs.map((x, i) => mine[i] == null ? null : { c: mine[i], a: x.a }) };
+  const mine = t.ans[id] || [], f = t.final, mark = k => ({ in: !!f && f.in.has(k), win: !!f && f.win.has(k) });
+  const out = { id: t.id, mine: t.qs.map((x, i) => mine[i] == null ? null : { c: mine[i], a: x.a }), final: !!f, due: !f && t.due ? Math.max(0, t.due - Date.now()) : null, me: mark(id) };
   if (tv !== t.id) out.qs = t.qs.map(x => ({ q: x.q, o: x.o, w: x.w }));
-  if (t.qs.every((_, i) => mine[i] != null)) out.others = Object.entries(r.players).filter(([k, q]) => k !== id && !q.late).map(([k, q]) => ({ name: q.name, res: t.qs.map((x, i) => { const v = (t.ans[k] || [])[i]; return v == null ? null : v === x.a ? 1 : 0; }), pick: t.qs.map((x, i) => (t.ans[k] || [])[i] ?? null) })); // pick = the option each one chose
+  if (triviaDone(t, id)) out.others = Object.entries(r.players).filter(([k, q]) => k !== id && !q.late).map(([k, q]) => ({ name: q.name, ...mark(k), res: t.qs.map((x, i) => { const v = (t.ans[k] || [])[i]; return v == null ? null : v === x.a ? 1 : 0; }), pick: t.qs.map((x, i) => (t.ans[k] || [])[i] ?? null) })); // pick = the option each one chose
+  if (f && f.names.length) out.win = f.names;
+  const can = triviaPlayers(r);
+  out.again = { open: voteOpen(r, can), yes: can.filter(([k]) => t.again.has(k)).length, need: Math.max(1, Math.ceil(can.length / 2)), mine: t.again.has(id) };
   return out;
 }
 const ALL = new Map(Object.values(AIR).flat().map(a => [a[0], a]));
@@ -40,11 +67,14 @@ let db = { sets: {}, used: {}, scores: {}, right: {} }; try { db = { ...db, ...J
 // A bug or a failed disk write must never take the server down: log it and keep serving (a request that hit it just times out).
 process.on("uncaughtException", e => console.error("uncaught:", e)); process.on("unhandledRejection", e => console.error("unhandled:", e));
 const day = () => Math.floor(Date.now() / 864e5), save = () => { try { fs.writeFileSync(FILE, JSON.stringify(db)); } catch (e) { console.error("save failed:", e.message); } };
+// The tunnel always connects to this port from loopback, whatever the real visitor's address; a request that reaches this port some other way (an exposed
+// port, a misconfigured route) is not coming through the tunnel at all, loopback or not.
+const LOOPBACK = /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/;
 // Loopback only, and not through the tunnel: the tunnel connects from this machine too, but adds these headers.
 // Also refused: any proxy header, a Host that is not localhost (DNS rebinding: a hostile site pointing its own name at 127.0.0.1), and a browser request that
 // comes from another site (a hostile page POSTing to localhost, or reading the answer). Scripts like curl send no Origin and still work.
 const isLocal = req => { const h = req.headers;
-  return /^(::1|127\.0\.0\.1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress) && !h["cf-connecting-ip"] && !h["x-forwarded-for"] && !h["x-forwarded-host"] && !h["forwarded"] && !h["x-real-ip"] && !h["cf-ray"]
+  return LOOPBACK.test(req.socket.remoteAddress) && !h["cf-connecting-ip"] && !h["x-forwarded-for"] && !h["x-forwarded-host"] && !h["forwarded"] && !h["x-real-ip"] && !h["cf-ray"]
     && /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(h.host || "") && (!h.origin || h.origin.toLowerCase() === "http://" + h.host.toLowerCase()) && !/cross-site|same-site/.test(h["sec-fetch-site"] || ""); };
 
 function ensure(d) {
@@ -135,7 +165,12 @@ const cleanName = t => [...String(t ?? "").replace(NAME_BAD, "").replace(/\s+/g,
 const validId = t => typeof t === "string" && /^[\w-]{1,64}$/.test(t); // player ids are random UUIDs; "__proto__" still passes, which is safe because lobby players and trivia answers are null-prototype objects and scores are only written when the id is not already "in" the object
 // A small rate limit per client address (behind a tunnel the real address is in a header): at most N requests a minute per route.
 const hits = new Map();
-const clientIp = req => String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim().slice(0, 64); // capped: the header is client-controlled when the port is reachable directly
+// capped: used only as a rate-limit bucket key, never trusted for anything else. The proxy headers are honored only when the connection really is the
+// tunnel's own loopback hop (see LOOPBACK above) -- otherwise this port was reached some other way, and the headers are just more attacker-supplied text
+// that would let one visitor claim a fresh "address" on every request and dodge every limiter below.
+const clientIp = req => { const real = String(req.socket.remoteAddress || "");
+  if (!LOOPBACK.test(real)) return real.slice(0, 64);
+  return String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || real).split(",")[0].trim().slice(0, 64); };
 function limited(req, route, max) {
   const now = Date.now(), k = route + "|" + clientIp(req); let h = hits.get(k);
   if (!h || now - h.t > 60000) {
@@ -147,11 +182,18 @@ function limited(req, route, max) {
 const roomCode = () => { for (;;) { const c = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random() * 24 | 0]).join(""); if (!rooms.has(c)) return c; } };
 // A host-typed airport list: an array of at most 100 airport codes, every one of which must be a real airport we know (anything else is dropped, never stored). Returns undefined for no list.
 const cleanList = l => { if (!Array.isArray(l)) return undefined; const out = []; for (const x of l.slice(0, 100)) { const c = typeof x === "string" ? x.trim().toUpperCase() : ""; if (/^[A-Z0-9]{3,4}$/.test(c) && ALL.has(c) && !out.includes(c)) out.push(c); } return out.length ? out : undefined; };
-const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000;
+const MAXP = 5, CD_MS = 5000, GAME_MS = 5 * 60000, HOST_QUIET_MS = 90000, MIN_ROUND_MS = 1200; // a guess can't be legitimately typed and checked faster than this
 // Lobby time-outs (never while a game is being played): 5 minutes with nothing happening (nobody joining, leaving, renaming, pressing Ready or starting over;
 // the page checking in does not count), and 10 minutes since the lobby opened or the last game ended without a new game starting, which keeps a lobby that
 // keeps almost-starting (everyone readies, someone backs out) from lasting forever. A timed-out lobby tells its players once, then disappears.
 const IDLE_MS = +process.env.ROOM_IDLE_MS || 5 * 60000, NOSTART_MS = +process.env.ROOM_NOSTART_MS || 10 * 60000;
+// What a player guessed, round by round, for the lobby's round maps: only "skip" or a K code gets through, never more than the game has room for.
+const cleanLog = v => Array.isArray(v) ? v.slice(0, PER).map(r => Array.isArray(r) ? r.slice(0, 4).filter(g => typeof g === "string" && /^(skip|K[A-Z]{3})$/.test(g)) : []) : [];
+// Where a finished game's round maps put things: each answer, the other right answers (City and state games), and every real airport somebody guessed.
+function roundMap(r, ps) {
+  const at = {}; for (const q of ps) for (const g of (q.log || []).flat()) { const a = ALL.get(g); if (a) at[g] = [a[3], a[4]]; }
+  return { ans: r.airports.map(a => [a[3], a[4]]), alts: r.airports.map(a => r.cfg.fmt === "city" ? (a[8] || []).map(x => x[0]) : []), at };
+}
 // Lobby -> playing -> over. Everyone Ready (2 or more) starts a 5-second countdown that any un-ready cancels; then 5 minutes; over when all are done or time is up.
 function roomTick(r) {
   const now = Date.now();
@@ -161,7 +203,13 @@ function roomTick(r) {
   }
   if (r.closed) return;
   if (r.phase === "lobby") {
-    for (const [k, q] of Object.entries(r.players)) if (now - q.seen > 15000) delete r.players[k]; // players who closed the page
+    for (const [k, q] of Object.entries(r.players)) { // players who closed the page
+      // The host gets longer unless the page said it was closing: a browser can slow a hidden tab to one check-in a minute, and that mustn't close everyone's lobby.
+      if (now - q.seen <= (k === r.owner && !q.away ? HOST_QUIET_MS : 15000)) continue;
+      if (k === r.owner) { r.closed = { why: "host", at: now }; return; } // no host, no lobby
+      delete r.players[k];
+    }
+    triviaTick(r, now);
     const ps = Object.values(r.players);
     if (ps.length >= 2 && ps.every(q => q.ready)) r.cd ??= now; else r.cd = null;
     if (r.cd && now - r.cd >= CD_MS) { r.phase = "playing"; r.end = r.cd + CD_MS + GAME_MS; }
@@ -170,7 +218,7 @@ function roomTick(r) {
     r.phase = "over"; r.act = r.since = now; const all = Object.values(r.players), ps = all.filter(q => !q.late); for (const q of all) q.done = true;
     const top = Math.max(...ps.map(q => q.total)); if (ps.length > 1) for (const q of ps) if (q.total === top) q.wins = (q.wins || 0) + 1; // a win (a star) for the top score; ties share it
     // The lobby remembers its finished games (newest last, the last 15): what was played and everyone's result. Sent to a page only when it has changed.
-    if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, fin: q.fin ?? null })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
+    if (ps.length) { r.games = (r.games || 0) + 1; (r.history ||= []).push({ n: r.games, cfg: { ...r.cfg }, codes: r.airports.map(a => a[0]), ...roundMap(r, ps), players: ps.map(q => ({ name: q.name, total: q.total, right: q.right, streak: q.streak || 0, fin: q.fin ?? null, log: q.log || [] })).sort((a, b) => b.total - a.total) }); if (r.history.length > 15) r.history.shift(); } // (a game nobody finished, because everyone left, isn't recorded)
   }
 }
 const zips = new Map();
@@ -306,7 +354,7 @@ function handle(req, res) {
     if (!validDay(d)) return json({ error: "day out of range" }, 400);
     ensure(day()); return json({ day: d, airports: setFor(d, mode) });
   }
-  if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name} | config {kind, ...} (owner only) | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | reset {code}
+  if (req.method === "POST" && u.pathname === "/api/room") { // action: create {name} | config {kind, ...} (owner only) | join {code, name} | sync {code, rounds, total, right, done} | ready {code, value} | trivia {q, choice} | again {tv, value} | away {code} | reset {code} | touch {code} (owner only)
     if (limited(req, "room", 600)) return json({ error: "Slow down a little." }, 429);
     let b = ""; req.on("data", c => (b += c, b.length > 3e3 && req.destroy())); // 3 KB at most (a typed airport list is up to 100 codes)
     return req.on("end", safe(res, async () => {
@@ -330,10 +378,11 @@ function handle(req, res) {
         code = roomCode(); rooms.set(code, r = { mode: "easy", cfg: { kind: "easy", mode: "easy", fmt: "map", st: "" }, owner: p.id, airports: randomSet("easy", "ALL"), players: Object.create(null), phase: "lobby", cd: null, end: 0, at: now, act: now, since: now, trivia: newTrivia() });
       } else if (!(r = rooms.get(code))) return json({ error: "No game with that code." }, 404);
       roomTick(r); // also notices a lobby that has timed out
-      if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
+      if (r.closed) return p.action === "sync" && p.id in r.players ? json({ error: r.closed.why === "host" ? "The host left." : "The lobby timed out.", timeout: r.closed.why }, 410) : json({ error: "No game with that code." }, 404);
       if (p.action === "leave") { // leaving takes you off the list at once (an empty game is deleted)
         if (p.id in r.players) r.act = now; // only a real member's leaving counts as activity (a stranger can't keep a lobby alive)
-        delete r.players[p.id]; if (!Object.keys(r.players).length) rooms.delete(code); else { if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; roomTick(r); }
+        const host = p.id === r.owner;
+        delete r.players[p.id]; if (!Object.keys(r.players).length) rooms.delete(code); else if (host) r.closed = { why: "host", at: now }; else roomTick(r); // the host leaving closes the lobby, even mid-game
         return json({ left: true });
       }
       let me = r.players[p.id];
@@ -343,15 +392,27 @@ function handle(req, res) {
         if (Object.keys(r.players).length >= MAXP) return json({ error: "That game is full." }, 409);
         me = r.players[p.id] = { name, ready: false, rounds: 0, total: 0, right: 0, done: false, late: r.phase !== "lobby" }; // late = joined while a game is on (or just finished)
       }
+      if (typeof p.tvOk === "boolean") me.tvOk = p.tvOk; // does this player's page show the lobby trivia?
       me.seen = now; if (name) { if (name !== me.name) r.act = now; me.name = name; }
+      me.away = p.action === "away";
+      if (me.away) { me.seen = now - 10000; me.ready = false; } // the page is closing or reloading: in a lobby the seat goes 5 s from now unless they're back (a game in progress keeps it)
       if (p.action === "join" || p.action === "ready" || p.action === "reset") r.act = now; // things people do count as activity; plain check-ins do not
+      if (p.action === "touch" && r.owner === p.id && r.phase !== "playing") r.act = r.since = now; // the host pressing anything in the lobby starts both closing timers over
       const num = (v, max) => Number.isInteger(v) ? Math.min(Math.max(v, 0), max) : 0;
-      if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) Object.assign(me, { rounds: num(p.rounds, PER), total: num(p.total, 20), right: num(p.right, PER), streak: num(p.streak, PER), done: !!p.done });
+      // A player's own progress is still self-reported (there is no server-side answer check, by design -- see README), but it must at least be as slow
+      // as a human actually playing: at MIN_ROUND_MS per round, claiming more rounds than the elapsed time allows is clamped away, so a single forged
+      // "I'm already done with a perfect score" sync sent right after the round starts can claim 0 rounds, not 5.
+      if (p.action === "sync" && r.phase === "playing" && !me.late && "rounds" in p) {
+        const n = r.airports.length, maxRounds = Math.min(n, Math.max(0, Math.floor((now - (r.end - GAME_MS)) / MIN_ROUND_MS))), rounds = Math.min(num(p.rounds, n), maxRounds);
+        Object.assign(me, { rounds, total: Math.min(num(p.total, n * 4), rounds * 4), right: Math.min(num(p.right, n), rounds), streak: Math.min(num(p.streak, n), rounds), done: !!p.done && rounds >= n });
+      }
+      if (p.action === "sync" && r.phase === "playing" && !me.late && "log" in p) me.log = cleanLog(p.log); // not sent to anyone until the game is over
       if (p.action === "sync" && r.phase === "playing" && !me.late && me.done && me.fin == null) me.fin = Math.max(0, now - (r.end - GAME_MS)); // when this player finished, in ms from the start of the game (stays empty if the time ran out)
       if ((p.action === "reset" || p.action === "ready") && r.phase === "over") { // a new game starts: everyone is back in the lobby with a fresh set (Ready after a game does this too)
         r.airports = genSet(r); r.phase = "lobby"; r.cd = null; r.trivia = newTrivia(); // a new game: new questions
-        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, late: false, fin: null });
+        for (const q of Object.values(r.players)) Object.assign(q, { ready: false, rounds: 0, total: 0, right: 0, streak: 0, done: false, viewing: !q.late, late: false, fin: null, log: null }); // viewing: they played, and are still on their results
       }
+      if (p.action === "reset" || p.action === "ready") me.viewing = false; // this player is back in the lobby
       if (p.action === "config" && r.owner === p.id && r.phase !== "playing") { // the owner changes what will be played; a lobby's players are un-readied and get a fresh set
         const k = p.kind;
         if (["easy", "medium", "hard"].includes(k)) r.cfg = { kind: k, mode: k, fmt: "map", st: "" };
@@ -378,11 +439,13 @@ function handle(req, res) {
       if (p.action === "trivia" && r.phase === "lobby" && r.trivia && !me.late && Number.isInteger(p.q) && p.q >= 0 && p.q < TQ && Number.isInteger(p.choice) && p.choice >= 0 && p.choice < 4) {
         const mine = (r.trivia.ans[p.id] ||= Array(TQ).fill(null)); if (mine[p.q] == null) { mine[p.q] = p.choice; r.act = now; } // one answer per question, no changing it
       }
+      if (p.action === "again" && r.phase === "lobby" && r.trivia && !me.late && p.tv === r.trivia.id && voteOpen(r, triviaPlayers(r))) { // a vote for new trivia (for the set the page is showing, so a slow press can't count toward the next one)
+        if (p.value) r.trivia.again.add(p.id); else r.trivia.again.delete(p.id); r.act = now;
+      }
       roomTick(r);
-      if (!r.players[r.owner]) r.owner = Object.keys(r.players)[0]; // the owner left: the longest-waiting player takes over
       json({ code, day: day(), mode: r.mode, cfg: r.cfg, empty: !r.airports.length, owner: r.owner === p.id, hn: r.games || 0, history: p.hn === (r.games || 0) ? undefined : r.history || [], phase: r.phase, cd: r.cd && r.phase === "lobby" ? Math.max(0, r.cd + CD_MS - now) : null, left: r.phase === "playing" ? Math.max(0, r.end - now) : null,
         closeIn: r.phase === "playing" ? null : Math.max(0, Math.min(IDLE_MS - (now - r.act), NOSTART_MS - (now - r.since))), // ms until this lobby times out (the page shows it next to the version)
-        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, wins: q.wins || 0, me: k === p.id })) });
+        trivia: r.phase === "lobby" && !me.late ? triviaFor(r, p.id, typeof p.tv === "string" ? p.tv.slice(0, 16) : "") : undefined, airports: r.phase === "playing" && !me.late && p.ga !== (r.games || 0) ? r.airports : undefined, /* watchers never get the answers; a page that says (ga) it already has this game's airports isn't sent them again */ n: r.airports.length, players: Object.entries(r.players).map(([k, q]) => ({ fin: q.fin ?? null, name: q.name, ready: q.ready, rounds: q.rounds, total: q.total, right: q.right, streak: q.streak || 0, done: q.done, late: !!q.late, viewing: !!q.viewing, wins: q.wins || 0, me: k === p.id })) });
     }));
   }
   // Player feedback after a daily or friend game: one JSON object per line in feedback.jsonl (override the path with FEEDBACK_FILE), e.g.
@@ -434,8 +497,8 @@ function handle(req, res) {
     if (sh[2]) return serve(res, SHARES + "/" + sh[1] + ".png", "public, max-age=86400");
     let m; try { m = JSON.parse(fs.readFileSync(SHARES + "/" + sh[1] + ".json", "utf8")); } catch { res.writeHead(302, { location: "/" }); return res.end(); }
     const host = /^[\w.-]+(:\d+)?$/.test(req.headers.host || "") ? req.headers.host : "localhost", proto = req.headers["x-forwarded-proto"] === "https" || !/^(localhost|127\.)/.test(host) ? "https" : "http", base = proto + "://" + host,
-      esc = t => String(t).replace(/[&<>"]/g, c => "&#" + c.charCodeAt(0) + ";"), ttl = "ICAOdle · " + m.title, desc = "I scored a " + m.score + "/" + m.of + ". Think you can beat it? Try your attempt!";
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600" });
+      esc = t => String(t).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";"), ttl = "ICAOdle · " + m.title, desc = "I scored a " + m.score + "/" + m.of + ". Think you can beat it? Try your attempt!";
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "public, max-age=3600", "content-security-policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" });
     return res.end(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(ttl)}</title><meta http-equiv="refresh" content="0;url=/">
 <meta property="og:type" content="website"><meta property="og:site_name" content="ICAOdle"><meta property="og:title" content="${esc(ttl)}"><meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${base}/s/${sh[1]}"><meta property="og:image" content="${base}/s/${sh[1]}.png"><meta property="og:image:width" content="1080"><meta property="og:image:height" content="1080">

@@ -3,6 +3,9 @@
 .gitignore
 node_modules
 data.json
+feedback.jsonl
+reports.jsonl
+shares
 test
 build-airports.js
 *.md

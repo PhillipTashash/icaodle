@@ -35,7 +35,7 @@ input,select{font:inherit;padding:.5em .7em;color:var(--text);background:var(--b
 input{text-transform:uppercase;font-family:ui-monospace,Consolas,monospace;letter-spacing:.2em;width:7em;text-align:center}
 input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .ghost,#again{background:transparent;border:1px solid var(--muted);color:var(--text);font-weight:600}
-.ghost:hover:not(:disabled),#again:hover{background:var(--surface-2);filter:none}
+.ghost:hover:not(:disabled),#again:hover:not(:disabled){background:var(--surface-2);filter:none}
 #reset{background:transparent;border:1px dashed var(--border);color:var(--muted);font-weight:400}
 
 /* header */
@@ -332,10 +332,7 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #fbAir button.on{border-color:var(--accent);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--accent)}
 @media (max-width:820px){#fbInline{order:9;flex-basis:100%;justify-content:flex-start}}
 #bestline{font-weight:600;color:var(--orange);margin:.2em 0}
-#lbStreak{display:table;margin:.2em auto .8em;padding:.25em .9em;border:1px solid var(--orange);border-radius:99px;background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--orange);font-weight:600;font-size:.9em}
-#lbStreak[hidden]{display:none}
 /* lobby spacing: the list, the one message/callout, and the buttons are always the same distance apart (0.8em) */
-#lbStreak{margin:.8em auto}
 #lbMsg:empty{display:none}
 #lbBtns{margin-top:.8em}
 /* lobby trivia (desktop browsers only): a compact card floating midway between the Ready/Leave buttons and the bottom of the screen */
@@ -351,8 +348,6 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #trivia .tvopt.dim{opacity:.5}
 .tvbar{display:flex;justify-content:space-between;align-items:center;gap:.8em;margin-top:.5em}.tvbar button{padding:.3em 1em;min-height:0}
 .tvres{font-weight:600;font-size:.9em}.tvres.ok{color:var(--ok)}.tvres.bad{color:var(--bad)}
-.tvrow{display:flex;justify-content:space-between;align-items:center;gap:1em;padding:.3em .6em;margin:.25em 0;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}.tvrow.me{border-color:var(--accent)}
-.tvpips{display:inline-flex;gap:.3em}.tvpips i{font-style:normal;width:1.4em;text-align:center;color:var(--muted)}.tvpips i.ok{color:var(--ok)}.tvpips i.bad{color:var(--bad)}
 /* trivia: larger and easier to read */
 #trivia{width:min(36em,94vw);padding:.9em 1.1em;font-size:1.05em}
 .tvhead{font-size:.8em;margin-bottom:.5em}
@@ -361,7 +356,6 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #trivia .tvopt{padding:.65em .9em;font-size:1em;line-height:1.3}
 .tvbar{margin-top:.8em}.tvbar button{padding:.45em 1.4em}
 .tvres{font-size:1.05em}
-.tvrow{padding:.5em .8em;margin:.35em 0}.tvpips i{width:1.7em}
 .tvbar{min-height:2.6em}
 #trivia{font-size:1em;padding:.8em 1em}
 .tvq{margin:.15em 0 .6em}
@@ -376,29 +370,18 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #lobby{text-align:left}
 #lbBtns{justify-content:flex-start}
 #lbReady{min-width:16em}
-#lbStreak{margin:.8em 0}
 #lbReady{min-width:8em}
 /* lobby vertical rhythm: every block (code, message, list, callout, buttons) is a tight box and the gap between neighbours is always 0.8em */
 #lbHead{display:block;width:fit-content}
 #lobby h3{margin:0;line-height:1.25}
 #lbMsg{margin:.8em 0 0;min-height:0;line-height:1.25}
 #lbPlayers{margin-top:.8em}
-#lbStreak{display:block;width:fit-content;margin:.8em 0 0}#lbStreak[hidden]{display:none}
-#lbStreak{margin:.8rem 0 0} /* rem, because the pill uses a smaller font and em would shrink its gap */
 #ver{margin-right:.8em}
 #lobbyClock{font-size:.75em;color:var(--muted);white-space:nowrap}#lobbyClock.soon{color:var(--orange)}
 /* City and state clue: locator map made of airport dots */
 .dotmap{display:block;width:100%;height:auto;margin-top:.4em}.dotmap path{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-linecap:round}
 .dotmap .tg{fill:var(--accent)}.dotmap .ring{fill:none;stroke:var(--accent);stroke-width:1.5}
 @media (max-width:820px){#cluebox .dotmap{max-height:6em}}
-/* trivia review */
-.tvcap{font-size:.75em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:.6em 0 .3em}
-.tvwho{display:grid;grid-template-columns:1fr 1fr;gap:.35em}
-.tvwhorow{display:flex;justify-content:space-between;gap:.6em;padding:.3em .6em;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);font-size:.9em}.tvwhorow.me{border-color:var(--accent)}
-.tvwhorow .ok{color:var(--ok)}.tvwhorow .bad{color:var(--bad)}
-.tvchips{display:flex;align-items:center;gap:.4em;margin:.2em 0 .6em;flex-wrap:wrap}.tvchips .tvcap{margin:0 .4em 0 0}
-.tvchips button{padding:.3em .8em;min-height:0}.tvchips button.ok{border-color:var(--ok);color:var(--ok)}.tvchips button.bad{border-color:var(--bad);color:var(--bad)}
-.tvnav{display:flex;gap:.4em}.tvnav button{padding:.3em .9em;min-height:0}
 #lobby.hasTrivia{padding-bottom:300px}
 /* after a game: the right column shows study notes for the airport you are looking at */
 #board.over #guesses,#board.over #cluebox{display:none}
@@ -521,9 +504,6 @@ footer{flex-wrap:wrap;gap:.5em;padding-bottom:calc(.6em + env(safe-area-inset-bo
 #lbTip{display:none}
 #lbCopy{min-height:0;padding:.3em .8em;font-size:.85em}
 #lbNote{min-height:0;margin:.5em 0 0;font-size:.85em;color:var(--accent)}#lbNote:empty{display:none}
-/* after a game the results come first (on a phone the host's settings would otherwise push them far down the page) */
-#lobby.over{display:flex;flex-direction:column}#lobby.over>*{order:5}
-#lobby.over #lbHead{order:0}#lobby.over #lbMsg{order:1}#lobby.over #lbNote{order:1}#lobby.over #lbPlayers{order:2}#lobby.over #lbStreak{order:3}#lobby.over #lbBtns{order:4}
 
 /* ===== Accessibility and data presentation pass =====
    Numbers line up (tabular), codes are monospace capitals, controls are 44 px on touch, focus is always visible, and nothing relies on color alone. */
@@ -564,13 +544,6 @@ summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible{outli
 #endbtns:has(#share:not([hidden])) #replay{background:transparent;border:1px solid var(--muted);color:var(--text);font-weight:600}
 #chartbox{grid-area:chart;min-width:0}#chartbox #chart{display:block;width:100%;height:auto}
 #chartSum{margin:.4em 0 0;font-size:.85rem;color:var(--muted);text-align:center}
-/* lobby results table: Player | Points | Solved | Time with right-aligned figures */
-#lbPlayers div.tbl{display:grid;grid-template-columns:minmax(0,1fr) 3.4rem 3.1rem 2.8rem;column-gap:.3rem;align-items:center} /* rem, so the header (smaller text) lines up with the rows */
-#lbPlayers div.tbl>span:first-child{display:flex;align-items:center;gap:.3em;min-width:0}
-#lbPlayers div.tbl>span:first-child input.nm{flex:1;width:auto}
-#lbPlayers .num{text-align:right}
-#lbPlayers div.hd{border:0;background:none;margin:.8rem 0 -.2rem;padding:0 calc(.8rem + 1px);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-#lbPlayers div.hd span:nth-child(n+2){text-align:right}
 #lbPlayers .wide{margin-left:auto;text-align:right}
 #lbPlayers input.nm{width:100%;max-width:9em;min-width:0}
 #lbPlayers .star{color:var(--amber)}
@@ -618,7 +591,6 @@ summary:focus-visible,[role=button]:focus-visible,[tabindex]:focus-visible{outli
 #lbAir button.air.on b,#lbChips .chip b{color:var(--accent)}
 /* streaks are amber like the other "your score" bits; orange is kept for the grade scale so two near-identical hues never mean different things */
 #streak,#bestline{color:var(--accent)}
-#lbStreak{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 /* logo: big only on the title screens; the lobby gets the in-game size, and starts at the top so the page does not jump as panels appear */
 main:has(#lobby:not([hidden])) h1.top svg{width:190px}
 main:has(#lobby:not([hidden])){justify-content:flex-start}
@@ -645,3 +617,94 @@ main:has(#lobby:not([hidden])){justify-content:flex-start}
 /* one gap from the logo to the first panel on every screen (17 px; the lobby and the game had 28 to 40) */
 #lobby{margin-top:.3rem}
 #board{margin-top:.3rem}
+
+/* friend game results: the one button fills the height of the score panel and is amber, so it is the obvious next step (tinted while waiting, solid when it works) */
+#stats.friend #endbtns{align-self:stretch;display:flex}
+#stats.friend #again{flex:1;margin:0;min-height:3.5rem;font-size:1.2rem;font-weight:700;background:var(--accent);color:var(--on-accent);border:2px solid var(--accent)}
+#stats.friend #again:disabled{background:color-mix(in srgb,var(--accent) 16%,var(--surface-2));color:var(--text);font-size:1rem}
+#stats.friend #grade{margin:0} /* so the button starts and ends level with the score and the percentage */
+/* previous games: the winner's row is amber with a crown (the crown and its "Winner" label carry the meaning, not just the color) */
+#lbHist .hrow{padding:.2em .5em;border:1px solid transparent;border-radius:6px}
+#lbHist .hrow.win{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);font-weight:600}
+#lbHist .crown{width:1.15em;height:.9em;margin-left:.4em;fill:var(--accent);vertical-align:-.05em}
+/* previous games: round buttons and the map of one player's guesses. Red = wrong guess to the next, amber = the arrow that found it; the codes and the list under the map say it in words too */
+#lbHist .rbtns,#lbHist .rwho{display:flex;flex-wrap:wrap;gap:.35em;margin:.4em 0}
+#lbHist .rbtns button,#lbHist .rwho button{padding:.3em .7em;font-size:.85em}
+#lbHist .rbtns button.on,#lbHist .rwho button.on{background:color-mix(in srgb,var(--accent) 16%,var(--surface-2));border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+#lbHist .rview{margin:.4em 0 .6em;padding:.2em .6em .6em;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.routemap{display:block;width:100%;height:auto}
+.routemap .land{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-linecap:round;opacity:.45}
+.routemap line{stroke-width:1.3;stroke-linecap:round}.routemap line.miss{stroke:var(--bad)}.routemap line.hit{stroke:var(--accent);stroke-width:1.8}
+.routemap .head.miss{fill:var(--bad)}.routemap .head.hit{fill:var(--accent)}
+.routemap .stop{fill:var(--bad);stroke:var(--bg);stroke-width:.8}
+.routemap .t1{fill:var(--accent)}.routemap .t2{fill:var(--bg)}
+.routemap .halo{fill:none;stroke:var(--accent);stroke-width:1;stroke-dasharray:2.5 2}
+.routemap text{font:700 6.5px ui-monospace,Consolas,monospace;paint-order:stroke;stroke:var(--bg);stroke-width:2.2px;stroke-linejoin:round}
+.routemap .stoplab{fill:var(--text)}.routemap .tlab{fill:var(--accent)}
+.rpath{font-size:.85em;color:var(--muted)}.rpath span{color:var(--text);font-family:ui-monospace,Consolas,monospace}.rpath span.ok{color:var(--accent)}
+.rview .dotmap{margin:0}
+@media (max-width:820px){.routemap text{font-size:9px}#lbHist .rbtns{flex-wrap:nowrap}#lbHist .rbtns button{flex:1;padding:.3em 0;font-size:.78em}} /* phones: readable map labels, all five round buttons on one line */
+.rpath b{color:var(--text)}.rpath+.rpath{margin-top:.2em}
+/* All players on one map: a color per player (up to the 5 a lobby holds), only used to tell players apart; amber stays the right airport. The initial on each marker means color is not the only cue */
+.pc0{--pc:#58a6ff}.pc1{--pc:#56d364}.pc2{--pc:#bc8cff}.pc3{--pc:#ff7eb6}.pc4{--pc:#39d0d8}
+.routemap .pin{fill:var(--pc);stroke:var(--bg);stroke-width:1}
+.routemap text.pintext{font-size:5.2px;fill:var(--bg);stroke:none;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.routemap .route{display:none}.routemap .pl.on .route{display:inline}
+.routemap .pl .route line.miss{stroke:var(--pc)}.routemap .pl .route .head.miss{fill:var(--pc)}
+.routemap.focus .pl:not(.on){opacity:.15}
+.rhint{margin:.3em 0;font-size:.8em;color:var(--muted)}
+#lbHist .rview button.rkey{display:block;width:100%;margin:.25em 0 0;padding:.35em .5em;text-align:left;font-weight:400;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:6px}
+#lbHist .rview button.rkey:hover,#lbHist .rview button.rkey[aria-pressed=true]{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,transparent);filter:none}
+#lbHist .rview button.rkey[aria-pressed=true]{box-shadow:inset 0 0 0 1px var(--pc)}
+.rkey i{display:inline-block;width:1.5em;height:1.5em;margin-right:.5em;border-radius:50%;background:var(--pc);color:var(--bg);font-style:normal;font-weight:700;line-height:1.5em;text-align:center}
+@media (max-width:820px){.routemap text.pintext{font-size:5.6px}} /* beats the larger phone map labels: this text has to fit inside its marker */
+/* trivia stands apart from the lobby: a wide gap above it. After a quiet spell it glows (with reduced motion the pulse is off and the glow just holds) */
+#lobby #trivia{margin-top:3rem!important}
+#trivia.glow{border-color:var(--accent);box-shadow:0 0 18px 3px color-mix(in srgb,var(--accent) 55%,transparent);animation:trivia-glow 1.33s ease-in-out 3}
+@keyframes trivia-glow{0%,100%{box-shadow:0 0 4px 0 color-mix(in srgb,var(--accent) 25%,transparent)}50%{box-shadow:0 0 22px 5px color-mix(in srgb,var(--accent) 65%,transparent)}}
+/* trivia results: one container, a question at a time, with < and > inside it; the winner in a bar underneath. Green/red also carry ✓ and ✗ */
+.tvslider{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.5em;padding:.65em .5em .4em}
+.tvslider,.tvfinal{border:1px solid var(--border);border-radius:10px;background:var(--bg)}
+.tvfinal{padding:.65em .75em}
+.tvview{overflow:hidden}.tvstrip{display:flex;transition:transform .3s ease}
+.tvbox{flex:0 0 100%;min-width:0;box-sizing:border-box;padding:0 2px}
+.tvbox .tvq{margin:0 0 .5em;font-size:1em;line-height:1.3}
+#trivia .tvarrow{padding:.5em .6em;min-height:0;font:700 1.2em ui-monospace,Consolas,monospace}
+#trivia .tvarrow[aria-disabled=true]{opacity:.3;cursor:default}
+.tvcount{grid-column:1/-1;text-align:center;font-size:.8em;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.tvstrip{transition:none}}
+.tvpick{display:flex;justify-content:space-between;align-items:center;gap:.5em;min-height:2em;margin-top:.25em;padding:.15em .6em;border:1px solid var(--border);border-radius:7px;font-size:.9em;color:var(--muted)}
+.tvpick.ok,.tvpick.bad{color:var(--text)}.tvpick.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}.tvpick.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.tvnames{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.25em;max-width:65%}
+.tvnames i{max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 .55em;border:1px solid var(--border);border-radius:99px;background:var(--surface-2);color:var(--text);font-size:.85em;font-style:normal;line-height:1.6}
+.tvnames i.me{border-color:var(--accent);color:var(--accent);font-weight:700}
+.tvwait{display:block;margin-top:.4em;font-size:.8em;color:var(--muted)}
+.tvfinal{margin-top:.6em;text-align:center}.tvfinal strong{font-size:1.15em;overflow-wrap:anywhere}
+/* the winner: a crown over a big bold amber name */
+.tvwinner{display:flex;flex-direction:column;align-items:center;gap:.15em;padding:.2em 0}
+.tvwinner .crown{width:3em;height:2.25em;fill:var(--accent)}
+.tvfinal .tvwinner strong{font-size:2.4em;font-weight:900;line-height:1.15;color:var(--accent);max-width:100%;overflow-wrap:anywhere}
+.tvwinner span{font-weight:700;font-size:1.05em}
+.tvbox .tvnames{max-width:82%}
+/* trivia winner burst: the planes are drawn over everything, never in the way of a click. .flybanner names the winner for anyone who can't see the winner bar */
+.flyover{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
+.flybanner{position:fixed;top:18%;left:50%;transform:translateX(-50%);width:max-content;max-width:90vw;box-sizing:border-box;padding:.7em 1.4em;border:2px solid var(--accent);border-radius:99px;background:var(--surface);color:var(--accent);font-weight:800;text-align:center;overflow-wrap:anywhere;pointer-events:none;z-index:50}
+/* lobby player status: the right end of the row is filled green (ready), red (not ready) or yellow (still playing); the words appear to its right on hover (to its left on a phone, where there's no room) */
+#lbPlayers .dot{position:absolute;top:0;bottom:0;right:0;width:4.5em;border-radius:0 7px 7px 0}
+#lbPlayers div:has(.dot){padding-right:5.5em}
+#lbPlayers .dot.yes{background:var(--ok)}#lbPlayers .dot.no{background:var(--bad)}#lbPlayers .dot.busy{background:#ffe14d}
+#lbPlayers .dot::after{content:attr(data-tip);position:absolute;left:calc(100% + .7em);top:50%;transform:translateY(-50%);width:max-content;padding:.3em .65em;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);font-size:.8rem;line-height:1.3;opacity:0;pointer-events:none;z-index:6}
+#lbPlayers .dot:hover::after,#lbPlayers .dot:focus-visible::after{opacity:1}
+@media (max-width:820px){#lbPlayers .dot::after{left:auto;right:calc(100% + .6em)}}
+.tvfinal .tvagain{display:block;margin:.7em auto 0;padding:.5em 1.4em;min-height:0}
+.tvbar .tvwait{margin:0 0 0 auto}
+/* countdown bars (#startBar above the game choices, for the 5 seconds before a game; #tvBar above trivia). The trivia one: sits above the card (taking over the gap that separates trivia from the lobby); the amber fill drains, the time stays readable over it */
+#tvBar,#startBar{position:relative;overflow:hidden;padding:.55em .8em;border:1px solid var(--accent);border-radius:var(--radius);background:var(--surface);text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+#tvBar{margin-top:3rem}#startBar{margin-top:.8em}
+#tvBar[hidden],#startBar[hidden]{display:none}
+#tvBar i,#startBar i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--accent) 30%,transparent);transition:width .25s linear}
+#tvBar span,#startBar span{position:relative}
+#lobby #tvBar:not([hidden])+#trivia{margin-top:.5rem!important}
+@media (pointer:coarse),(max-width:820px){#tvBar{display:none}}
+#startBar i{transition:width .35s cubic-bezier(.3,1.3,.5,1)} /* one soft snap per second: quick, with a small settle */
+@media (prefers-reduced-motion:reduce){#startBar i{transition:none}}

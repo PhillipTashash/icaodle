@@ -14,7 +14,7 @@ export const EVENTS = {
   open: { cue: "open" },              // custom setup panel, results screen, review board
   back: { cue: "back" },              // custom setup -> menu, review Back, results -> menu
   forward: { cue: "forward" },        // review Next
-  correct: { file: "correct", cue: "success" },   // (not used by the game now: streak1 is the solve sound)
+  correct: { file: "correct", cue: "success" },   // a right trivia answer (a solved round uses streak1)
   streak1: { file: "streak1", cue: "success" },   // round solved, not on a streak yet
   streak2: { file: "streak2", cue: "streak" },    // 2 solved in a row
   streak3: { file: "streak3", cue: "streak" },    // 3 in a row
@@ -29,6 +29,9 @@ export const EVENTS = {
   tick: { file: "countdown", cue: "progress-step", tone: { freq: 660, dur: 0.14 } },   // lobby countdown: one beep each of the last 3 seconds
   minute: { file: "minute", cue: "notification", tone: { freq: 880, dur: 0.3 } }, // friend game: one beep as each minute of the 5 runs out
   go: { file: "go", cue: "start", tone: { freq: 1320, dur: 0.5 } },            // the lobby countdown hits zero and the friend game starts (a longer, higher beep)
+  triviaWinner: { file: "trivia_winner_announce", cue: "notification" }, // the lobby trivia winner is announced...
+  triviaLoser: { file: "trivia_loser_announce", cue: "blocked" }, // ...and what everyone else who played hears instead
+  horn1: { file: "horn1", cue: "achievement" }, horn2: { file: "horn2", cue: "achievement" }, horn3: { file: "horn3", cue: "achievement" }, horn4: { file: "horn4", cue: "achievement" }, // ...with one of these horns on top
   soundOn: { cue: "toggle-on" },                  // sound switched back on (muting is silent: mute must be immediate)
 };
 
